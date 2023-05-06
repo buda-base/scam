@@ -66,7 +66,7 @@ def touches_3_edges(sam_annotation, approx=20):
     return nb_edges > 2
 
 def test():
-    with open('sam_res.pickle', 'rb') as f:
+    with open('examples/IMG_56015_1024_sam.pickle', 'rb') as f:
         anns = pickle.load(f)
         anns_by_area = sorted(anns, key=(lambda x: x['area']), reverse=True)
         image_anns = []
