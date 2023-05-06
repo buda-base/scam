@@ -2,8 +2,12 @@ import mozjpeg_lossless_optimization
 import io
 import pickle
 from PIL import Image, ImageCms
+import cv2
+import gzip
+import numpy as np
+import math
 
-def extract_img(img_orig, sam_annotation, resize_factor, rotate=False):
+def extract_img(img_orig, sam_annotation, resize_factor, dst_fname = "", rotate=True):
     if not rotate:
         bbox = sam_annotation["bbox"]
         print(bbox)
@@ -12,6 +16,38 @@ def extract_img(img_orig, sam_annotation, resize_factor, rotate=False):
         # img crop is left, top, right, bottom
         # sam bbox is [x,y,w,h]
         return img_orig.crop((bbox_orig[0], bbox_orig[1], bbox_orig[0]+bbox_orig[2], bbox_orig[1]+bbox_orig[3]))
+    mask = sam_annotation["segmentation"]
+    mask = (255*mask.astype(np.uint8)).astype('uint8')  #convert to an unsigned byte
+    cv2.imwrite(dst_fname+"mask.jpg", mask)
+    mask = cv2.resize( mask, ( img_orig.width, img_orig.height ), interpolation = cv2.INTER_NEAREST ).astype('uint8')
+    cnts, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    rect = cv2.minAreaRect(cnts[0])
+    center, (width, height), angle = rect
+
+    box = cv2.boxPoints(rect)
+    box = np.int0(box)
+    open_cv_image = np.array(img_orig)
+
+    # for debugging
+    #print("bounding box: {}".format(box))
+    #cv2.drawContours(open_cv_image, [box], 0, (0, 0, 255), 2)
+    #cv2.imwrite(dst_fname+"drawcontours.jpg", open_cv_image)
+
+    src_pts = box.astype("float32")
+    # coordinate of the points in box points after the rectangle has been
+    # straightened
+    dst_pts = np.array([[0, int(height)-1],
+                        [0, 0],
+                        [int(width)-1, 0],
+                        [int(width)-1, int(height)-1]], dtype="float32")
+
+    # the perspective transformation matrix
+    M = cv2.getPerspectiveTransform(src_pts, dst_pts)
+
+    # directly warp the rotated rectangle to get the straightened rectangle
+    warped = cv2.warpPerspective(open_cv_image, M, (int(width), int(height)))
+    return Image.fromarray(warped)
+
 
 def encode_img(img):
     target_mode = get_best_mode(img)
@@ -45,8 +81,8 @@ def apply_icc(img):
         #print("toto")
         #print(img.info.get('icc_profile', ''))
 
-def extract_encode_img(img_orig, sam_annotation, resize_factor):
-    cropped_img = extract_img(img_orig, sam_annotation, resize_factor)
+def extract_encode_img(img_orig, sam_annotation, resize_factor, dst_fname):
+    cropped_img = extract_img(img_orig, sam_annotation, resize_factor, dst_fname)
     print(cropped_img)
     return encode_img(cropped_img)
 
@@ -66,7 +102,7 @@ def touches_3_edges(sam_annotation, approx=20):
     return nb_edges > 2
 
 def test():
-    with open('examples/IMG_56015_1024_sam.pickle', 'rb') as f:
+    with gzip.open('examples/IMG_56015_1024_sam.pickle.gz', 'rb') as f:
         anns = pickle.load(f)
         anns_by_area = sorted(anns, key=(lambda x: x['area']), reverse=True)
         image_anns = []
@@ -88,12 +124,11 @@ def test():
         apply_icc(img_orig)
         resize_factor = max(img_orig.width, img_orig.height) / 1024
         ig_img_basedir = "./"
-        ig_lname = "I0123"
+        ig_lname = "I0123R"
         for i, img_ann in enumerate(image_anns):
-            img_bytes, file_ext = extract_encode_img(img_orig, img_ann, resize_factor)
-            print(i)
-            des_fname = "%s%s%04d%s" % (ig_img_basedir, ig_lname, i+1, file_ext)
-            with open(des_fname, 'wb') as f: 
+            dst_base_fname = "%s%s%04d" % (ig_img_basedir, ig_lname, i+1)
+            img_bytes, file_ext = extract_encode_img(img_orig, img_ann, resize_factor, dst_base_fname)
+            with open(dst_base_fname+file_ext, 'wb') as f: 
                 f.write(img_bytes)
 
 test()
