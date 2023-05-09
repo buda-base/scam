@@ -4,6 +4,7 @@ from PIL import Image
 import botocore
 from pathlib import Path
 from io import StringIO
+import io
 import boto3
 import sys
 import cv2
@@ -72,7 +73,6 @@ def list_obj_keys(prefix):
             response = S3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix, ContinuationToken=continuation_token)
         else:
             response = S3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
-        print(response)
         if 'Contents' in response and response['Contents']:
             for obj in response['Contents']:
                 obj_key = obj['Key']
@@ -95,15 +95,15 @@ def calc_sam_pickles(img_s3_path):
     if s3key_exists(picke_s3_path):
         return
     print("apply SAM on %s -> %s" % (img_s3_path, picke_s3_path))
-    img = Image.open(data=gets3blob(img_s3_path))
-    ratio = max(MAX_SIZE/width, MAX_SIZE/height)
+    img = Image.open(gets3blob(img_s3_path))
+    ratio = max(MAX_SIZE/img.width, MAX_SIZE/img.height)
     new_width = int(img.width * ratio)
     new_height = int(img.height * ratio)
     img = img.resize((new_width, new_height), Image.LANCZOS)
     img = np.array(img)
     sam_results = mask_generator.generate(img)
-    out = StringIO()
-    with gzip.GzipFile(fileobj=out, mode="w") as f:
+    out = io.BytesIO()
+    with gzip.GzipFile(fileobj=out, mode="wb") as f:
         pickle.dump(sam_results, f)
     gzipped_pickled_bytes = out.getvalue()
     # gc
