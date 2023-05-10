@@ -89,7 +89,8 @@ def list_obj_keys(prefix):
     return obj_keys
 
 def list_img_keys(prefix):
-    obj_keys = list_obj_keys(prefix).sort()
+    obj_keys = list_obj_keys(prefix)
+    obj_keys.sort()
     return filter(is_img, obj_keys)
 
 MAX_SIZE = 1024
