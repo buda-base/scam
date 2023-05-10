@@ -30,7 +30,9 @@ def crop_pickled_image(img_s3_path, cropped_s3_prefix, next_idx):
     dst_base_fname = cropped_s3_prefix[cropped_s3_prefix.rfind("/")+1:]
     for i, image_ann_info in enumerate(image_ann_infos):
         img_bytes, file_ext = extract_encode_img(img_orig, image_ann_info, "%s%04d" % (dst_base_fname, next_idx+i))
-        cropped_s3_img_key = "%s%04d%s" % (cropped_s3_prefix, next_idx+i, file_ext)
+        cropped_s3_img_key_base = img_s3_path.replace("/sources/", "/images/")
+        cropped_s3_img_key = "%s_%02d%s" % (cropped_s3_img_key_base, i+1, file_ext)
+        # cropped_s3_img_key = "%s%04d%s" % (cropped_s3_prefix, next_idx+i, file_ext)
         print("-> "+cropped_s3_img_key)
         upload_to_s3(img_bytes, cropped_s3_img_key)
     return next_idx + len(image_ann_infos)
@@ -61,4 +63,7 @@ def debug_pickled(img_s3_path):
 
 if __name__ == "__main__":
     crop_pickled_prefix("ER/W1ER120/sources/W1ER120-I1ER790/")
+    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56008.JPG")
     #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56011.JPG")
+    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56012.JPG")
+    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56022.JPG")

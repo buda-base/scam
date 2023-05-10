@@ -7,7 +7,7 @@ import gzip
 import numpy as np
 import math
 
-DEBUG = True
+DEBUG = False
 
 class AnnotationInfo:
     def __init__(self, sam_annotation, original_img_width, original_img_height):
@@ -81,6 +81,9 @@ def iou(ann_info1, ann_info2):
     # ann bbox is (x,y,w,h)
     bbox1 = xywh_xy1xy2wh(ann_info1.bbox)
     bbox2 = xywh_xy1xy2wh(ann_info2.bbox)
+    return iou_bbox_xy1xy2wh(bbox1, bbox2)
+
+def iou_bbox_xy1xy2wh(bbox1, bbox2):
     # determine the (x, y)-coordinates of the intersection rectangle
     ix1 = max(bbox1[0], bbox2[0])
     iy1 = max(bbox1[1], bbox2[1])
@@ -91,12 +94,47 @@ def iou(ann_info1, ann_info2):
     uArea = bbox1[4]*bbox1[5] + bbox2[4]*bbox2[5] - iArea
     return iArea / float(uArea)
 
-def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname=""):
+def is_union(union_ann, part_anns):
+    # union of bboxes should be similar to bbox of the tested union
+    # and their intersection should be small
+    union_bbox = None
+    intersection_bbox = None
+    for ann in part_anns:
+        ann_bbox = xywh_xy1xy2wh(ann.bbox)
+        print(ann_bbox)
+        if union_bbox is None:
+            union_bbox = ann_bbox.copy()
+            intersection_bbox = ann_bbox.copy()
+        else:
+            # TODO: the union area computation is bogus...
+            # but it should do for now
+            union_bbox[0] = min(union_bbox[0], ann_bbox[0])
+            union_bbox[1] = min(union_bbox[1], ann_bbox[1])
+            union_bbox[2] = max(union_bbox[2], ann_bbox[2])
+            union_bbox[3] = max(union_bbox[3], ann_bbox[3])
+            intersection_bbox[0] = max(intersection_bbox[0], ann_bbox[0])
+            intersection_bbox[1] = max(intersection_bbox[1], ann_bbox[1])
+            intersection_bbox[2] = min(intersection_bbox[2], ann_bbox[2])
+            intersection_bbox[3] = min(intersection_bbox[3], ann_bbox[3])
+    parts_intersection_area = max(0, intersection_bbox[2] - intersection_bbox[0]) * max(0, intersection_bbox[3] - intersection_bbox[1])
+    parts_union_area = max(0, union_bbox[2] - union_bbox[0]) * max(0, union_bbox[3] - union_bbox[1])
+    # test if parts intersect
+    if parts_intersection_area / float(parts_union_area) > 0.4:
+        return False
+    # now test if union of parts and union intersect:
+    # we recompute w and h for union_bbox
+    union_bbox[4] = union_bbox[2] - union_bbox[0]
+    union_bbox[5] = union_bbox[3] - union_bbox[1]
+    union_parts_iou = iou_bbox_xy1xy2wh(xywh_xy1xy2wh(union_ann.bbox), union_bbox)
+    return union_parts_iou > 0.9
+
+def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2):
     ann_list = []
     for sam_ann in sam_ann_list:
         ann_list.append(AnnotationInfo(sam_ann, original_img_width, original_img_height))
     anns_by_area = sorted(ann_list, key=(lambda x: x.contour_area), reverse=True)
     image_anns = []
+    potential_split_anns = []
     ref_size = None
     for i, ann in enumerate(anns_by_area):
         if DEBUG:
@@ -116,9 +154,13 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             continue
         if abs(ref_size - ann.contour_area) / ann.contour_area < 0.15:
             image_anns.append(ann)
+        elif len(image_anns) < expected_nb_pages and len(potential_split_anns) < expected_nb_pages:
+            #print("add annotation %d to the potential union detection" % i)
+            potential_split_anns.append(ann)
         else:
-            #print("annotation area too small (%d / %d, %d pct), ignoring and breaking" % (ann.contour_area, ref_size, int(100*abs(ref_size - ann.contour_area) / ann.contour_area)))
             break
+    if len(potential_split_anns) and is_union(image_anns[0], potential_split_anns):
+        image_anns = potential_split_anns
     # we sort by top x coordinate descending
     image_anns = sorted(image_anns, key=(lambda x: x.bbox[1]))
     # we filter by measuring iou with previous image:
