@@ -31,21 +31,28 @@ def gets3blob(s3Key):
         else:
             raise
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+MASK_GENERATOR = None
 
-sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
-sam.to(device=device)
+def get_mask_generator():
+    global MASK_GENERATOR
+    if MASK_GENERATOR is not None:
+        return MASK_GENERATOR
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("using %s" % device)
+    sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
+    sam.to(device=device)
+    MASK_GENERATOR = SamAutomaticMaskGenerator(
+        model=sam,
+        points_per_side=8,
+        points_per_batch=128,
+    #    pred_iou_thresh=0.86,
+    #    stability_score_thresh=0.92,
+    #    crop_n_layers=1,
+    #    crop_n_points_downscale_factor=2,
+    #    min_mask_region_area=1000,  # Requires open-cv to run post-processing
+    )
+    return MASK_GENERATOR
 
-mask_generator = SamAutomaticMaskGenerator(
-    model=sam,
-    points_per_side=8,
-    points_per_batch=128,
-#    pred_iou_thresh=0.86,
-#    stability_score_thresh=0.92,
-#    crop_n_layers=1,
-#    crop_n_points_downscale_factor=2,
-#    min_mask_region_area=1000,  # Requires open-cv to run post-processing
-)
 
 def upload_to_s3(data, s3_key):
     S3.put_object(Bucket=BUCKET_NAME, Key=s3_key, Body=data)
@@ -88,9 +95,12 @@ def list_img_keys(prefix):
 MAX_SIZE = 1024
 POINTS_PER_SIDE = 8
 
-def calc_sam_pickles(img_s3_path):
+def s3_img_key_to_s3_pickle_key(img_s3_key):
     suffix = "_"+str(MAX_SIZE)+"_"+str(POINTS_PER_SIDE)+".pickle.gz"
-    picke_s3_path = img_s3_path.replace("/sources/", "/tmp-sam/") + suffix
+    return img_s3_key.replace("/sources/", "/tmp-sam/") + suffix 
+
+def calc_sam_pickles(img_s3_path):
+    picke_s3_path = s3_img_key_to_s3_pickle_key(img_s3_path)
     if s3key_exists(picke_s3_path):
         return
     print("apply SAM on %s -> %s" % (img_s3_path, picke_s3_path))
@@ -100,7 +110,7 @@ def calc_sam_pickles(img_s3_path):
     new_height = int(img.height * ratio)
     img = img.resize((new_width, new_height), Image.LANCZOS)
     img = np.array(img)
-    sam_results = mask_generator.generate(img)
+    sam_results = get_mask_generator().generate(img)
     out = io.BytesIO()
     with gzip.GzipFile(fileobj=out, mode="wb") as f:
         pickle.dump(sam_results, f)
