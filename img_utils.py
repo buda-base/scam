@@ -170,4 +170,5 @@ def test():
             with open(dst_base_fname+file_ext, 'wb') as f: 
                 f.write(img_bytes)
 
-test()
+if __name__ == "__main__":
+    test()
