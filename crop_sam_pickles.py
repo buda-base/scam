@@ -4,10 +4,11 @@ from PIL import Image
 import pickle
 import gzip
 import re
+import os
 
 DEST = "local"
 
-def crop_pickled_image(img_s3_path, cropped_s3_prefix, next_idx):
+def get_img_pickled(img_s3_path):
     img_orig = Image.open(gets3blob(img_s3_path))
     apply_icc(img_orig)
     pickle_s3_path = s3_img_key_to_s3_pickle_key(img_s3_path)
@@ -19,6 +20,10 @@ def crop_pickled_image(img_s3_path, cropped_s3_prefix, next_idx):
     pickled = gzip.decompress(blob.read())
     blob = None # gc
     anns = pickle.loads(pickled)
+    return img_orig, anns
+
+def crop_pickled_image(img_s3_path, cropped_s3_prefix, next_idx):
+    img_orig, anns = get_img_pickled(img_s3_path)
     image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height)
     if len(image_ann_infos) != 2:
         print("oops, %d image_ann_infos for %s" % (len(image_ann_infos), img_s3_path))
@@ -37,5 +42,23 @@ def crop_pickled_prefix(s3_prefix):
     for img_s3_path in list_img_keys(s3_prefix):
         next_idx = crop_pickled_image(img_s3_path, cropped_s3_prefix, next_idx)
 
+def to_local(s3_key):
+    return s3_key[s3_key.rfind("/")+1:]
+
+def debug_pickled(img_s3_path):
+    img_fname = "debug/"+to_local(img_s3_path)
+    pickle_s3_path = s3_img_key_to_s3_pickle_key(img_s3_path)
+    pickle_fname = "debug/"+to_local(pickle_s3_path)
+    if not os.path.isfile(img_fname) or not os.path.isfile(pickle_fname):
+        S3.download_file(BUCKET_NAME, img_s3_path, img_fname)
+        S3.download_file(BUCKET_NAME, pickle_s3_path, pickle_fname)
+    img_orig = Image.open(img_fname)
+    apply_icc(img_orig)
+    with gzip.open(pickle_fname, 'rb') as f:
+        anns = pickle.load(f)
+        image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height, img_fname)
+
+
 if __name__ == "__main__":
     crop_pickled_prefix("ER/W1ER120/sources/W1ER120-I1ER790/")
+    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56011.JPG")

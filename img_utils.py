@@ -7,34 +7,54 @@ import gzip
 import numpy as np
 import math
 
+DEBUG = True
 
 class AnnotationInfo:
     def __init__(self, sam_annotation, original_img_width, original_img_height):
         self.sam_annotation = sam_annotation
-        mask = sam_annotation["segmentation"]
-        mask = (255*mask.astype(np.uint8)).astype('uint8')  #convert to an unsigned byte
-        #cv2.imwrite(dst_fname+"mask.jpg", mask)
+        self.mask = sam_annotation["segmentation"]
+        self.mask = (255*self.mask.astype(np.uint8)).astype('uint8')  #convert to an unsigned byte
         # SAM masks often need some cleanup
-        cv2.erode(mask, kernel=np.ones((18, 18)), iterations=1)
+        cv2.erode(self.mask, kernel=np.ones((30, 30)), iterations=1)
         # resize the mask
-        self.mask = cv2.resize( mask, (original_img_width, original_img_height), interpolation = cv2.INTER_NEAREST ).astype('uint8')
+        self.mask = cv2.resize( self.mask, (original_img_width, original_img_height), interpolation = cv2.INTER_NEAREST ).astype('uint8')
         self.contour, self.contour_area = self.get_largest_contour()
         self.minAreaRect = cv2.minAreaRect(self.contour)
         self.bbox = cv2.boundingRect(self.contour)
 
+    def debug_mask(self, base_fname):
+        print(base_fname)
+        print("  bbox: "+str(self.bbox))
+        print("  mask.shape: "+str(self.mask.shape))
+        cv2.imwrite(base_fname+"_mask.png", self.mask)
+        contours, _ = cv2.findContours(self.mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        areas = [cv2.contourArea(c) for c in contours]
+        max_index = np.argmax(areas)
+        color_mask = np.ones((self.mask.shape[0], self.mask.shape[1], 3))
+        cv2.drawContours(color_mask, contours, max_index, (0,255,0))
+        cv2.rectangle(color_mask, (self.bbox[0], self.bbox[1]), (self.bbox[0]+self.bbox[2], self.bbox[1]+self.bbox[3]), (255,0,0), 3)
+        box = cv2.boxPoints(self.minAreaRect)
+        box = np.int0(box)
+        cv2.drawContours(color_mask,[box],0,(0,0,255),2)
+        cv2.imwrite(base_fname+"_contours.png", color_mask)
+
     def nb_edges_touched(self, px=20):
-        sam_annotation = self.sam_annotation
         nb_edges = 0
         # crop_box is left, top, right, bottom
         # bbox is [x,y,w,h]
+        # mask.shape is [nb_rows=h,nb_cols=w,nb_channels]
         for i in range(2):
-            if (abs(self.bbox[i] - sam_annotation["crop_box"][i]) < px):
+            if self.bbox[i] < px:
                 nb_edges += 1
-        if (abs(self.bbox[0]+self.bbox[2] - sam_annotation["crop_box"][2]) < px):
+        if (abs(self.bbox[0]+self.bbox[2] - self.mask.shape[1]) < px):
                 nb_edges += 1
-        if (abs(self.bbox[1]+self.bbox[3] - sam_annotation["crop_box"][3]) < px):
+        if (abs(self.bbox[1]+self.bbox[3] - self.mask.shape[0]) < px):
                 nb_edges += 1
         return nb_edges
+
+    def touches_top_bottom(self, px=20):
+        print("top, bottom? %d - %d / 0 - %d" % (self.bbox[1], self.bbox[1]+self.bbox[3], self.mask.shape[0]))
+        return self.bbox[1] < px and abs(self.bbox[1]+self.bbox[3] - self.mask.shape[0]) < px
 
     def get_largest_contour(self):
         """ get the largest contour.
@@ -71,17 +91,24 @@ def iou(ann_info1, ann_info2):
     uArea = bbox1[4]*bbox1[5] + bbox2[4]*bbox2[5] - iArea
     return iArea / float(uArea)
 
-def get_image_ann_list(sam_ann_list, original_img_width, original_img_height):
+def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname=""):
     ann_list = []
     for sam_ann in sam_ann_list:
         ann_list.append(AnnotationInfo(sam_ann, original_img_width, original_img_height))
     anns_by_area = sorted(ann_list, key=(lambda x: x.contour_area), reverse=True)
     image_anns = []
     ref_size = None
-    for ann in anns_by_area:
+    for i, ann in enumerate(anns_by_area):
+        if DEBUG:
+            ann.debug_mask(debug_base_fname+"_%03d" % i)
         if ann.nb_edges_touched() > 2:
+            #print("ann %d touches %d edges, excuding" % (i, ann.nb_edges_touched()))
+            continue
+        if ann.touches_top_bottom():
+            #print("ann %d touches top and bottom edges, exclude" % i)
             continue
         if ann.squarishness() < 0.85:
+            #print("ann %d has a squarishness of %f, excuding" % (i, ann.squarishness()))
             continue
         if not ref_size:
             ref_size = ann.contour_area
@@ -90,15 +117,18 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height):
         if abs(ref_size - ann.contour_area) / ann.contour_area < 0.15:
             image_anns.append(ann)
         else:
+            #print("annotation area too small (%d / %d, %d pct), ignoring and breaking" % (ann.contour_area, ref_size, int(100*abs(ref_size - ann.contour_area) / ann.contour_area)))
             break
     # we sort by top x coordinate descending
     image_anns = sorted(image_anns, key=(lambda x: x.bbox[1]))
     # we filter by measuring iou with previous image:
     filtered_image_anns = []
     prev_image_ann = None
-    for image_ann in image_anns:
+    for i, image_ann in enumerate(image_anns):
         if prev_image_ann is None or iou(prev_image_ann, image_ann) < 0.85:
             filtered_image_anns.append(image_ann)
+            if DEBUG:
+                image_ann.debug_mask(debug_base_fname+"_selected%03d" % i)
         prev_image_ann = image_ann
     return filtered_image_anns
 
@@ -161,7 +191,7 @@ def test():
         anns = pickle.load(f)
         img_orig = Image.open("examples/IMG_56015.JPG")
         apply_icc(img_orig)
-        image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height)
+        image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height, "examples/IMG_56015")
         ig_img_basedir = "./"
         ig_lname = "I0123"
         for i, image_ann_info in enumerate(image_ann_infos):
