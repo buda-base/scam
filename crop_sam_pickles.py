@@ -59,6 +59,11 @@ def debug_pickled(img_s3_path):
     with gzip.open(pickle_fname, 'rb') as f:
         anns = pickle.load(f)
         image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height, img_fname)
+        for i, image_ann_info in enumerate(image_ann_infos):
+            fname_base = "debug/"+to_local(img_s3_path)+("_%02d" % i)
+            img_bytes, file_ext = extract_encode_img(img_orig, image_ann_info, fname_base, rotate=True)
+            with open(fname_base+file_ext, "wb") as binary_file:
+                binary_file.write(img_bytes)
 
 
 if __name__ == "__main__":
