@@ -53,7 +53,7 @@ class AnnotationInfo:
         return nb_edges
 
     def touches_top_bottom(self, px=20):
-        print("top, bottom? %d - %d / 0 - %d" % (self.bbox[1], self.bbox[1]+self.bbox[3], self.mask.shape[0]))
+        #print("top, bottom? %d - %d / 0 - %d" % (self.bbox[1], self.bbox[1]+self.bbox[3], self.mask.shape[0]))
         return self.bbox[1] < px and abs(self.bbox[1]+self.bbox[3] - self.mask.shape[0]) < px
 
     def get_largest_contour(self):
@@ -128,6 +128,12 @@ def is_union(union_ann, part_anns):
     union_parts_iou = iou_bbox_xy1xy2wh(xywh_xy1xy2wh(union_ann.bbox), union_bbox)
     return union_parts_iou > 0.9
 
+def ann_has_duplicate_in(ann, ann_list):
+    for other_ann in ann_list:
+        if iou(other_ann, ann) > 0.8:
+            return True
+    return False
+
 def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2):
     ann_list = []
     for sam_ann in sam_ann_list:
@@ -147,6 +153,9 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             continue
         if ann.squarishness() < 0.85:
             #print("ann %d has a squarishness of %f, excuding" % (i, ann.squarishness()))
+            continue
+        if ann_has_duplicate_in(ann, image_anns) or ann_has_duplicate_in(ann, potential_split_anns):
+            #print("ann %d is duplicate, excuding" % i)
             continue
         if not ref_size:
             ref_size = ann.contour_area
