@@ -22,17 +22,19 @@ def get_img_pickled(img_s3_path):
     anns = pickle.loads(pickled)
     return img_orig, anns
 
-def crop_pickled_image(img_s3_path, cropped_s3_prefix, next_idx):
+def crop_pickled_image(img_s3_path, cropped_s3_prefix, orig_filename, next_idx):
     img_orig, anns = get_img_pickled(img_s3_path)
     image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height)
     if len(image_ann_infos) != 2:
         print("oops, %d image_ann_infos for %s" % (len(image_ann_infos), img_s3_path))
     dst_base_fname = cropped_s3_prefix[cropped_s3_prefix.rfind("/")+1:]
+    if not image_ann_infos:
+        image_ann_infos = [ None ]
     for i, image_ann_info in enumerate(image_ann_infos):
         img_bytes, file_ext = extract_encode_img(img_orig, image_ann_info, "%s%04d" % (dst_base_fname, next_idx+i))
-        cropped_s3_img_key_base = img_s3_path.replace("/sources/", "/images/")
-        cropped_s3_img_key = "%s_%02d%s" % (cropped_s3_img_key_base, i+1, file_ext)
-        # cropped_s3_img_key = "%s%04d%s" % (cropped_s3_prefix, next_idx+i, file_ext)
+        suffix_idx = 0 if image_ann_info is None else i+1
+        prefix_idx = next_idx+i
+        cropped_s3_img_key = "%s%04d_%s_%02d%s" % (cropped_s3_prefix, prefix_idx, orig_filename, suffix_idx, file_ext)
         print("-> "+cropped_s3_img_key)
         upload_to_s3(img_bytes, cropped_s3_img_key)
     return next_idx + len(image_ann_infos)
@@ -40,9 +42,9 @@ def crop_pickled_image(img_s3_path, cropped_s3_prefix, next_idx):
 def crop_pickled_prefix(s3_prefix):
     next_idx = 1
     cropped_s3_prefix = s3_prefix.replace("/sources/", "/images/")
-    cropped_s3_prefix = re.sub(r"-(I[A-Z_0-9]+)/$", r"-\1/\1", cropped_s3_prefix)
     for img_s3_path in list_img_keys(s3_prefix):
-        next_idx = crop_pickled_image(img_s3_path, cropped_s3_prefix, next_idx)
+        img_s3_subpath = img_s3_path[len(s3_prefix):].replace("/","_")
+        next_idx = crop_pickled_image(img_s3_path, cropped_s3_prefix, img_s3_subpath, next_idx)
 
 def to_local(s3_key):
     return s3_key[s3_key.rfind("/")+1:]
@@ -63,7 +65,9 @@ def debug_pickled(img_s3_path):
 
 if __name__ == "__main__":
     crop_pickled_prefix("ER/W1ER120/sources/W1ER120-I1ER790/")
-    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56008.JPG")
-    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56011.JPG")
+    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56008.JPG") # 2 squares
+    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56011.JPG") # normal case
     #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56012.JPG")
-    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56022.JPG")
+    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56022.JPG") # merge / split
+    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56062.JPG") # duplicate mask
+    #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56069.JPG")
