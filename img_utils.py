@@ -84,15 +84,22 @@ def iou(ann_info1, ann_info2):
     return iou_bbox_xy1xy2wh(bbox1, bbox2)
 
 def iou_bbox_xy1xy2wh(bbox1, bbox2):
+    iArea = intersect_area_bbox_xy1xy2wh(bbox1, bbox2)
+    uArea = bbox1[4]*bbox1[5] + bbox2[4]*bbox2[5] - iArea
+    return iArea / float(uArea)
+
+def intersect_area_bbox_xy1xy2wh(bbox1, bbox2):
     # determine the (x, y)-coordinates of the intersection rectangle
     ix1 = max(bbox1[0], bbox2[0])
     iy1 = max(bbox1[1], bbox2[1])
     ix2 = min(bbox1[2], bbox2[2])
     iy2 = min(bbox1[3], bbox2[3])
-    # compute the area of intersection rectangle
-    iArea = max(0, ix2 - ix1) * max(0, iy2 - iy1)
-    uArea = bbox1[4]*bbox1[5] + bbox2[4]*bbox2[5] - iArea
-    return iArea / float(uArea)
+    return max(0, ix2 - ix1) * max(0, iy2 - iy1)
+
+def intersect_area(ann1, ann2):
+    bbox1 = xywh_xy1xy2wh(ann1.bbox)
+    bbox2 = xywh_xy1xy2wh(ann2.bbox)
+    return intersect_area_bbox_xy1xy2wh(bbox1, bbox2)
 
 def is_union(union_ann, part_anns):
     # union of bboxes should be similar to bbox of the tested union
@@ -101,7 +108,6 @@ def is_union(union_ann, part_anns):
     intersection_bbox = None
     for ann in part_anns:
         ann_bbox = xywh_xy1xy2wh(ann.bbox)
-        print(ann_bbox)
         if union_bbox is None:
             union_bbox = ann_bbox.copy()
             intersection_bbox = ann_bbox.copy()
@@ -134,7 +140,15 @@ def ann_has_duplicate_in(ann, ann_list):
             return True
     return False
 
-def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2):
+def ann_included_in(ann, image_anns):
+    ann_area = ann.bbox[2]*ann.bbox[3]
+    for other_ann in image_anns:
+        iarea = intersect_area(ann, other_ann)
+        if ann_area - iarea / float(ann_area) < 0.1:
+            return True
+    return False
+
+def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, minwhratio=1.7):
     ann_list = []
     for sam_ann in sam_ann_list:
         ann_list.append(AnnotationInfo(sam_ann, original_img_width, original_img_height))
@@ -159,10 +173,19 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             continue
         if not ref_size:
             ref_size = ann.contour_area
-            image_anns.append(ann)
+            if ann.bbox[2] / float(ann.bbox[3]) >= minwhratio:
+                image_anns.append(ann)
+            else:
+                print("found annotation with wrong aspect ratio")
             continue
-        if abs(ref_size - ann.contour_area) / ann.contour_area < 0.15:
-            image_anns.append(ann)
+        if ann_included_in(ann, potential_split_anns):
+            #print("ann %d included in potential split, excluding" % i)
+            continue
+        diff_factor = 0.4 if len(image_anns) < expected_nb_pages else 0.15
+        #print("diff is %f / %f" % (abs(ref_size - ann.contour_area) / ann.contour_area, diff_factor))
+        if abs(ref_size - ann.contour_area) / ann.contour_area < diff_factor and not ann_included_in(ann, image_anns):
+            if ann.bbox[2] / float(ann.bbox[3]) >= minwhratio:
+                image_anns.append(ann)
         elif len(image_anns) < expected_nb_pages and len(potential_split_anns) < expected_nb_pages:
             #print("add annotation %d to the potential union detection" % i)
             potential_split_anns.append(ann)
@@ -172,18 +195,14 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
         image_anns = potential_split_anns
     # we sort by top x coordinate descending
     image_anns = sorted(image_anns, key=(lambda x: x.bbox[1]))
-    # we filter by measuring iou with previous image:
-    filtered_image_anns = []
-    prev_image_ann = None
-    for i, image_ann in enumerate(image_anns):
-        if prev_image_ann is None or iou(prev_image_ann, image_ann) < 0.85:
-            filtered_image_anns.append(image_ann)
-            if DEBUG:
-                image_ann.debug_mask(debug_base_fname+"_selected%03d" % i)
-        prev_image_ann = image_ann
-    return filtered_image_anns
+    if DEBUG:
+        for i, image_ann in enumerate(image_anns):
+            image_ann.debug_mask(debug_base_fname+"_selected%03d" % i)
+    return image_anns
 
 def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
+    if ann_info is None:
+        return img_orig
     if not rotate: # default
         return img_orig.crop((ann_info.bbox[0], ann_info.bbox[1], ann_info.bbox[0]+ann_info.bbox[2], ann_info.bbox[1]+ann_info.bbox[3]))
     # else, we usually don't go that route but just in case...
