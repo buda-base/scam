@@ -6,8 +6,6 @@ import gzip
 import re
 import os
 
-DEST = "local"
-
 def get_img_pickled(img_s3_path):
     img_orig = Image.open(gets3blob(img_s3_path))
     apply_icc(img_orig)
@@ -31,7 +29,7 @@ def crop_pickled_image(img_s3_path, cropped_s3_prefix, orig_filename, next_idx):
     if not image_ann_infos:
         image_ann_infos = [ None ]
     for i, image_ann_info in enumerate(image_ann_infos):
-        img_bytes, file_ext = extract_encode_img(img_orig, image_ann_info, "%s%04d" % (dst_base_fname, next_idx+i))
+        img_bytes, file_ext = extract_encode_img(img_orig, image_ann_info, "%s%04d" % (dst_base_fname, next_idx+i), rotate=True)
         suffix_idx = 0 if image_ann_info is None else i+1
         prefix_idx = next_idx+i
         cropped_s3_img_key = "%s%04d_%s_%02d%s" % (cropped_s3_prefix, prefix_idx, orig_filename, suffix_idx, file_ext)

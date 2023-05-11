@@ -200,16 +200,17 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             image_ann.debug_mask(debug_base_fname+"_selected%03d" % i)
     return image_anns
 
-def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
-    if ann_info is None:
-        return img_orig
-    if not rotate: # default
-        return img_orig.crop((ann_info.bbox[0], ann_info.bbox[1], ann_info.bbox[0]+ann_info.bbox[2], ann_info.bbox[1]+ann_info.bbox[3]))
-    # else, we usually don't go that route but just in case...
-    center, (width, height), angle = ann_info.minAreaRect
+def rotate_warp_perspective(pil_img, rect):
+    """
+    rotate function based on warpPerspective, from
+    https://jdhao.github.io/2019/02/23/crop_rotated_rectangle_opencv/
+
+    returns the most blurry results
+    """
+    opencv_img = np.array(pil_img)
+    center, (width, height), angle = rect
     box = cv2.boxPoints(rect)
     box = np.int0(box)
-    open_cv_image = np.array(img_orig)
     src_pts = box.astype("float32")
     # coordinate of the points in box points after the rectangle has been
     # straightened
@@ -220,9 +221,33 @@ def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
     # the perspective transformation matrix
     M = cv2.getPerspectiveTransform(src_pts, dst_pts)
     # directly warp the rotated rectangle to get the straightened rectangle
-    warped = cv2.warpPerspective(open_cv_image, M, (int(width), int(height)), cv2.INTER_LANCZOS4)
+    warped = cv2.warpPerspective(opencv_img, M, (int(width), int(height)), cv2.INTER_LANCZOS4)
     return Image.fromarray(warped)
 
+def rotate_warp_affine(pil_img, rect):
+    """
+    rotate function based on warpAffine
+
+    returns acceptable results
+    """
+    opencv_img = np.array(pil_img)
+    center, (width, height), angle = rect
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    # or cv2.INTER_LANCZOS4, but CUBIC looks slightly better(?)
+    res = cv2.warpAffine(opencv_img, M, (opencv_img.shape[1], opencv_img.shape[0]), flags=cv2.INTER_CUBIC)
+    res = cv2.getRectSubPix(res, (int(width), int(height)), center)
+    return Image.fromarray(res)
+
+def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
+    if ann_info is None:
+        return img_orig
+    if not rotate: # default
+        return img_orig.crop((ann_info.bbox[0], ann_info.bbox[1], ann_info.bbox[0]+ann_info.bbox[2], ann_info.bbox[1]+ann_info.bbox[3]))
+    # subjectively, warp_affine gives a more crisp result
+    print(ann_info.minAreaRect)
+    #return rotate_warp_perspective(img_orig, ann_info.minAreaRect)
+    return rotate_warp_affine(img_orig, ann_info.minAreaRect)
+    
 def encode_img(img):
     target_mode = get_best_mode(img)
     if img.mode != target_mode:
@@ -263,10 +288,10 @@ def test():
         apply_icc(img_orig)
         image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height, "examples/IMG_56015")
         ig_img_basedir = "./"
-        ig_lname = "I0123"
+        ig_lname = "I0123RA"
         for i, image_ann_info in enumerate(image_ann_infos):
             dst_base_fname = "%s%s%04d" % (ig_img_basedir, ig_lname, i+1)
-            img_bytes, file_ext = extract_encode_img(img_orig, image_ann_info, dst_base_fname)
+            img_bytes, file_ext = extract_encode_img(img_orig, image_ann_info, dst_base_fname, rotate=True)
             with open(dst_base_fname+file_ext, 'wb') as f: 
                 f.write(img_bytes)
 
