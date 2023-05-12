@@ -1,5 +1,5 @@
 from utils import s3_img_key_to_s3_pickle_key, MAX_SIZE, upload_to_s3, gets3blob, S3, BUCKET_NAME, list_img_keys
-from img_utils import extract_encode_img, apply_icc
+from img_utils import extract_encode_img, apply_icc, apply_exif_rotation
 from sam_annotation_utils import get_image_ann_list
 from PIL import Image
 import pickle
@@ -33,7 +33,7 @@ def crop_pickled_image(img_s3_path, cropped_s3_prefix, orig_filename, next_idx):
         img_bytes, file_ext = extract_encode_img(img_orig, image_ann_info, "%s%04d" % (dst_base_fname, next_idx+i), rotate=True)
         suffix_idx = 0 if image_ann_info is None else i+1
         prefix_idx = next_idx+i
-        cropped_s3_img_key = "%s%04d_%s_%02d%s" % (cropped_s3_prefix, prefix_idx, orig_filename, suffix_idx, file_ext)
+        cropped_s3_img_key = "%s%04d0_%s_%02d%s" % (cropped_s3_prefix, prefix_idx, orig_filename, suffix_idx, file_ext)
         print("-> "+cropped_s3_img_key)
         upload_to_s3(img_bytes, cropped_s3_img_key)
     return next_idx + len(image_ann_infos)
@@ -56,7 +56,8 @@ def debug_pickled(img_s3_path):
         S3.download_file(BUCKET_NAME, img_s3_path, img_fname)
         S3.download_file(BUCKET_NAME, pickle_s3_path, pickle_fname)
     img_orig = Image.open(img_fname)
-    apply_icc(img_orig)
+    img_orig = apply_icc(img_orig)
+    img_orig = apply_exif_rotation(img_orig)
     with gzip.open(pickle_fname, 'rb') as f:
         anns = pickle.load(f)
         image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height, img_fname)
@@ -65,7 +66,6 @@ def debug_pickled(img_s3_path):
             img_bytes, file_ext = extract_encode_img(img_orig, image_ann_info, fname_base, rotate=True)
             with open(fname_base+file_ext, "wb") as binary_file:
                 binary_file.write(img_bytes)
-
 
 if __name__ == "__main__":
     crop_pickled_prefix("ER/W1ER120/sources/W1ER120-I1ER790/")

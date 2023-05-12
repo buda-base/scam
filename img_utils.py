@@ -1,13 +1,15 @@
 import mozjpeg_lossless_optimization
 import io
 import pickle
-from PIL import Image, ImageCms
+from PIL import Image, ImageCms, ExifTags
 import cv2
 import gzip
 import numpy as np
 import math
 import logging
+from raw_pillow_opener import register_raw_opener
 
+register_raw_opener()
 
 def rotate_warp_perspective(pil_img, rect):
     """
@@ -48,6 +50,9 @@ def rotate_warp_affine(pil_img, rect):
     return Image.fromarray(res)
 
 def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
+    """
+    extract a subset of an image corresponding to the ann_info (type AnnotationInfo) argument
+    """
     if ann_info is None:
         return img_orig
     if not rotate: # default
@@ -59,6 +64,9 @@ def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
     return rotate_warp_affine(img_orig, ann_info.minAreaRect)
     
 def encode_img(img, target_mode=None, mozjpeg_optimize=True):
+    """
+    returns the bytes of the encoded image (jpg or g4 tiff if binary)
+    """
     target_mode = target_mode if target_mode is not None else get_best_mode(img)
     if img.mode != target_mode:
         img = img.convert(target_mode)
@@ -72,6 +80,11 @@ def encode_img(img, target_mode=None, mozjpeg_optimize=True):
         return jpg_bytes, ".jpg"
 
 def get_best_mode(img):
+    """
+    returns the best Pillow mode for an image
+
+    TODO
+    """
     return "L"
 
 def is_grayscale(img):
@@ -80,13 +93,36 @@ def is_grayscale(img):
     return False
 
 def apply_icc(img):
-    '''Convert PIL image to sRGB color space (if possible)'''
+    """
+    Convert PIL image to sRGB color space (if possible)
+    """
     icc = img.info.get('icc_profile', '')
     if icc and img.mode == "RGB":
         io_handle = io.BytesIO(icc)     # virtual file
         src_profile = ImageCms.ImageCmsProfile(io_handle)
         dst_profile = ImageCms.createProfile('sRGB')
         ImageCms.profileToProfile(img, src_profile, dst_profile, inPlace=True)
+    return img
+
+def apply_exif_rotation(img):
+    """
+    apply rotation recorded in exif data
+
+    https://stackoverflow.com/a/26928142/2560906
+    """
+    for orientation in ExifTags.TAGS.keys():
+        if ExifTags.TAGS[orientation]=='Orientation':
+            break
+    
+    exif = image._getexif()
+
+    if exif[orientation] == 3:
+        return img.rotate(180, expand=True)
+    elif exif[orientation] == 6:
+        return img.rotate(270, expand=True)
+    elif exif[orientation] == 8:
+        return img.rotate(90, expand=True)
+    return img
 
 def extract_encode_img(img_orig, sam_annotation, dst_fname, rotate=False):
     cropped_img = extract_img(img_orig, sam_annotation, dst_fname, rotate)

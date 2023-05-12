@@ -13,6 +13,7 @@ import torch
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
 import pickle
 from utils import s3_img_key_to_s3_pickle_key, MAX_SIZE, POINTS_PER_SIDE, upload_to_s3, gets3blob, S3, BUCKET_NAME, list_img_keys
+from img_utils import apply_exif_rotation
 
 sam_checkpoint = "sam_vit_h_4b8939.pth"
 model_type = "vit_h"
@@ -45,6 +46,7 @@ def calc_sam_pickles(img_s3_path):
         return
     print("apply SAM on %s -> %s" % (img_s3_path, picke_s3_path))
     img = Image.open(gets3blob(img_s3_path))
+    img = apply_exif_rotation(img)
     ratio = max(MAX_SIZE/img.width, MAX_SIZE/img.height)
     new_width = int(img.width * ratio)
     new_height = int(img.height * ratio)
