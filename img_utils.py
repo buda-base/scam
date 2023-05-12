@@ -6,6 +6,7 @@ import cv2
 import gzip
 import numpy as np
 import math
+import logging
 
 DEBUG = False
 
@@ -244,12 +245,13 @@ def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
     if not rotate: # default
         return img_orig.crop((ann_info.bbox[0], ann_info.bbox[1], ann_info.bbox[0]+ann_info.bbox[2], ann_info.bbox[1]+ann_info.bbox[3]))
     # subjectively, warp_affine gives a more crisp result
-    print(ann_info.minAreaRect)
+    # the best results are with Gimp's "noHalo" interpolation, but there seems to be
+    # no way to use it in Python
     #return rotate_warp_perspective(img_orig, ann_info.minAreaRect)
     return rotate_warp_affine(img_orig, ann_info.minAreaRect)
     
-def encode_img(img):
-    target_mode = get_best_mode(img)
+def encode_img(img, target_mode=None, mozjpeg_optimize=True):
+    target_mode = target_mode if target_mode is not None else get_best_mode(img)
     if img.mode != target_mode:
         img = img.convert(target_mode)
     if target_mode != "1":
@@ -257,7 +259,8 @@ def encode_img(img):
         with io.BytesIO() as output:
             img.save(output, icc_profile=img.info.get('icc_profile'), format="JPEG", quality=85, optimize=True, progressive=True, subsampling="4:2:2", comment="")
             jpg_bytes = output.getvalue()
-        jpg_bytes = mozjpeg_lossless_optimization.optimize(jpg_bytes)
+        if mozjpeg_optimize:
+            jpg_bytes = mozjpeg_lossless_optimization.optimize(jpg_bytes)
         return jpg_bytes, ".jpg"
 
 def get_best_mode(img):
@@ -280,6 +283,43 @@ def apply_icc(img):
 def extract_encode_img(img_orig, sam_annotation, dst_fname, rotate=False):
     cropped_img = extract_img(img_orig, sam_annotation, dst_fname, rotate)
     return encode_img(cropped_img)
+
+COLORS = [
+    (0,255,0),
+    (255,0,0),
+    (0,0,255),
+    (255,255,0),
+    (0,255,255),
+    (255,0,255),
+    (0,127,0),
+    (127,0,0),
+    (0,0,127),
+    (127,127,0),
+    (0,127,127),
+    (127,0,127)
+]
+
+def get_debug_img_bytes(img_orig, image_anns, max_size_px=256, draw_rotated=True, line_thickness=2):
+    """
+    return an encoded jpg with the image annotations represented as rectangles
+    the image is converted to RGB and resized
+    """
+    # resize factor
+    rf = max(max_size_px/float(img_orig.size[0]), max_size_px/float(img_orig.size[1]))
+    img_orig = img_orig.resize((img_orig.size[0]*rf, img_orig.size[1]*rf), Image.BICUBIC)
+    # produce an opencv image
+    img_orig = img_orig.convert('RGB')
+    new_img = cv2.cvtColor(numpy.array(img_orig), cv2.COLOR_RGB2BGR) 
+    img_org = None # gc
+    # resize_factor
+    for i, image_ann in enumerate(image_anns):
+        (oldcx, oldcy), (oldw, oldh), angle = image_ann.minAreaRect
+        new_rect = ((oldcx*rf,oldcy*rf), (oldw*rf, oldh*rf), angle)
+        box = np.int0(cv2.boxPoints(new_rect))
+        color = COLORS[i % len(COLORS)]
+        cv2.drawContours(new_img, [box], 0, color, line_thickness)
+    new_img = Image.fromarray(new_img)
+    return encode_img(new_img, target_mode="RGB", mozjpeg_optimize=False)
 
 def test():
     with gzip.open('examples/IMG_56015_1024_sam.pickle.gz', 'rb') as f:
