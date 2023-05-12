@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
 import pickle
-from utils import s3_img_key_to_s3_pickle_key, MAX_SIZE, upload_to_s3, gets3blob, S3, BUCKET_NAME, list_img_keys
+from utils import s3_img_key_to_s3_pickle_key, MAX_SIZE, POINTS_PER_SIDE, upload_to_s3, gets3blob, S3, BUCKET_NAME, list_img_keys
 
 sam_checkpoint = "sam_vit_h_4b8939.pth"
 model_type = "vit_h"
@@ -38,9 +38,6 @@ def get_mask_generator():
     #    min_mask_region_area=1000,  # Requires open-cv to run post-processing
     )
     return MASK_GENERATOR
-
-
-POINTS_PER_SIDE = 8
 
 def calc_sam_pickles(img_s3_path):
     picke_s3_path = s3_img_key_to_s3_pickle_key(img_s3_path)

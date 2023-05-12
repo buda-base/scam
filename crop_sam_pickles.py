@@ -1,5 +1,6 @@
 from utils import s3_img_key_to_s3_pickle_key, MAX_SIZE, upload_to_s3, gets3blob, S3, BUCKET_NAME, list_img_keys
-from img_utils import extract_encode_img, apply_icc, get_image_ann_list
+from img_utils import extract_encode_img, apply_icc
+from sam_annotation_utils import get_image_ann_list
 from PIL import Image
 import pickle
 import gzip

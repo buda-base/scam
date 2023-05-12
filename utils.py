@@ -58,6 +58,7 @@ def list_img_keys(prefix):
     return filter(is_img, obj_keys)
 
 MAX_SIZE = 1024
+POINTS_PER_SIDE = 8
 
 def s3_img_key_to_s3_pickle_key(img_s3_key):
     suffix = "_"+str(MAX_SIZE)+"_"+str(POINTS_PER_SIDE)+".pickle.gz"
