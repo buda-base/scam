@@ -7,7 +7,7 @@ import botocore
 from sam_annotation_utils import get_image_ann_list
 
 class BatchRunner:
-    def __init__(images_path, pipeline="sam:crop", dest_path=None, points_per_side=8, sam_resize=1024, reorder=True, rotate=False, pre_rotate=0, aws_profile='image_processing'):
+    def __init__(images_path, pipeline="sam:crop", mode=None, output_uncompressed=True, output_compressed=True, dest_path=None, points_per_side=8, sam_resize=1024, reorder=True, rotate=False, pre_rotate=0, aws_profile='image_processing'):
         self.images_path = images_path
         self.read_mode = None
         self.read_bucket = None
@@ -31,6 +31,9 @@ class BatchRunner:
         self.analyze_write_path()
         self.SESSION = boto3.Session(profile_name=aws_profile)
         self.S3 = SESSION.client('s3')
+        self.mode = mode
+        self.output_compressed = output_compressed
+        self.output_uncompressed = output_uncompressed
 
     def analyze_read_path(self):
         if self.images_path.startswith("s3://"):
@@ -92,11 +95,16 @@ class BatchRunner:
     def img_path_to_prefixed_path(self, img_path, prefix):
         other_dir = False
         if "/images/" in img_path:
+            other_dir = True
             img_path = img_path.replace("/images/", "/images_%s/" % prefix)
-            other_dir = True
         if "/sources/" in img_path:
-            img_path = img_path.replace("/sources/", "/sources_%s/" % prefix)
             other_dir = True
+            if prefix == "cropped_compressed":
+                img_path = img_path.replace("/sources/", "/images/" % prefix)
+            elif prefix == "cropped_uncompressed":
+                img_path = img_path.replace("/sources/", "/archive/" % prefix)
+            else:
+                img_path = img_path.replace("/sources/", "/sources_%s/" % prefix)
         basename = os.path.basename(img_path)
         dirname = os.path.dirname(img_path)
         if not other_dir:
@@ -116,7 +124,10 @@ class BatchRunner:
         return dirname, basename
 
     def img_path_to_img_path_base(self, img_path):
-        return img_path_to_prefixed_path("cropped")
+        return img_path_to_prefixed_path("cropped_compressed")
+
+    def img_path_to_archive_path_base(self, img_path):
+        return img_path_to_prefixed_path("cropped_uncompressed")
 
     def list_img_paths(self, source_path):
         img_keys = []
@@ -130,7 +141,7 @@ class BatchRunner:
         if write_mode == "S3":
             return
 
-    def process_img_path(self, img_path):
+    def process_img_path(self, img_path, next_idx):
         img_orig = None
         if self.mode == "S3":
             self.gets3blob(img_path)
@@ -143,6 +154,8 @@ class BatchRunner:
         self.mkdir(pickle_dirname)
         cropped_dirname, cropped_fname = self.img_path_to_img_path_base(img_path)
         self.mkdir(cropped_dirname)
+        cropped_uncompressed_dirname, cropped_uncompressed_fname = self.img_path_to_archive_path_base(img_path)
+        self.mkdir(cropped_uncompressed_dirname)
         qc_dirname, qc_fname = self.img_path_to_qc_path_base(img_path)
         self.mkdir(qc_dirname)
         sam_results = None
@@ -151,7 +164,7 @@ class BatchRunner:
             gzipped_pickled_bytes = get_gzip_picked_bytes(sam_results)
             self.upload_to_s3(gzipped_pickled_bytes, picke_s3_path)
             gzipped_pickled_bytes = None # gc
-        if "crop" in pipeline:
+        if "crop" in pipeline and (self.output_compressed or self.output_uncompressed):
             if sam_results is None:
                 blob = self.gets3blob(pickle_s3_path)
                 if blob is None:
@@ -167,9 +180,18 @@ class BatchRunner:
             if not image_ann_infos:
                 image_ann_infos = [ None ]
             for i, image_ann_info in enumerate(image_ann_infos):
-                img_bytes, file_ext = extract_encode_img(img_orig, image_ann_info, "%s%04d" % (dst_base_fname, next_idx+i), rotate=True)
                 suffix_idx = 0 if image_ann_info is None else i+1
                 prefix_idx = next_idx+i
-                cropped_s3_img_key = "%s%04d0_%s_%02d%s" % (cropped_s3_prefix, prefix_idx, orig_filename, suffix_idx, file_ext)
-                upload_to_s3(img_bytes, cropped_s3_img_key)
+                extracted_img = extract_img(img_orig, "%s%04d" % (dst_base_fname, next_idx+i), rotate=True)
+                if self.output_uncompressed:
+                    img_bytes, file_ext = encode_img_uncompressed(extracted_img)
+                    cropped_s3_img_key = "%s%04d0_%s_%02d%s" % (cropped_s3_prefix, prefix_idx, orig_filename, suffix_idx, file_ext)
+                    upload_to_s3(img_bytes, cropped_s3_img_key)
+                    img_bytes = None # gc
+                if self.output_compressed:
+                    img_bytes, file_ext = encode_img(extracted_img)
+                    cropped_s3_img_key = "%s%04d0_%s_%02d%s" % (cropped_s3_prefix, prefix_idx, orig_filename, suffix_idx, file_ext)
+                    upload_to_s3(img_bytes, cropped_s3_img_key)
+                    img_bytes = None # gc
+                extracted_img = None # gc
             return next_idx + len(image_ann_infos)

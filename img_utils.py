@@ -62,7 +62,15 @@ def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
     # no way to use it in Python
     #return rotate_warp_perspective(img_orig, ann_info.minAreaRect)
     return rotate_warp_affine(img_orig, ann_info.minAreaRect)
-    
+
+def encode_img_uncompressed(img):
+    """
+    returns the bytes of the uncompressed tiff image
+    """
+    with io.BytesIO() as output:
+        img.save(output, icc_profile=img.info.get('icc_profile'), format="TIFF", compression=None)
+        return output.getvalue(), ".tiff"
+
 def encode_img(img, target_mode=None, mozjpeg_optimize=True):
     """
     returns the bytes of the encoded image (jpg or g4 tiff if binary)
