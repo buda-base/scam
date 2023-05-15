@@ -143,7 +143,7 @@ def ann_included_in(ann, image_anns):
             return True
     return False
 
-def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, minwhratio=1.7):
+def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, expected_ratio_range=[1.7, 20.0]):
     ann_list = []
     for sam_ann in sam_ann_list:
         ann_list.append(AnnotationInfo(sam_ann, original_img_width, original_img_height))
@@ -168,7 +168,8 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             continue
         if not ref_size:
             ref_size = ann.contour_area
-            if ann.bbox[2] / float(ann.bbox[3]) >= minwhratio:
+            ann_ratio = ann.bbox[2] / float(ann.bbox[3])
+            if not expected_ratio_range or (ann_ratio >= expected_ratio_range[0] and ann_ratio <= expected_ratio_range[1]):
                 image_anns.append(ann)
             else:
                 print("found annotation with wrong aspect ratio")

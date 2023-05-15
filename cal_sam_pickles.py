@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
 import pickle
-from utils import s3_img_key_to_s3_pickle_key, MAX_SIZE, POINTS_PER_SIDE, upload_to_s3, gets3blob, S3, BUCKET_NAME, list_img_keys
+from utils import s3_img_key_to_s3_pickle_key, MAX_SIZE, POINTS_PER_SIDE, upload_to_s3, gets3blob, S3, BUCKET_NAME, list_img_keys, get_gzip_picked_bytes
 from img_utils import apply_exif_rotation
 
 sam_checkpoint = "sam_vit_h_4b8939.pth"
@@ -40,6 +40,14 @@ def get_mask_generator():
     )
     return MASK_GENERATOR
 
+def get_sam_output(img, max_size=1024, points_per_side=8):
+    ratio = max(max_size/img.width, max_size/img.height)
+    new_width = int(img.width * ratio)
+    new_height = int(img.height * ratio)
+    img = img.resize((new_width, new_height), Image.LANCZOS)
+    img = np.array(img)
+    return get_mask_generator().generate(img)
+
 def calc_sam_pickles(img_s3_path):
     picke_s3_path = s3_img_key_to_s3_pickle_key(img_s3_path)
     if s3key_exists(picke_s3_path):
@@ -47,20 +55,8 @@ def calc_sam_pickles(img_s3_path):
     print("apply SAM on %s -> %s" % (img_s3_path, picke_s3_path))
     img = Image.open(gets3blob(img_s3_path))
     img = apply_exif_rotation(img)
-    ratio = max(MAX_SIZE/img.width, MAX_SIZE/img.height)
-    new_width = int(img.width * ratio)
-    new_height = int(img.height * ratio)
-    img = img.resize((new_width, new_height), Image.LANCZOS)
-    img = np.array(img)
-    sam_results = get_mask_generator().generate(img)
-    out = io.BytesIO()
-    with gzip.GzipFile(fileobj=out, mode="wb") as f:
-        pickle.dump(sam_results, f)
-    gzipped_pickled_bytes = out.getvalue()
-    # gc
-    sam_results = None
-    img = None
-    out = None
+    sam_results = get_sam_output(img)
+    gzipped_pickled_bytes = get_gzip_picked_bytes(sam_results)
     upload_to_s3(gzipped_pickled_bytes, picke_s3_path)
     
 def calc_all_sam_pickles(s3_prefix):
