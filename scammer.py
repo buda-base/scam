@@ -10,6 +10,9 @@ import botocore
 import tqdm
 from sam_annotation_utils import get_image_ann_list
 from PIL import Image
+import cv2
+
+print("open cv version %s" % cv2.__version__)
 
 class BatchRunner:
     def __init__(self, images_path, pipeline="sam:crop", img_mode=None, expected_ratio_range = [1.8, 20.0], output_uncompressed=True, output_compressed=False, dest_path=None, points_per_side=8, sam_resize=1024, rotate=True, expand_mask_pct=0, pre_rotate=0, aws_profile=None, dryrun=False):
@@ -222,7 +225,6 @@ class BatchRunner:
     def process_dir(self):
         for img_path in tqdm.tqdm(self.list_img_paths(self.images_path)):
             self.process_img_path(img_path)
-            return
 
 if __name__ == "__main__":
     br = BatchRunner("s3://image-processing.bdrc.io/ER/W1ER120/sources/W1ER120-I1ER790/", pipeline="crop", dryrun=False, rotate=True, aws_profile='image_processing')
