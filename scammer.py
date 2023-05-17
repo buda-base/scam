@@ -1,4 +1,4 @@
-from utils import split_s3_path, is_img, get_gzip_picked_bytes
+from utils import split_s3_path, is_img, get_gzip_picked_bytes, list_img_keys
 from cal_sam_pickles import get_sam_output
 from img_utils import apply_exif_rotation, apply_icc, extract_img, encode_img_uncompressed, encode_img
 import os
@@ -7,11 +7,12 @@ import io
 import gzip
 import pickle
 import botocore
+import tqdm
 from sam_annotation_utils import get_image_ann_list
 from PIL import Image
 
 class BatchRunner:
-    def __init__(self, images_path, pipeline="sam:crop", img_mode=None, output_uncompressed=True, output_compressed=False, dest_path=None, points_per_side=8, sam_resize=1024, rotate=True, expand_mask_pct=0, pre_rotate=0, aws_profile=None, dryrun=False):
+    def __init__(self, images_path, pipeline="sam:crop", img_mode=None, expected_ratio_range = [1.8, 20.0], output_uncompressed=True, output_compressed=False, dest_path=None, points_per_side=8, sam_resize=1024, rotate=True, expand_mask_pct=0, pre_rotate=0, aws_profile=None, dryrun=False):
         self.images_path = images_path
         self.pipeline = pipeline
         self.dryrun = dryrun
@@ -26,7 +27,7 @@ class BatchRunner:
         self.local_debug_dir = "debug/"
         self.sam_resize = sam_resize
         self.points_per_side = points_per_side
-        self.expected_ratio_range = [1.8, 20.0]
+        self.expected_ratio_range = expected_ratio_range
         self.expected_nb_pages = 2
         # pre-rotate the images by a certain angle, most likely 90 or -90
         self.pre_rotate = 0 
@@ -147,7 +148,9 @@ class BatchRunner:
     def list_img_paths(self, source_path):
         img_keys = []
         if self.read_mode == "S3":
-            img_keys = list_img_keys(self.images_path)
+            img_keys = []
+            for img_full_key in sorted(list_img_keys(self.images_path)):
+                img_keys.append(img_full_key[len(self.images_path):])
         else:
             img_keys = list_img_local(self.images_path)
         return img_keys
@@ -167,7 +170,6 @@ class BatchRunner:
         self.mkdir(pickle_dirname)
         img_orig = None
         if self.read_mode == "S3":
-            print(self.images_path + img_path)
             img_orig = Image.open(self.gets3blob(self.images_path + img_path))
         else:
             img_orig = Image.open(self.images_path + img_path)
@@ -184,7 +186,7 @@ class BatchRunner:
             if sam_results is None:
                 blob = self.gets3blob(pickle_dirname+pickle_fname)
                 if blob is None:
-                    log_str = "  error! no %s" % (pickle_dirname+pickle_fname)
+                    self.log_str += "  error! no %s" % (pickle_dirname+pickle_fname)
                     return
                 blob.seek(0)
                 sam_results = pickle.loads(gzip.decompress(blob.read()))
@@ -192,7 +194,7 @@ class BatchRunner:
                 blob = None # gc
             image_ann_infos = get_image_ann_list(sam_results, img_orig.width, img_orig.height, debug_base_fname = os.path.basename(img_path), expected_nb_pages = self.expected_nb_pages)
             if len(image_ann_infos) != 2:
-                self.log_str += "  WARN: %d pages found in %s (%d expected)\n" % (len(image_ann_infos), img_path, self.expected_nb_pages)
+                self.log_str += "   WARN: %d pages found in %s (%d expected)\n" % (len(image_ann_infos), img_path, self.expected_nb_pages)
             if not image_ann_infos:
                 image_ann_infos = [ None ]
             for i, image_ann_info in enumerate(image_ann_infos):
@@ -217,7 +219,13 @@ class BatchRunner:
                 qc_dirname, qc_fname = self.img_path_to_qc_path_base(img_path)
                 self.mkdir(qc_dirname)
 
+    def process_dir(self):
+        for img_path in tqdm.tqdm(self.list_img_paths(self.images_path)):
+            self.process_img_path(img_path)
+            return
+
 if __name__ == "__main__":
-    br = BatchRunner("s3://image-processing.bdrc.io/ER/W1ER120/sources/W1ER120-I1ER790/", pipeline="crop", dryrun=True, rotate=False, aws_profile='image_processing')
-    br.process_img_path("IMG_56013.JPG")
+    br = BatchRunner("s3://image-processing.bdrc.io/ER/W1ER120/sources/W1ER120-I1ER790/", pipeline="crop", dryrun=False, rotate=True, aws_profile='image_processing')
+    br.process_img_path("IMG_56013.JPG") # to test a particular image
+    #br.process_dir()
     print(br.log_str)
