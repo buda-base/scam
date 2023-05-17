@@ -12,7 +12,7 @@ class AnnotationInfo:
         # SAM masks often need some cleanup
         cv2.erode(self.mask, kernel=np.ones((30, 30)), iterations=1)
         # resize the mask
-        self.mask = cv2.resize( self.mask, (original_img_width, original_img_height), interpolation = cv2.INTER_NEAREST ).astype('uint8')
+        self.mask = cv2.resize(self.mask, (original_img_width, original_img_height), interpolation = cv2.INTER_NEAREST ).astype('uint8')
         self.contour, self.contour_area = self.get_largest_contour()
         self.minAreaRect = cv2.minAreaRect(self.contour)
         self.bbox = cv2.boundingRect(self.contour)

@@ -43,6 +43,9 @@ def rotate_warp_affine(pil_img, rect):
     """
     opencv_img = np.array(pil_img)
     center, (width, height), angle = rect
+    if angle > 45:
+        angle = angle-90
+        width, height = height, width
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
     # or cv2.INTER_LANCZOS4, but CUBIC looks slightly better(?)
     res = cv2.warpAffine(opencv_img, M, (opencv_img.shape[1], opencv_img.shape[0]), flags=cv2.INTER_CUBIC)
