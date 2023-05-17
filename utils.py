@@ -1,6 +1,8 @@
 import boto3
 import io
 import botocore
+import gzip
+import pickle
 
 BUCKET_NAME = "image-processing.bdrc.io"
 

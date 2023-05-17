@@ -9,7 +9,7 @@ import math
 import logging
 from raw_pillow_opener import register_raw_opener
 
-register_raw_opener()
+#register_raw_opener()
 
 def rotate_warp_perspective(pil_img, rect):
     """
@@ -68,7 +68,7 @@ def encode_img_uncompressed(img):
     returns the bytes of the uncompressed tiff image
     """
     with io.BytesIO() as output:
-        img.save(output, icc_profile=img.info.get('icc_profile'), format="TIFF", compression=None)
+        img.save(output, icc_profile=img.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
         return output.getvalue(), ".tiff"
 
 def encode_img(img, target_mode=None, mozjpeg_optimize=True):
@@ -122,7 +122,7 @@ def apply_exif_rotation(img):
         if ExifTags.TAGS[orientation]=='Orientation':
             break
     
-    exif = image._getexif()
+    exif = img._getexif()
 
     if exif[orientation] == 3:
         return img.rotate(180, expand=True)
