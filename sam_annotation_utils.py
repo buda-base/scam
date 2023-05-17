@@ -18,9 +18,6 @@ class AnnotationInfo:
         self.bbox = cv2.boundingRect(self.contour)
 
     def debug_mask(self, base_fname):
-        print(base_fname)
-        print("  bbox: "+str(self.bbox))
-        print("  mask.shape: "+str(self.mask.shape))
         cv2.imwrite(base_fname+"_mask.png", self.mask)
         contours, _ = cv2.findContours(self.mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         areas = [cv2.contourArea(c) for c in contours]
@@ -180,7 +177,8 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
         diff_factor = 0.4 if len(image_anns) < expected_nb_pages else 0.15
         #print("diff is %f / %f" % (abs(ref_size - ann.contour_area) / ann.contour_area, diff_factor))
         if abs(ref_size - ann.contour_area) / ann.contour_area < diff_factor and not ann_included_in(ann, image_anns):
-            if ann.bbox[2] / float(ann.bbox[3]) >= minwhratio:
+            ann_ratio = ann.bbox[2] / float(ann.bbox[3])
+            if not expected_ratio_range or (ann_ratio >= expected_ratio_range[0] and ann_ratio <= expected_ratio_range[1]):
                 image_anns.append(ann)
         elif len(image_anns) < expected_nb_pages and len(potential_split_anns) < expected_nb_pages:
             #print("add annotation %d to the potential union detection" % i)

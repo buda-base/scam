@@ -27,7 +27,7 @@ def get_gzip_picked_bytes(o):
     out = io.BytesIO()
     with gzip.GzipFile(fileobj=out, mode="wb") as f:
         pickle.dump(o, f)
-    gzipped_pickled_bytes = out.getvalue()
+    return out.getvalue()
 
 def s3key_exists(s3_key):
     try:

@@ -1,15 +1,17 @@
 from utils import split_s3_path, is_img, get_gzip_picked_bytes
 from cal_sam_pickles import get_sam_output
-from img_utils import apply_exif_rotation, apply_icc
+from img_utils import apply_exif_rotation, apply_icc, extract_img, encode_img_uncompressed, encode_img
 import os
 import boto3
 import io
+import gzip
+import pickle
 import botocore
 from sam_annotation_utils import get_image_ann_list
 from PIL import Image
 
 class BatchRunner:
-    def __init__(self, images_path, pipeline="sam:crop", img_mode=None, output_uncompressed=True, output_compressed=False, dest_path=None, points_per_side=8, sam_resize=1024, rotate=False, expand_mask_pct=0, pre_rotate=0, aws_profile=None, dryrun=False):
+    def __init__(self, images_path, pipeline="sam:crop", img_mode=None, output_uncompressed=True, output_compressed=False, dest_path=None, points_per_side=8, sam_resize=1024, rotate=True, expand_mask_pct=0, pre_rotate=0, aws_profile=None, dryrun=False):
         self.images_path = images_path
         self.pipeline = pipeline
         self.dryrun = dryrun
@@ -52,6 +54,8 @@ class BatchRunner:
     def analyze_write_path(self):
         if self.dest_path is None:
             self.write_mode = self.read_mode
+            self.write_bucket = self.read_bucket
+            self.dest_path = self.images_path
         else:
             if self.dest_path.startswith("s3://"):
                 self.write_bucket, self.dest_path = split_s3_path(self.dest_path)
@@ -102,16 +106,18 @@ class BatchRunner:
         other_dir = False
         if "/images/" in img_path:
             other_dir = True
-            img_path = img_path.replace("/images/", "/images_%s/" % prefix)
+            if prefix == "cropped_uncompressed":
+                img_path = img_path.replace("/images/", "/archive/")
+            else:
+                img_path = img_path.replace("/images/", "/images_%s/" % prefix)
         if "/sources/" in img_path:
             other_dir = True
             if prefix == "cropped_compressed":
-                img_path = img_path.replace("/sources/", "/images/" % prefix)
+                img_path = img_path.replace("/sources/", "/images/")
             elif prefix == "cropped_uncompressed":
-                img_path = img_path.replace("/sources/", "/archive/" % prefix)
+                img_path = img_path.replace("/sources/", "/archive/")
             else:
                 img_path = img_path.replace("/sources/", "/sources_%s/" % prefix)
-        print(img_path)
         basename = os.path.basename(img_path)
         dirname = os.path.dirname(img_path)
         if not other_dir:
@@ -135,7 +141,7 @@ class BatchRunner:
 
     def img_path_to_archive_path_base(self, img_path):
         dirname, basename = self.img_path_to_prefixed_path(img_path, "cropped_uncompressed")
-        basename = os.path.splitext(base)[0] # removing extension
+        basename = os.path.splitext(basename)[0] # removing extension
         return dirname, basename
 
     def list_img_paths(self, source_path):
@@ -147,6 +153,7 @@ class BatchRunner:
         return img_keys
 
     def save_file(self, dirname, fname, data):
+        self.log_str += "   save %s\n" % (dirname+fname)
         if self.write_mode == "S3":
             self.upload_to_s3(data, dirname+fname)
 
@@ -171,31 +178,27 @@ class BatchRunner:
             self.log_str += "   generate SAM results\n"
             sam_results = get_sam_output(img_orig)
             gzipped_pickled_bytes = get_gzip_picked_bytes(sam_results)
-            self.upload_to_s3(gzipped_pickled_bytes, pickle_dirname+pickle_fname)
             self.save_file(pickle_dirname, pickle_fname, gzipped_pickled_bytes)
-            self.log_str += "   save %s\n" % img_path
             gzipped_pickled_bytes = None # gc
         if "crop" in self.pipeline and (self.output_compressed or self.output_uncompressed):
             if sam_results is None:
                 blob = self.gets3blob(pickle_dirname+pickle_fname)
                 if blob is None:
-                    print("error! no "+pickle_dirname+pickle_fname)
+                    log_str = "  error! no %s" % (pickle_dirname+pickle_fname)
                     return
                 blob.seek(0)
-                sam_results = gzip.decompress(blob.read())
-                self.log_str += "   get SAM results from %s\n" % self.images_path + img_path
+                sam_results = pickle.loads(gzip.decompress(blob.read()))
+                self.log_str += "   get SAM results from %s\n" % (self.images_path + img_path)
                 blob = None # gc
             image_ann_infos = get_image_ann_list(sam_results, img_orig.width, img_orig.height, debug_base_fname = os.path.basename(img_path), expected_nb_pages = self.expected_nb_pages)
             if len(image_ann_infos) != 2:
                 self.log_str += "  WARN: %d pages found in %s (%d expected)\n" % (len(image_ann_infos), img_path, self.expected_nb_pages)
-            dst_base_fname = cropped_s3_prefix[cropped_s3_prefix.rfind("/")+1:]
             if not image_ann_infos:
                 image_ann_infos = [ None ]
             for i, image_ann_info in enumerate(image_ann_infos):
                 suffix_idx = 0 if image_ann_info is None else i+1
-                prefix_idx = next_idx+i
-                extracted_img = extract_img(img_orig, "%s%04d" % (dst_base_fname, next_idx+i), rotate=True)
                 cropped_fname_letter = chr(97+i)
+                extracted_img = extract_img(img_orig, image_ann_info, img_path, rotate=self.rotate)
                 if self.output_uncompressed:
                     cropped_uncompressed_dirname, cropped_uncompressed_fname_base = self.img_path_to_archive_path_base(self.images_path + img_path)
                     self.mkdir(cropped_uncompressed_dirname)
@@ -215,6 +218,6 @@ class BatchRunner:
                 self.mkdir(qc_dirname)
 
 if __name__ == "__main__":
-    br = BatchRunner("s3://image-processing.bdrc.io/ER/W1ER120/sources/W1ER120-I1ER790/", pipeline="sam:crop", dryrun=True, aws_profile='image_processing')
+    br = BatchRunner("s3://image-processing.bdrc.io/ER/W1ER120/sources/W1ER120-I1ER790/", pipeline="crop", dryrun=True, rotate=False, aws_profile='image_processing')
     br.process_img_path("IMG_56013.JPG")
     print(br.log_str)
