@@ -126,6 +126,8 @@ def apply_exif_rotation(img):
             break
     
     exif = img._getexif()
+    if exif is None:
+        return img
 
     if exif[orientation] == 3:
         return img.rotate(180, expand=True)
