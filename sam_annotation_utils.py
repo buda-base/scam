@@ -185,7 +185,7 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             potential_split_anns.append(ann)
         else:
             break
-    if len(potential_split_anns) and is_union(image_anns[0], potential_split_anns):
+    if len(potential_split_anns) and len(image_anns) and is_union(image_anns[0], potential_split_anns):
         image_anns = potential_split_anns
     # we sort by top x coordinate descending
     image_anns = sorted(image_anns, key=(lambda x: x.bbox[1]))
