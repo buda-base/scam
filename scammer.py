@@ -11,6 +11,8 @@ import tqdm
 from sam_annotation_utils import get_image_ann_list
 from PIL import Image
 import cv2
+import sys
+import csv
 
 class BatchRunner:
     def __init__(self, images_path, pipeline="sam:crop", img_mode=None, expected_ratio_range = [1.8, 20.0], output_uncompressed=True, output_compressed=False, dest_path=None, points_per_side=8, sam_resize=1024, rotate=True, expand_mask_pct=0, pre_rotate=0, aws_profile=None, dryrun=False):
@@ -225,8 +227,22 @@ class BatchRunner:
         for img_path in tqdm.tqdm(self.list_img_paths(self.images_path)):
             self.process_img_path(img_path)
 
-if __name__ == "__main__":
+def main():
+    if len(sys.argv) <= 1:
+        print("nothing to do, please pass the path to a csv file")
+
+    with open(sys.argv[1], newline='') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            br = BatchRunner(row[0], pipeline=row[1], dryrun=False, rotate=True, aws_profile='image_processing')
+            br.process_dir()
+            print(br.log_str)
+
+def test():
     br = BatchRunner("s3://image-processing.bdrc.io/ER/W1ER120/sources/W1ER120-I1ER790/", pipeline="crop", dryrun=False, rotate=True, aws_profile='image_processing')
     #br.process_img_path("IMG_56013.JPG") # to test a particular image
     br.process_dir()
     print(br.log_str)
+
+if __name__ == "__main__":
+    main()
