@@ -41,6 +41,8 @@ def get_mask_generator():
     return MASK_GENERATOR
 
 def get_sam_output(img, max_size=1024, points_per_side=8):
+    if img.mode != "RGB":
+        img = img.convert('RGB')
     ratio = max(max_size/img.width, max_size/img.height)
     new_width = int(img.width * ratio)
     new_height = int(img.height * ratio)
