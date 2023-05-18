@@ -198,7 +198,7 @@ class BatchRunner:
                 blob = None # gc
             image_ann_infos = get_image_ann_list(sam_results, img_orig.width, img_orig.height, debug_base_fname = os.path.basename(img_path), expected_nb_pages = self.expected_nb_pages)
             if len(image_ann_infos) != 2:
-                self.log_str += "   WARN: %d pages found in %s%s (%d expected)\n" % (len(image_ann_infos), self.images_path + img_path, img_dir_info, self.expected_nb_pages)
+                self.log_str += "   WARN: %d pages found in %s (%s) (%d expected)\n" % (len(image_ann_infos), self.images_path + img_path, img_dir_info, self.expected_nb_pages)
             if not image_ann_infos:
                 image_ann_infos = [ None ]
             for i, image_ann_info in enumerate(image_ann_infos):
@@ -225,8 +225,9 @@ class BatchRunner:
 
     def process_dir(self):
         self.log_str += "process dir %s" % self.images_path
-        for i, img_path in enumerate(tqdm.tqdm(self.list_img_paths(self.images_path))):
-            self.process_img_path(img_path, "%d/%d" % (i, len(self.images_path)))
+        img_paths = self.list_img_paths(self.images_path)
+        for i, img_path in enumerate(tqdm.tqdm(img_paths)):
+            self.process_img_path(img_path, "%d/%d" % (i, len(img_paths)))
 
 def main():
     if len(sys.argv) <= 1:
