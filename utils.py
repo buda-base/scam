@@ -69,8 +69,8 @@ MAX_SIZE = 1024
 POINTS_PER_SIDE = 8
 
 def s3_img_key_to_s3_pickle_key(img_s3_key):
-    suffix = "_"+str(MAX_SIZE)+"_"+str(POINTS_PER_SIDE)+".pickle.gz"
-    return img_s3_key.replace("/sources/", "/tmp-sam/") + suffix 
+    suffix = "_sam_"+str(MAX_SIZE)+"_"+str(POINTS_PER_SIDE)+".pickle.gz"
+    return img_s3_key.replace("/sources/", "/sources_tmp_pickle/") + suffix 
 
 def split_s3_path(s3_path):
     path_parts=s3_path.replace("s3://","").split("/")

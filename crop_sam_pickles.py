@@ -51,6 +51,7 @@ def to_local(s3_key):
 def debug_pickled(img_s3_path):
     img_fname = "debug/"+to_local(img_s3_path)
     pickle_s3_path = s3_img_key_to_s3_pickle_key(img_s3_path)
+    print(pickle_s3_path)
     pickle_fname = "debug/"+to_local(pickle_s3_path)
     if not os.path.isfile(img_fname) or not os.path.isfile(pickle_fname):
         S3.download_file(BUCKET_NAME, img_s3_path, img_fname)
@@ -68,10 +69,11 @@ def debug_pickled(img_s3_path):
                 binary_file.write(img_bytes)
 
 if __name__ == "__main__":
-    crop_pickled_prefix("ER/W1ER120/sources/W1ER120-I1ER790/")
+    #crop_pickled_prefix("ER/W1ER120/sources/W1ER120-I1ER790/")
     #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56008.JPG") # 2 squares
     #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56011.JPG") # normal case
     #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56012.JPG")
     #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56022.JPG") # merge / split
     #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56062.JPG") # duplicate mask
     #debug_pickled("ER/W1ER120/sources/W1ER120-I1ER790/IMG_56069.JPG")
+    debug_pickled("ER/W1ER124/sources/W1ER124-I1ER800/IMG_56553.JPG") # 2 squares
