@@ -19,18 +19,25 @@ sam_checkpoint = "sam_vit_h_4b8939.pth"
 model_type = "vit_h"
 
 MASK_GENERATOR = None
+SAM_MODEL = None
 
-def get_mask_generator():
-    global MASK_GENERATOR
-    if MASK_GENERATOR is not None:
-        return MASK_GENERATOR
+def get_sam_model():
+    global SAM_MODEL
+    if SAM_MODEL is not None:
+        return SAM_MODEL
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("using %s" % device)
     sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
     sam.to(device=device)
-    MASK_GENERATOR = SamAutomaticMaskGenerator(
+    SAM_MODEL = sam
+    return SAM_MODEL
+
+def get_mask_generator(points_per_side=8):
+    sam = get_sam_model()
+    print("generator for points per side = %d" % points_per_side)
+    return SamAutomaticMaskGenerator(
         model=sam,
-        points_per_side=8,
+        points_per_side=points_per_side,
         points_per_batch=128,
     #    pred_iou_thresh=0.86,
     #    stability_score_thresh=0.92,
@@ -38,7 +45,6 @@ def get_mask_generator():
     #    crop_n_points_downscale_factor=2,
     #    min_mask_region_area=1000,  # Requires open-cv to run post-processing
     )
-    return MASK_GENERATOR
 
 def get_sam_output(img, max_size=1024, points_per_side=8):
     if img.mode != "RGB":
@@ -48,7 +54,7 @@ def get_sam_output(img, max_size=1024, points_per_side=8):
     new_height = int(img.height * ratio)
     img = img.resize((new_width, new_height), Image.LANCZOS)
     img = np.array(img)
-    return get_mask_generator().generate(img)
+    return get_mask_generator(points_per_side).generate(img)
 
 def calc_sam_pickles(img_s3_path):
     picke_s3_path = s3_img_key_to_s3_pickle_key(img_s3_path)

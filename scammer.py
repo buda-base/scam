@@ -182,7 +182,7 @@ class BatchRunner:
         sam_results = None
         if "sam" in self.pipeline:
             self.log_str += "   generate SAM results\n"
-            sam_results = get_sam_output(img_orig)
+            sam_results = get_sam_output(img_orig, max_size=self.sam_resize, points_per_side=self.points_per_side)
             gzipped_pickled_bytes = get_gzip_picked_bytes(sam_results)
             self.save_file(pickle_dirname, pickle_fname, gzipped_pickled_bytes)
             gzipped_pickled_bytes = None # gc
@@ -227,7 +227,7 @@ class BatchRunner:
         self.log_str += "process dir %s" % self.images_path
         img_paths = self.list_img_paths(self.images_path)
         for i, img_path in enumerate(tqdm.tqdm(img_paths)):
-            self.process_img_path(img_path, "%d/%d" % (i, len(img_paths)))
+            self.process_img_path(img_path, "%d/%d" % (i+1, len(img_paths)))
 
 def main():
     if len(sys.argv) <= 1:
@@ -240,11 +240,23 @@ def main():
             br.process_dir()
             print(br.log_str)
 
+def process_failed(csv_fname):
+    with open(csv_fname, newline='') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            imgdir = row[0][:row[0].rfind("/")+1]
+            imgfname = row[0][row[0].rfind("/")+1:]
+            br = BatchRunner(imgdir, pipeline="sam:crop", points_per_side=16, dryrun=False, rotate=True, aws_profile='image_processing')
+            br.process_img_path(imgfname)
+            print(br.log_str)
+
 def test():
-    br = BatchRunner("s3://image-processing.bdrc.io/ER/W1ER120/sources/W1ER120-I1ER790/", pipeline="crop", dryrun=False, rotate=True, aws_profile='image_processing')
-    #br.process_img_path("IMG_56013.JPG") # to test a particular image
+    br = BatchRunner("s3://image-processing.bdrc.io/ER/W1ER123/sources/W1ER123-I1ER797/", pipeline="crop", dryrun=False, rotate=True, aws_profile='image_processing')
+    #br.process_img_path("E 2256-00  001.jpg") # to test a particular image
     br.process_dir()
     print(br.log_str)
 
 if __name__ == "__main__":
-    main()
+    #main()
+    #test()
+    process_failed("failed.csv")
