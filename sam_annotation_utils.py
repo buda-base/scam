@@ -164,12 +164,13 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             #print("ann %d is duplicate, excuding" % i)
             continue
         if not ref_size:
-            ref_size = ann.contour_area
             ann_ratio = ann.bbox[2] / float(ann.bbox[3])
             if not expected_ratio_range or (ann_ratio >= expected_ratio_range[0] and ann_ratio <= expected_ratio_range[1]):
                 image_anns.append(ann)
-            else:
-                print("found annotation with wrong aspect ratio")
+                ref_size = ann.contour_area
+                #print("select ann %d" % i)
+            #else:
+                #print("found annotation with wrong aspect ratio")
             continue
         if ann_included_in(ann, potential_split_anns):
             #print("ann %d included in potential split, excluding" % i)
@@ -180,12 +181,14 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             ann_ratio = ann.bbox[2] / float(ann.bbox[3])
             if not expected_ratio_range or (ann_ratio >= expected_ratio_range[0] and ann_ratio <= expected_ratio_range[1]):
                 image_anns.append(ann)
+                #print("select ann %d" % i)
         elif len(image_anns) < expected_nb_pages and len(potential_split_anns) < expected_nb_pages:
             #print("add annotation %d to the potential union detection" % i)
             potential_split_anns.append(ann)
-        else:
-            break
-    if len(potential_split_anns) and len(image_anns) and is_union(image_anns[0], potential_split_anns):
+            #print("select %d as potential" % i)
+        #else:
+        #    break
+    if len(potential_split_anns) and (len(image_anns) == 0 or is_union(image_anns[0], potential_split_anns)):
         image_anns = potential_split_anns
     # we sort by top x coordinate descending
     image_anns = sorted(image_anns, key=(lambda x: x.bbox[1]))
