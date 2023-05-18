@@ -177,7 +177,7 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             continue
         diff_factor = 0.4 if len(image_anns) < expected_nb_pages else 0.15
         #print("diff is %f / %f" % (abs(ref_size - ann.contour_area) / ann.contour_area, diff_factor))
-        if abs(ref_size - ann.contour_area) / ann.contour_area < diff_factor and not ann_included_in(ann, image_anns):
+        if abs(ref_size - ann.contour_area) / ref_size < diff_factor and not ann_included_in(ann, image_anns):
             ann_ratio = ann.bbox[2] / float(ann.bbox[3])
             if not expected_ratio_range or (ann_ratio >= expected_ratio_range[0] and ann_ratio <= expected_ratio_range[1]):
                 image_anns.append(ann)
