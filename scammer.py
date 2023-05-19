@@ -15,7 +15,7 @@ import sys
 import csv
 
 class BatchRunner:
-    def __init__(self, images_path, pipeline="sam:crop", img_mode=None, expected_ratio_range = [1.8, 20.0], output_uncompressed=True, output_compressed=False, dest_path=None, points_per_side=8, sam_resize=1024, rotate=True, expand_mask_pct=0, pre_rotate=0, aws_profile=None, dryrun=False):
+    def __init__(self, images_path, pipeline="sam:crop", img_mode=None, expected_nb_pages = 2, expected_ratio_range = [1.8, 20.0], output_uncompressed=True, output_compressed=False, dest_path=None, points_per_side=8, points_per_side_2 = 32, sam_resize=1024, rotate=True, expand_mask_pct=0, pre_rotate=0, aws_profile=None, dryrun=False):
         self.images_path = images_path
         self.pipeline = pipeline
         self.dryrun = dryrun
@@ -30,8 +30,9 @@ class BatchRunner:
         self.local_debug_dir = "debug/"
         self.sam_resize = sam_resize
         self.points_per_side = points_per_side
+        self.points_per_side_2 = points_per_side_2
         self.expected_ratio_range = expected_ratio_range
-        self.expected_nb_pages = 2
+        self.expected_nb_pages = expected_nb_pages
         # pre-rotate the images by a certain angle, most likely 90 or -90
         self.pre_rotate = 0 
         self.rotate = rotate
@@ -131,9 +132,9 @@ class BatchRunner:
             dirname += "/"
         return dirname, basename
 
-    def img_path_to_pickle_path(self, img_path):
+    def img_path_to_pickle_path(self, img_path, points_per_side):
         dirname, basename = self.img_path_to_prefixed_path(img_path, "tmp_pickle")
-        basename += "_sam_%d_%d.pickle.gz" % (self.sam_resize, self.points_per_side)
+        basename += "_sam_%d_%d.pickle.gz" % (self.sam_resize, points_per_side)
         return dirname, basename
 
     def img_path_to_qc_path_base(self, img_path):
@@ -168,10 +169,64 @@ class BatchRunner:
         if self.write_mode == "S3":
             return
 
+    def get_save_sam(self, img_path, img_orig, points_per_side):
+        self.log_str += "   generate SAM results for %s , pps: %d\n" % (img_path, points_per_side)
+        sam_results = get_sam_output(img_orig, max_size=self.sam_resize, points_per_side=points_per_side)
+        gzipped_pickled_bytes = get_gzip_picked_bytes(sam_results)
+        pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path, points_per_side)
+        self.mkdir(pickle_dirname)
+        self.save_file(pickle_dirname, pickle_fname, gzipped_pickled_bytes)
+        return sam_results
+
+    def crop_from_sam_results(self, img_path, img_orig, sam_results, save_if_fail, points_per_side):
+        """
+        analyzes the results from SAM and saves the results, returning True
+
+        If save_if_fail is false and the number of detected pages is not
+        what was expected, doesn't save the results and returns False
+        """
+        image_ann_infos = get_image_ann_list(sam_results, img_orig.width, img_orig.height, debug_base_fname = os.path.basename(img_path), expected_nb_pages = self.expected_nb_pages)
+        if len(image_ann_infos) != self.expected_nb_pages:
+            if not save_if_fail:
+                return False
+            self.log_str += "   WARN: %d pages found in %s [%s] (%d expected, pps: %d)\n" % (len(image_ann_infos), self.images_path + img_path, img_dir_info, self.expected_nb_pages, points_per_side)
+        if not image_ann_infos:
+            image_ann_infos = [ None ]
+        for i, image_ann_info in enumerate(image_ann_infos):
+            suffix_idx = 0 if image_ann_info is None else i+1
+            cropped_fname_letter = chr(97+i)
+            extracted_img = extract_img(img_orig, image_ann_info, img_path, rotate=self.rotate)
+            if self.output_uncompressed:
+                cropped_uncompressed_dirname, cropped_uncompressed_fname_base = self.img_path_to_archive_path_base(self.images_path + img_path)
+                self.mkdir(cropped_uncompressed_dirname)
+                img_bytes, file_ext = encode_img_uncompressed(extracted_img)
+                cropped_uncompressed_fname = "%s%s%s" % (cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
+                self.save_file(cropped_uncompressed_dirname, cropped_uncompressed_fname, img_bytes)
+                img_bytes = None # gc
+            if self.output_compressed:
+                cropped_dirname, cropped_fname = self.img_path_to_img_path_base(self.images_path + img_path)
+                self.mkdir(cropped_dirname)
+                img_bytes, file_ext = encode_img(extracted_img)
+                cropped_uncompressed_fname = "%s%s%s" % (cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
+                self.save_file(cropped_uncompressed_dirname, cropped_uncompressed_fname, img_bytes)
+                img_bytes = None
+            # TODO: output QC
+            qc_dirname, qc_fname = self.img_path_to_qc_path_base(img_path)
+            self.mkdir(qc_dirname)
+        return True
+
+    def get_sam_results(self, img_path, points_per_side):
+        pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path, points_per_side)
+        self.log_str += "   getting SAM results from %s\n" % (self.pickle_dirname + pickle_fname)
+        blob = self.gets3blob(pickle_dirname+pickle_fname)
+        if blob is None:
+            self.log_str += "  error! no %s" % (pickle_dirname+pickle_fname)
+            return
+        blob.seek(0)
+        return pickle.loads(gzip.decompress(blob.read()))
+
     def process_img_path(self, img_path, img_dir_info=""):
         self.log_str += " looking at %s\n" % img_path
-        pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path)
-        self.mkdir(pickle_dirname)
         img_orig = None
         if self.read_mode == "S3":
             img_orig = Image.open(self.gets3blob(self.images_path + img_path))
@@ -181,47 +236,22 @@ class BatchRunner:
         img_orig = apply_exif_rotation(img_orig)
         sam_results = None
         if "sam" in self.pipeline:
-            self.log_str += "   generate SAM results\n"
-            sam_results = get_sam_output(img_orig, max_size=self.sam_resize, points_per_side=self.points_per_side)
-            gzipped_pickled_bytes = get_gzip_picked_bytes(sam_results)
-            self.save_file(pickle_dirname, pickle_fname, gzipped_pickled_bytes)
-            gzipped_pickled_bytes = None # gc
-        if "crop" in self.pipeline and (self.output_compressed or self.output_uncompressed):
-            if sam_results is None:
-                blob = self.gets3blob(pickle_dirname+pickle_fname)
-                if blob is None:
-                    self.log_str += "  error! no %s" % (pickle_dirname+pickle_fname)
+            sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side)
+            if "crop" in self.pipeline:
+                # we first try with a lower points per side:
+                success = self.crop_from_sam_results(img_path, img_orig, sam_results, False, self.points_per_side)
+                if success:
                     return
-                blob.seek(0)
-                sam_results = pickle.loads(gzip.decompress(blob.read()))
-                self.log_str += "   get SAM results from %s\n" % (self.images_path + img_path)
-                blob = None # gc
-            image_ann_infos = get_image_ann_list(sam_results, img_orig.width, img_orig.height, debug_base_fname = os.path.basename(img_path), expected_nb_pages = self.expected_nb_pages)
-            if len(image_ann_infos) != 2:
-                self.log_str += "   WARN: %d pages found in %s (%s) (%d expected)\n" % (len(image_ann_infos), self.images_path + img_path, img_dir_info, self.expected_nb_pages)
-            if not image_ann_infos:
-                image_ann_infos = [ None ]
-            for i, image_ann_info in enumerate(image_ann_infos):
-                suffix_idx = 0 if image_ann_info is None else i+1
-                cropped_fname_letter = chr(97+i)
-                extracted_img = extract_img(img_orig, image_ann_info, img_path, rotate=self.rotate)
-                if self.output_uncompressed:
-                    cropped_uncompressed_dirname, cropped_uncompressed_fname_base = self.img_path_to_archive_path_base(self.images_path + img_path)
-                    self.mkdir(cropped_uncompressed_dirname)
-                    img_bytes, file_ext = encode_img_uncompressed(extracted_img)
-                    cropped_uncompressed_fname = "%s%s%s" % (cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
-                    self.save_file(cropped_uncompressed_dirname, cropped_uncompressed_fname, img_bytes)
-                    img_bytes = None # gc
-                if self.output_compressed:
-                    cropped_dirname, cropped_fname = self.img_path_to_img_path_base(self.images_path + img_path)
-                    self.mkdir(cropped_dirname)
-                    img_bytes, file_ext = encode_img(extracted_img)
-                    cropped_uncompressed_fname = "%s%s%s" % (cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
-                    self.save_file(cropped_uncompressed_dirname, cropped_uncompressed_fname, img_bytes)
-                    img_bytes = None
-                # TODO: output QC
-                qc_dirname, qc_fname = self.img_path_to_qc_path_base(img_path)
-                self.mkdir(qc_dirname)
+                self.log_str += "   INFO: failing with pps = %d, retrying with pps = %d" % (self.points_per_side, self.points_per_side_2)
+                # if it didn't work, we try with a higher one:
+                sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side_2)
+                success = self.crop_from_sam_results(img_path, img_orig, sam_results, True, self.points_per_side_2)
+        else:
+            if "crop" not in self.pipeline or (not self.output_compressed and not self.output_uncompressed):
+                print("nothing to do!")
+                return
+            sam_results = self.get_sam_output(img_path, self.points_per_side)
+            self.crop_from_sam_results(img_path, img_orig, sam_results, True, self.points_per_side)
 
     def process_dir(self):
         self.log_str += "process dir %s" % self.images_path
@@ -240,13 +270,13 @@ def main():
             br.process_dir()
             print(br.log_str)
 
-def process_failed(csv_fname):
+def process_individual_images(csv_fname):
     with open(csv_fname, newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
             imgdir = row[0][:row[0].rfind("/")+1]
             imgfname = row[0][row[0].rfind("/")+1:]
-            br = BatchRunner(imgdir, pipeline="sam:crop", points_per_side=16, dryrun=False, rotate=True, aws_profile='image_processing')
+            br = BatchRunner(imgdir, pipeline="sam:crop", points_per_side=8, points_per_side_2=32, dryrun=False, rotate=True, aws_profile='image_processing')
             br.process_img_path(imgfname)
             print(br.log_str)
 
@@ -257,6 +287,6 @@ def test():
     print(br.log_str)
 
 if __name__ == "__main__":
-    #main()
+    main()
     #test()
-    process_failed("failed.csv")
+    #process_individual_images("failed.csv")
