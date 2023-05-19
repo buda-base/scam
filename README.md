@@ -12,12 +12,16 @@ pip3 install git+https://github.com/facebookresearch/segment-anything.git
 pip3 install torch torchvision opencv-python boto3 raw-pillow-opener mozjpeg-lossless-optimization tqdm
 ```
 
-#### Overview
+If S3 is used, AWS credentials must be accessible by the script. The default profile is `image_processing`.
 
-The tool is composed of two parts:
-- `cal_sam_pickles.py` runs SAM on an S3 prefix and saves the output as a gzipped pickle. Warning: for better performance (by a factor of 45!), run this operation on a GPU
-- `crop_sam_pickles.py` gets the pickle files produced by the previous scripts and performs the actual image segmentation, saving the output on s3
+#### Running
 
-SAM only returns a series of masks but does not identify pages. Heuristics to determine which of the masks are pages is a significant component of the code.
+To run the script:
 
-Future plans include determining of a page is upside down using AI.
+```sh
+python scammer.py path_to_csv.csv
+```
+
+The csv file contains a list of image folder or s3 prefix that will be cropped. Currently only the first column is read, see [todo.csv](todo.csv) for an example.
+
+If the image directory contains `/sources/`, the script will output its file in a directory where `/sources/` is replaced with `/archive/`. Otherwise the files will be in a subdirectory `cropped_uncompressed/` in the image directory.
