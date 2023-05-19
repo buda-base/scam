@@ -13,6 +13,7 @@ from PIL import Image
 import cv2
 import sys
 import csv
+from raw_pillow_opener import register_raw_opener
 
 class BatchRunner:
     def __init__(
@@ -247,6 +248,8 @@ class BatchRunner:
     def process_img_path(self, img_path, img_dir_info=""):
         self.log_str += " looking at %s\n" % img_path
         img_orig = None
+        if img_path.endswith("cr2"):
+            register_raw_opener()
         if self.read_mode == "S3":
             img_orig = Image.open(self.gets3blob(self.images_path + img_path))
         else:
