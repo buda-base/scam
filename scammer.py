@@ -178,7 +178,7 @@ class BatchRunner:
         self.save_file(pickle_dirname, pickle_fname, gzipped_pickled_bytes)
         return sam_results
 
-    def crop_from_sam_results(self, img_path, img_orig, sam_results, save_if_fail, points_per_side):
+    def crop_from_sam_results(self, img_path, img_dir_info, img_orig, sam_results, save_if_fail, points_per_side):
         """
         analyzes the results from SAM and saves the results, returning True
 
@@ -217,7 +217,7 @@ class BatchRunner:
 
     def get_sam_results(self, img_path, points_per_side):
         pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path, points_per_side)
-        self.log_str += "   getting SAM results from %s\n" % (self.pickle_dirname + pickle_fname)
+        self.log_str += "   getting SAM results from %s\n" % (pickle_dirname + pickle_fname)
         blob = self.gets3blob(pickle_dirname+pickle_fname)
         if blob is None:
             self.log_str += "  error! no %s" % (pickle_dirname+pickle_fname)
@@ -239,19 +239,19 @@ class BatchRunner:
             sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side)
             if "crop" in self.pipeline:
                 # we first try with a lower points per side:
-                success = self.crop_from_sam_results(img_path, img_orig, sam_results, False, self.points_per_side)
+                success = self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, False, self.points_per_side)
                 if success:
                     return
                 self.log_str += "   INFO: failing with pps = %d, retrying with pps = %d" % (self.points_per_side, self.points_per_side_2)
                 # if it didn't work, we try with a higher one:
                 sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side_2)
-                success = self.crop_from_sam_results(img_path, img_orig, sam_results, True, self.points_per_side_2)
+                success = self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, True, self.points_per_side_2)
         else:
             if "crop" not in self.pipeline or (not self.output_compressed and not self.output_uncompressed):
                 print("nothing to do!")
                 return
             sam_results = self.get_sam_results(img_path, self.points_per_side)
-            self.crop_from_sam_results(img_path, img_orig, sam_results, True, self.points_per_side)
+            self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, True, self.points_per_side)
 
     def process_dir(self):
         self.log_str += "process dir %s" % self.images_path
