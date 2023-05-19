@@ -15,8 +15,27 @@ import sys
 import csv
 
 class BatchRunner:
-    def __init__(self, images_path, pipeline="sam:crop", img_mode=None, expected_nb_pages = 2, expected_ratio_range = [1.8, 20.0], output_uncompressed=True, output_compressed=False, dest_path=None, points_per_side=8, points_per_side_2 = 32, sam_resize=1024, rotate=True, expand_mask_pct=0, pre_rotate=0, aws_profile=None, dryrun=False):
+    def __init__(
+            self, 
+            images_path, 
+            pipeline="sam:crop", 
+            img_mode=None, 
+            expected_nb_pages = 2, 
+            expected_ratio_range = [1.8, 20.0], 
+            min_area_ratio = 0.1,
+            output_uncompressed=True, 
+            output_compressed=False, 
+            dest_path=None, 
+            points_per_side=8, 
+            points_per_side_2 = 32, 
+            sam_resize=1024, 
+            rotate=True, 
+            expand_mask_pct=0, 
+            pre_rotate=0, 
+            aws_profile=None, 
+            dryrun=False):
         self.images_path = images_path
+        self.min_area_ratio = min_area_ratio
         self.pipeline = pipeline
         self.dryrun = dryrun
         self.read_mode = None
@@ -185,7 +204,7 @@ class BatchRunner:
         If save_if_fail is false and the number of detected pages is not
         what was expected, doesn't save the results and returns False
         """
-        image_ann_infos = get_image_ann_list(sam_results, img_orig.width, img_orig.height, debug_base_fname = os.path.basename(img_path), expected_nb_pages = self.expected_nb_pages)
+        image_ann_infos = get_image_ann_list(sam_results, img_orig.width, img_orig.height, debug_base_fname = os.path.basename(img_path), expected_nb_pages = self.expected_nb_pages, min_area_ratio = self.min_area_ratio)
         if len(image_ann_infos) != self.expected_nb_pages:
             if not save_if_fail:
                 return False

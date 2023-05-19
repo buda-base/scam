@@ -140,7 +140,7 @@ def ann_included_in(ann, image_anns):
             return True
     return False
 
-def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, expected_ratio_range=[1.7, 20.0]):
+def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, expected_ratio_range=[1.7, 20.0], min_area_ratio=0.01):
     ann_list = []
     for sam_ann in sam_ann_list:
         ann_list.append(AnnotationInfo(sam_ann, original_img_width, original_img_height))
@@ -148,9 +148,13 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
     image_anns = []
     potential_split_anns = []
     ref_size = None
+    total_area = float(original_img_height * original_img_height)
     for i, ann in enumerate(anns_by_area):
         if DEBUG:
             ann.debug_mask(debug_base_fname+"_%03d" % i)
+        if ann.contour_area / total_area < min_area_ratio:
+            #print("reject annotation with ratio = %f < %f" % (ann.contour_area / total_area, min_area_ratio))
+            break
         if ann.nb_edges_touched() > 2:
             #print("ann %d touches %d edges, excuding" % (i, ann.nb_edges_touched()))
             continue
@@ -168,7 +172,7 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             if not expected_ratio_range or (ann_ratio >= expected_ratio_range[0] and ann_ratio <= expected_ratio_range[1]):
                 image_anns.append(ann)
                 ref_size = ann.contour_area
-                #print("select ann %d" % i)
+                #print("select ann %d with area ratio %f" % (i, ann.contour_area / total_area))
             #else:
                 #print("found annotation with wrong aspect ratio")
             continue
