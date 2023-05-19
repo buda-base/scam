@@ -250,7 +250,7 @@ class BatchRunner:
             if "crop" not in self.pipeline or (not self.output_compressed and not self.output_uncompressed):
                 print("nothing to do!")
                 return
-            sam_results = self.get_sam_output(img_path, self.points_per_side)
+            sam_results = self.get_sam_results(img_path, self.points_per_side)
             self.crop_from_sam_results(img_path, img_orig, sam_results, True, self.points_per_side)
 
     def process_dir(self):
