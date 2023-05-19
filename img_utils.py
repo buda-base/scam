@@ -125,7 +125,11 @@ def apply_exif_rotation(img):
         if ExifTags.TAGS[orientation]=='Orientation':
             break
     
-    exif = img._getexif()
+    exif = None
+    try:
+        exif = img._getexif()
+    except:
+        return img
     if exif is None:
         return img
 
