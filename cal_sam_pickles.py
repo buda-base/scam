@@ -34,7 +34,7 @@ def get_sam_model():
 
 def get_mask_generator(points_per_side=8):
     sam = get_sam_model()
-    print("generator for points per side = %d" % points_per_side)
+    #print("generator for points per side = %d" % points_per_side)
     return SamAutomaticMaskGenerator(
         model=sam,
         points_per_side=points_per_side,
