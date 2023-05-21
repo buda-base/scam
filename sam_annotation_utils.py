@@ -174,7 +174,7 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
                 ref_size = ann.contour_area
                 #print("select ann %d with area ratio %f" % (i, ann.contour_area / total_area))
             #else:
-                #print("found annotation with wrong aspect ratio")
+            #    print("found annotation with wrong aspect ratio %f not in [%f, %f]" % (ann_ratio, expected_ratio_range[0], expected_ratio_range[1]))
             continue
         if ann_included_in(ann, potential_split_anns):
             #print("ann %d included in potential split, excluding" % i)

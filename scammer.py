@@ -28,12 +28,13 @@ class BatchRunner:
             output_compressed=False, 
             dest_path=None, 
             points_per_side=8, 
-            points_per_side_2 = 32, 
+            points_per_side_2=32, 
             sam_resize=1024, 
             rotate=True, 
             expand_mask_pct=0, 
             pre_rotate=0, 
-            aws_profile=None, 
+            aws_profile=None,
+            apply_exif_rotation = False,
             dryrun=False):
         self.images_path = images_path
         self.min_area_ratio = min_area_ratio
@@ -53,6 +54,7 @@ class BatchRunner:
         self.points_per_side_2 = points_per_side_2
         self.expected_ratio_range = expected_ratio_range
         self.expected_nb_pages = expected_nb_pages
+        self.apply_exif_rotation = apply_exif_rotation
         # pre-rotate the images by a certain angle, most likely 90 or -90
         self.pre_rotate = 0 
         self.rotate = rotate
@@ -130,12 +132,16 @@ class BatchRunner:
 
     def img_path_to_prefixed_path(self, img_path, prefix):
         other_dir = False
+        if img_path.startswith(self.images_path) and self.images_path != self.dest_path:
+            img_path = self.dest_path + img_path[len(self.images_path):]
+            if prefix == "cropped_uncompressed":
+                other_dir = True
         if "/images/" in img_path:
             other_dir = True
             if prefix == "cropped_uncompressed":
                 img_path = img_path.replace("/images/", "/archive/")
             else:
-                img_path = img_path.replace("/images/", "/images_%s/" % prefix)
+                img_path = img_path.replace("/images/", "/images%s/" % prefix)
         if "/sources/" in img_path:
             other_dir = True
             if prefix == "cropped_compressed":
@@ -143,7 +149,7 @@ class BatchRunner:
             elif prefix == "cropped_uncompressed":
                 img_path = img_path.replace("/sources/", "/archive/")
             else:
-                img_path = img_path.replace("/sources/", "/sources_%s/" % prefix)
+                img_path = img_path.replace("/sources/", "/sources%s/" % prefix)
         basename = os.path.basename(img_path)
         dirname = os.path.dirname(img_path)
         if not other_dir:
@@ -153,20 +159,20 @@ class BatchRunner:
         return dirname, basename
 
     def img_path_to_pickle_path(self, img_path, points_per_side):
-        dirname, basename = self.img_path_to_prefixed_path(img_path, "tmp_pickle")
+        dirname, basename = self.img_path_to_prefixed_path(img_path, "_tmp_pickle")
         basename += "_sam_%d_%d.pickle.gz" % (self.sam_resize, points_per_side)
         return dirname, basename
 
     def img_path_to_qc_path_base(self, img_path):
-        dirname, basename = self.img_path_to_prefixed_path(img_path, "cropped_qc")
+        dirname, basename = self.img_path_to_prefixed_path(img_path, "_cropped_qc")
         basename += "_qc.jpg"
         return dirname, basename
 
     def img_path_to_img_path_base(self, img_path):
-        return self.img_path_to_prefixed_path(img_path, "cropped_compressed")
+        return self.img_path_to_prefixed_path(img_path, "_cropped_compressed")
 
     def img_path_to_archive_path_base(self, img_path):
-        dirname, basename = self.img_path_to_prefixed_path(img_path, "cropped_uncompressed")
+        dirname, basename = self.img_path_to_prefixed_path(img_path, "_cropped_uncompressed")
         basename = os.path.splitext(basename)[0] # removing extension
         return dirname, basename
 
@@ -205,7 +211,7 @@ class BatchRunner:
         If save_if_fail is false and the number of detected pages is not
         what was expected, doesn't save the results and returns False
         """
-        image_ann_infos = get_image_ann_list(sam_results, img_orig.width, img_orig.height, debug_base_fname = os.path.basename(img_path), expected_nb_pages = self.expected_nb_pages, min_area_ratio = self.min_area_ratio)
+        image_ann_infos = get_image_ann_list(sam_results, img_orig.width, img_orig.height, debug_base_fname = os.path.basename(img_path), expected_nb_pages = self.expected_nb_pages, min_area_ratio = self.min_area_ratio, expected_ratio_range = self.expected_ratio_range)
         if len(image_ann_infos) != self.expected_nb_pages:
             if not save_if_fail:
                 return False
@@ -254,8 +260,9 @@ class BatchRunner:
             img_orig = Image.open(self.gets3blob(self.images_path + img_path))
         else:
             img_orig = Image.open(self.images_path + img_path)
-        img_orig = apply_icc(img_orig) # maybe icc shouldn't be applied to archive images?s
-        img_orig = apply_exif_rotation(img_orig)
+        img_orig = apply_icc(img_orig) # maybe icc shouldn't be applied to archive images?
+        if self.apply_exif_rotation:
+            img_orig = apply_exif_rotation(img_orig)
         sam_results = None
         if "sam" in self.pipeline:
             sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side)
@@ -288,7 +295,7 @@ def main():
     with open(sys.argv[1], newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
-            br = BatchRunner(row[0], pipeline=row[1], dryrun=False, rotate=True, aws_profile='image_processing')
+            br = BatchRunner(row[0], expected_ratio_range = [0.5, 30.0], expected_nb_pages = 1, pipeline=row[1], dryrun=False, rotate=False, aws_profile='image_processing')
             br.process_dir()
             print(br.log_str)
 
@@ -308,7 +315,13 @@ def test():
     br.process_dir()
     print(br.log_str)
 
+def matho():
+    br = BatchRunner("s3://image-processing.bdrc.io/Matho/", dest_path="s3://image-processing.bdrc.io/Matho-cropped/", expected_ratio_range = [0.5, 30.0], expected_nb_pages = 1, pipeline="sam:crop", dryrun=False, rotate=False, aws_profile='image_processing')
+    br.process_dir()
+    print(br.log_str)
+
 if __name__ == "__main__":
     main()
+    #matho()
     #test()
     #process_individual_images("failed.csv")
