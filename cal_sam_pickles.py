@@ -38,7 +38,7 @@ def get_mask_generator(points_per_side=8):
     return SamAutomaticMaskGenerator(
         model=sam,
         points_per_side=points_per_side,
-        points_per_batch=128,
+    #    points_per_batch=128, # sometimes causes OOM errors
     #    pred_iou_thresh=0.86,
     #    stability_score_thresh=0.92,
     #    crop_n_layers=1,
