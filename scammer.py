@@ -130,7 +130,7 @@ class BatchRunner:
 
     def s3key_exists(self, s3Key):
         try:
-            self.S3.head_object(self.read_bucket, s3Key)
+            self.S3.head_object(Bucket=self.read_bucket, Key=s3Key)
             return True
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == '404':
