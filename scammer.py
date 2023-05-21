@@ -31,7 +31,8 @@ class BatchRunner:
             points_per_side_2=32, 
             sam_resize=1024, 
             rotate=True, 
-            expand_mask_pct=0, 
+            expand_mask_pct=0,
+            skip_if_exists=True,
             pre_rotate=0, 
             aws_profile=None,
             apply_exif_rotation = False,
@@ -44,6 +45,7 @@ class BatchRunner:
         self.read_bucket = None
         self.dest_path = dest_path
         self.write_mode = None
+        self.skip_if_exists = skip_if_exists
         self.cropped_images_path = None
         self.qc_images_path = None
         self.write_bucket = None
@@ -126,6 +128,16 @@ class BatchRunner:
             else:
                 raise
 
+    def s3key_exists(self, s3Key):
+        try:
+            self.S3.head_object(self.read_bucket, s3Key)
+            return True
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == '404':
+                return False
+            else:
+                raise
+
     def upload_to_s3(self, data, s3_key):
         if not self.dryrun:
             self.S3.put_object(Bucket=self.write_bucket, Key=s3_key, Body=data)
@@ -191,15 +203,26 @@ class BatchRunner:
         if self.write_mode == "S3":
             self.upload_to_s3(data, dirname+fname)
 
+    def file_exists(self, dirname, fname):
+        if self.write_mode == "S3":
+            self.s3key_exists(dirname+fname)
+
     def mkdir(self, dirname):
         if self.write_mode == "S3":
             return
 
     def get_save_sam(self, img_path, img_orig, points_per_side):
+        pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path, points_per_side)
+        if self.skip_if_exists and self.file_exists(pickle_dirname, pickle_fname):
+            blob = self.gets3blob(pickle_dirname+pickle_fname)
+            if blob is None:
+                self.log_str += "  error! no %s" % (pickle_dirname+pickle_fname)
+                return
+            blob.seek(0)
+            return pickle.loads(gzip.decompress(blob.read()))
         self.log_str += "   generate SAM results for %s , pps: %d\n" % (img_path, points_per_side)
         sam_results = get_sam_output(img_orig, max_size=self.sam_resize, points_per_side=points_per_side)
         gzipped_pickled_bytes = get_gzip_picked_bytes(sam_results)
-        pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path, points_per_side)
         self.mkdir(pickle_dirname)
         self.save_file(pickle_dirname, pickle_fname, gzipped_pickled_bytes)
         return sam_results
@@ -316,7 +339,7 @@ def test():
     print(br.log_str)
 
 def matho():
-    br = BatchRunner("s3://image-processing.bdrc.io/Matho/", dest_path="s3://image-processing.bdrc.io/Matho-cropped/", expected_ratio_range = [0.5, 30.0], expected_nb_pages = 1, pipeline="sam:crop", dryrun=False, rotate=False, aws_profile='image_processing')
+    br = BatchRunner("s3://image-processing.bdrc.io/Matho/", dest_path="s3://image-processing.bdrc.io/Matho-cropped/", expected_ratio_range = [0.5, 30.0], expected_nb_pages = 1, pipeline="sam", dryrun=False, rotate=False, aws_profile='image_processing')
     br.process_dir()
     print(br.log_str)
 
