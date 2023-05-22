@@ -58,7 +58,7 @@ class BatchRunner:
         self.expected_nb_pages = expected_nb_pages
         self.apply_exif_rotation = apply_exif_rotation
         # pre-rotate the images by a certain angle, most likely 90 or -90
-        self.pre_rotate = 0 
+        self.pre_rotate = pre_rotate
         self.rotate = rotate
         self.images_prefix = None
         self.analyze_read_path()
@@ -172,7 +172,10 @@ class BatchRunner:
 
     def img_path_to_pickle_path(self, img_path, points_per_side):
         dirname, basename = self.img_path_to_prefixed_path(img_path, "_tmp_pickle")
-        basename += "_sam_%d_%d.pickle.gz" % (self.sam_resize, points_per_side)
+        angle_suffix = ""
+        if self.pre_rotate != 0:
+            angle_suffix = "_"+str(self.pre_rotate)
+        basename += "_sam_%d_%d%s.pickle.gz" % (self.sam_resize, points_per_side, angle_suffix)
         return dirname, basename
 
     def img_path_to_qc_path_base(self, img_path):
@@ -215,9 +218,6 @@ class BatchRunner:
         pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path, points_per_side)
         if self.skip_if_exists and self.file_exists(pickle_dirname, pickle_fname):
             blob = self.gets3blob(pickle_dirname+pickle_fname)
-            if blob is None:
-                self.log_str += "  error! no %s" % (pickle_dirname+pickle_fname)
-                return
             blob.seek(0)
             return pickle.loads(gzip.decompress(blob.read()))
         self.log_str += "   generate SAM results for %s , pps: %d\n" % (img_path, points_per_side)
@@ -286,6 +286,8 @@ class BatchRunner:
         img_orig = apply_icc(img_orig) # maybe icc shouldn't be applied to archive images?
         if self.apply_exif_rotation:
             img_orig = apply_exif_rotation(img_orig)
+        if self.pre_rotate:
+            img_orig = img_orig.rotate(self.pre_rotate, expand=True)
         sam_results = None
         if "sam" in self.pipeline:
             sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side)
