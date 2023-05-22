@@ -140,6 +140,26 @@ def ann_included_in(ann, image_anns):
             return True
     return False
 
+def order_image_annotation(image_anns):
+    if len(image_anns) < 2:
+        return image_anns
+    # we need to order the annotations in the page order, sometimes left to right, sometimes top to bottom
+    # we get the annotation centers:
+    centers_x = []
+    centers_y = []
+    for img_ann in image_anns:
+        centers_x.append(img_ann.bbox[0]+(img_ann.bbox[2]/2))
+        centers_y.append(img_ann.bbox[1]+(img_ann.bbox[3]/2))
+    centers_x.sort()
+    centers_y.sort()
+    var_x = centers_x[-1] - centers_x[0]
+    var_y = centers_y[-1] - centers_y[0]
+    #print("var_x = %d, var_y = %d" % (var_x, var_y))
+    if var_x > var_y:
+        return sorted(image_anns, key=(lambda x: x.bbox[0]))
+    else:
+        return sorted(image_anns, key=(lambda x: x.bbox[1]))
+
 def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, expected_ratio_range=[1.7, 20.0], min_area_ratio=0.01):
     ann_list = []
     for sam_ann in sam_ann_list:
@@ -194,8 +214,8 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
         #    break
     if len(potential_split_anns) and (len(image_anns) == 0 or is_union(image_anns[0], potential_split_anns)):
         image_anns = potential_split_anns
-    # we sort by top x coordinate descending
-    image_anns = sorted(image_anns, key=(lambda x: x.bbox[1]))
+    # we sort according to the split direction:
+    image_anns = order_image_annotation(image_anns)
     if DEBUG:
         for i, image_ann in enumerate(image_anns):
             image_ann.debug_mask(debug_base_fname+"_selected%03d" % i)
