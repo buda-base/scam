@@ -1,0 +1,9 @@
+git+https://github.com/facebookresearch/segment-anything.git
+torch
+torchvision
+opencv-python
+boto3
+raw-pillow-opener
+mozjpeg-lossless-optimization
+tqdm
+numpy
