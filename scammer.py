@@ -125,16 +125,27 @@ class BatchRunner:
         obj_keys.sort()
         return filter(is_img, obj_keys)
 
-    def gets3blob(self, s3Key):
-        f = io.BytesIO()
-        try:
-            self.S3.download_fileobj(self.read_bucket, s3Key, f)
-            return f
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == '404':
+    def gets3blob(self, blob_source: Path) -> io.BytesIO:
+        """
+        @param blob_source: path to data object
+        @return:
+        """
+
+        if self.read_mode == "S3":
+            try:
+                f = io.BytesIO()
+                self.S3.download_fileobj(self.read_bucket, blob_source, f)
+                return f
+            except botocore.exceptions.ClientError as e:
+                if e.response['Error']['Code'] == '404':
+                    return None
+                else:
+                    raise
+        else:
+            if not os.path.exists(blob_source):
                 return None
-            else:
-                raise
+            with open(blob_source, "rb") as fh:
+                return io.BytesIO(fh.read())
 
     def s3key_exists(self, s3Key):
         try:
@@ -241,7 +252,7 @@ class BatchRunner:
     def get_save_sam(self, img_path, img_orig, points_per_side):
         pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path, points_per_side)
         if self.skip_if_exists and self.file_exists(pickle_dirname, pickle_fname):
-            blob = self.gets3blob(pickle_dirname + pickle_fname)
+            blob = self.gets3blob(Path(pickle_dirname, pickle_fname))
             blob.seek(0)
             return pickle.loads(gzip.decompress(blob.read()))
         self.log_str += "   generate SAM results for %s , pps: %d\n" % (img_path, points_per_side)
@@ -267,7 +278,8 @@ class BatchRunner:
             if not save_if_fail:
                 return False
             self.log_str += "   WARN: %d pages found in %s [%s] (%d expected, pps: %d)\n" % (
-            len(image_ann_infos), self.images_path + img_path, img_dir_info, self.expected_nb_pages, points_per_side)
+                len(image_ann_infos), self.images_path + img_path, img_dir_info, self.expected_nb_pages,
+                points_per_side)
         if not image_ann_infos:
             image_ann_infos = [None]
         for i, image_ann_info in enumerate(image_ann_infos):
@@ -280,7 +292,7 @@ class BatchRunner:
                 self.mkdir(cropped_uncompressed_dirname)
                 img_bytes, file_ext = encode_img_uncompressed(extracted_img)
                 cropped_uncompressed_fname = "%s%s%s" % (
-                cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
+                    cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
                 self.save_file(cropped_uncompressed_dirname, cropped_uncompressed_fname, img_bytes)
                 img_bytes = None  # gc
             if self.output_compressed:
@@ -291,7 +303,7 @@ class BatchRunner:
                 # WARNING: cropped_uncompressed_fname_base might be referenced before assignment.
                 # fix up
                 cropped_uncompressed_fname = "%s%s%s" % (
-                cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
+                    cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
                 self.save_file(cropped_uncompressed_dirname, cropped_uncompressed_fname, img_bytes)
                 img_bytes = None
             # TODO: output QC
@@ -302,7 +314,7 @@ class BatchRunner:
     def get_sam_results(self, img_path, points_per_side):
         pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path, points_per_side)
         self.log_str += "   getting SAM results from %s\n" % (pickle_dirname + pickle_fname)
-        blob = self.gets3blob(pickle_dirname + pickle_fname)
+        blob = self.gets3blob(Path(pickle_dirname, pickle_fname))
         if blob is None:
             self.log_str += "  error! no %s" % (pickle_dirname + pickle_fname)
             return
@@ -315,7 +327,7 @@ class BatchRunner:
         if img_path.endswith("cr2"):
             register_raw_opener()
         if self.read_mode == "S3":
-            img_orig = Image.open(self.gets3blob(self.images_path + img_path))
+            img_orig = Image.open(self.gets3blob(Path(self.images_path, img_path)))
         else:
             img_orig = Image.open(str(Path(self.images_path, img_path)))
         img_orig = apply_icc(img_orig)  # maybe icc shouldn't be applied to archive images?
@@ -328,11 +340,12 @@ class BatchRunner:
             sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side)
             if "crop" in self.pipeline:
                 # we first try with a lower points per side:
-                success = self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, False, self.points_per_side)
+                success = self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, False,
+                                                     self.points_per_side)
                 if success or self.points_per_side_2 <= self.points_per_side:
                     return
                 self.log_str += "   INFO: failing with pps = %d, retrying with pps = %d" % (
-                self.points_per_side, self.points_per_side_2)
+                    self.points_per_side, self.points_per_side_2)
                 # if it didn't work, we try with a higher one:
                 sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side_2)
                 success = self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, True,
@@ -358,31 +371,49 @@ def main():
     with open(sys.argv[1], newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
-            br = BatchRunner(row[0], points_per_side=16, points_per_side_2=64, expected_ratio_range = [4.0, 10.0], expected_nb_pages = 4, pipeline=row[1], dryrun=False, rotate=True, aws_profile='image_processing')
+#             br = BatchRunner(row[0], points_per_side=16, points_per_side_2=64, expected_ratio_range=[4.0, 10.0],
+#                              expected_nb_pages=4, pipeline=row[1], dryrun=False, rotate=True,
+#                              aws_profile='image_processing')
+#             expected_ratio_range = [4.0, 10.0]
+# pre_rotate=
+# expected_nb_pages = 2
+# points_per_side=8
+# points_per_side_2=32
+            br = BatchRunner(row[0], points_per_side=8, points_per_side_2=32, expected_ratio_range=[4.0, 10.0],
+                             expected_nb_pages=2, pipeline=row[1], dryrun=False, rotate=True, pre_rotate=0,
+                             aws_profile='image_processing')
             br.process_dir()
             print(br.log_str)
+
 
 def process_individual_images(csv_fname):
     with open(csv_fname, newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
-            imgdir = row[0][:row[0].rfind("/")+1]
-            imgfname = row[0][row[0].rfind("/")+1:]
-            br = BatchRunner(imgdir, pipeline="sam:crop", pre_rotate=90, expected_ratio_range = [4.0, 10.0], expected_nb_pages = 4, points_per_side=8, points_per_side_2=32, dryrun=False, rotate=True, aws_profile='image_processing')
+            imgdir = row[0][:row[0].rfind("/") + 1]
+            imgfname = row[0][row[0].rfind("/") + 1:]
+            br = BatchRunner(imgdir, pipeline="sam:crop", pre_rotate=90, expected_ratio_range=[4.0, 10.0],
+                             expected_nb_pages=4, points_per_side=8, points_per_side_2=32, dryrun=False, rotate=True,
+                             aws_profile='image_processing')
             br.process_img_path(imgfname)
             print(br.log_str)
 
 
 def test():
-    br = BatchRunner("s3://image-processing.bdrc.io/ER/W1ER123/sources/W1ER123-I1ER797/", pipeline="crop", dryrun=False, rotate=True, aws_profile='image_processing')
-    #br.process_img_path("E 2256-00  001.jpg") # to test a particular image
+    br = BatchRunner("s3://image-processing.bdrc.io/ER/W1ER123/sources/W1ER123-I1ER797/", pipeline="crop", dryrun=False,
+                     rotate=True, aws_profile='image_processing')
+    # br.process_img_path("E 2256-00  001.jpg") # to test a particular image
     br.process_dir()
     print(br.log_str)
 
+
 def matho():
-    br = BatchRunner("s3://image-processing.bdrc.io/Matho/2-up/", dest_path="s3://image-processing.bdrc.io/Matho-cropped/2-up/", expected_ratio_range = [0.5, 30.0], expected_nb_pages = 2, pipeline="crop", dryrun=False, rotate=False, aws_profile='image_processing')
+    br = BatchRunner("s3://image-processing.bdrc.io/Matho/2-up/",
+                     dest_path="s3://image-processing.bdrc.io/Matho-cropped/2-up/", expected_ratio_range=[0.5, 30.0],
+                     expected_nb_pages=2, pipeline="crop", dryrun=False, rotate=False, aws_profile='image_processing')
     br.process_dir()
     print(br.log_str)
+
 
 if __name__ == "__main__":
     main()
