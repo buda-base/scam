@@ -1,3 +1,5 @@
+import os
+
 import boto3
 import io
 import botocore
@@ -39,9 +41,15 @@ def s3key_exists(s3_key):
             return False # ?
     return True
 
-def is_img(path):
-    end4 = path[-4:].lower()
-    return end4 in [".jpg", "jpeg", ".tif", "tiff", ".cr2"]
+def is_img(path: str) -> bool:
+    """"
+    Better to use try: Image.open() but this is faster)
+    """
+    end4: [str] = os.path.splitext(path)
+
+    if len(end4) < 2:
+        return False
+    return end4[1].lower() in [".jpg", "jpeg", ".tif", "tiff", ".cr2"]
 
 def list_obj_keys(prefix, bucket=BUCKET_NAME):
     obj_keys = []
@@ -64,6 +72,15 @@ def list_img_keys(prefix, bucket=BUCKET_NAME):
     obj_keys = list_obj_keys(prefix, bucket)
     obj_keys.sort()
     return filter(is_img, obj_keys)
+
+def list_img_local(path: str) ->filter:
+    obj_keys:[str] = []
+    for afile in os.scandir(path):
+        if afile.is_file():
+            obj_keys.append(afile.path)
+    obj_keys.sort()
+    return filter(is_img, obj_keys)
+
 
 MAX_SIZE = 1024
 POINTS_PER_SIDE = 8
