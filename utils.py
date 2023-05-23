@@ -68,9 +68,12 @@ def list_img_keys(prefix, bucket=BUCKET_NAME):
 MAX_SIZE = 1024
 POINTS_PER_SIDE = 8
 
-def s3_img_key_to_s3_pickle_key(img_s3_key):
-    suffix = "_sam_"+str(MAX_SIZE)+"_"+str(POINTS_PER_SIDE)+".pickle.gz"
-    return img_s3_key.replace("/sources/", "/sources_tmp_pickle/") + suffix 
+def s3_img_key_to_s3_pickle_key(img_s3_key, dots_per_side=8, pre_rotate=0):
+    rotatestr = "" if pre_rotate == 0 else "_"+str(pre_rotate)
+    suffix = "_sam_"+str(MAX_SIZE)+"_"+str(dots_per_side)+("%s.pickle.gz" % rotatestr)
+    if "/images/" in img_s3_key:
+        return img_s3_key.replace("/images/", "/images_tmp_pickle/") + suffix
+    return img_s3_key.replace("/sources/", "/archive/") + suffix 
 
 def split_s3_path(s3_path):
     path_parts=s3_path.replace("s3://","").split("/")
