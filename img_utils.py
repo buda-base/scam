@@ -66,9 +66,10 @@ def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
     #return rotate_warp_perspective(img_orig, ann_info.minAreaRect)
     return rotate_warp_affine(img_orig, ann_info.minAreaRect)
 
-def encode_img_uncompressed(img):
+def encode_img_uncompressed(img) -> (bytes, str):
     """
     returns the bytes of the uncompressed tiff image
+    AND the expected file extension
     """
     with io.BytesIO() as output:
         img.save(output, icc_profile=img.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
@@ -170,7 +171,7 @@ def get_debug_img_bytes(img_orig, image_anns, max_size_px=256, draw_rotated=True
     img_orig = img_orig.resize((img_orig.size[0]*rf, img_orig.size[1]*rf), Image.BICUBIC)
     # produce an opencv image
     img_orig = img_orig.convert('RGB')
-    new_img = cv2.cvtColor(numpy.array(img_orig), cv2.COLOR_RGB2BGR) 
+    new_img = cv2.cvtColor(np.array(img_orig), cv2.COLOR_RGB2BGR)
     img_org = None # gc
     # resize_factor
     for i, image_ann in enumerate(image_anns):

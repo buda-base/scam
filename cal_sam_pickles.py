@@ -1,18 +1,18 @@
-import gzip
-import pickle
+# import gzip
+# import pickle
 from PIL import Image
-import botocore
-from pathlib import Path
-from io import StringIO
-import io
-import boto3
-import sys
-import cv2
+# import botocore
+# from pathlib import Path
+# from io import StringIO
+# import io
+# import boto3
+# import sys
+# import cv2
 import numpy as np
 import torch
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
 import pickle
-from utils import s3_img_key_to_s3_pickle_key, MAX_SIZE, POINTS_PER_SIDE, upload_to_s3, gets3blob, S3, BUCKET_NAME, list_img_keys, get_gzip_picked_bytes
+from utils import s3_img_key_to_s3_pickle_key, MAX_SIZE, POINTS_PER_SIDE, upload_to_s3, gets3blob, S3, BUCKET_NAME, list_img_keys, get_gzip_picked_bytes, s3key_exists
 from img_utils import apply_exif_rotation
 
 sam_checkpoint = "sam_vit_h_4b8939.pth"
