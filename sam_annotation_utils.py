@@ -182,6 +182,7 @@ def handle_unions(image_anns, potential_split_anns):
         return potential_split_anns
     # TODO: implement a more thorought approach, but the number of tests
     # get too big too quickly with a naive approach
+    return image_anns
 
 def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, expected_ratio_range=[1.7, 20.0], min_area_ratio=0.01):
     ann_list = []
