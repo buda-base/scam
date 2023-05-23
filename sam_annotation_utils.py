@@ -18,7 +18,7 @@ class AnnotationInfo:
         self.bbox = cv2.boundingRect(self.contour)
 
     def debug_mask(self, base_fname):
-        cv2.imwrite(base_fname+"_mask.png", self.mask)
+        cv2.imwrite("debug/"+base_fname+"_mask.png", self.mask)
         contours, _ = cv2.findContours(self.mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         areas = [cv2.contourArea(c) for c in contours]
         max_index = np.argmax(areas)
@@ -28,7 +28,7 @@ class AnnotationInfo:
         box = cv2.boxPoints(self.minAreaRect)
         box = np.int0(box)
         cv2.drawContours(color_mask,[box],0,(0,0,255),2)
-        cv2.imwrite(base_fname+"_contours.png", color_mask)
+        cv2.imwrite("debug/"+base_fname+"_contours.png", color_mask)
 
     def nb_edges_touched(self, px=20):
         nb_edges = 0
@@ -140,9 +140,10 @@ def ann_included_in(ann, image_anns):
             return True
     return False
 
-def order_image_annotation(image_anns):
-    if len(image_anns) < 2:
-        return image_anns
+def get_direction(image_anns):
+    """
+    returns "x" or "y" depending on the axis of the annotations
+    """
     # we need to order the annotations in the page order, sometimes left to right, sometimes top to bottom
     # we get the annotation centers:
     centers_x = []
@@ -155,10 +156,32 @@ def order_image_annotation(image_anns):
     var_x = centers_x[-1] - centers_x[0]
     var_y = centers_y[-1] - centers_y[0]
     #print("var_x = %d, var_y = %d" % (var_x, var_y))
-    if var_x > var_y:
+    return "x" if var_x > var_y else "y"
+
+def order_image_annotation(image_anns):
+    if len(image_anns) < 2:
+        return image_anns
+    d = get_direction(image_anns)
+    if d == "x":
         return sorted(image_anns, key=(lambda x: x.bbox[0]))
     else:
         return sorted(image_anns, key=(lambda x: x.bbox[1]))
+
+#def has_parts_in(image_ann, potential_split_anns):
+#    for 
+
+def handle_unions(image_anns, potential_split_anns):
+    if len(potential_split_anns) == 0:
+        return image_anns
+    if len(image_anns) == 0:
+        return potential_split_anns
+    d = get_direction(image_anns)
+    #image_anns = order_image_annotation(image_anns)
+    #potential_split_anns = order_image_annotation(potential_split_anns)
+    if is_union(image_anns[0], potential_split_anns):
+        return potential_split_anns
+    # TODO: implement a more thorought approach, but the number of tests
+    # get too big too quickly with a naive approach
 
 def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, expected_ratio_range=[1.7, 20.0], min_area_ratio=0.01):
     ann_list = []
@@ -170,6 +193,8 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
     ref_size = None
     total_area = float(original_img_height * original_img_height)
     for i, ann in enumerate(anns_by_area):
+        ann_ratio = ann.bbox[2] / float(ann.bbox[3])
+        #print("ann %d, bbox %s, aspect ratio %f" % (i, str(ann.bbox), ann_ratio))
         if DEBUG:
             ann.debug_mask(debug_base_fname+"_%03d" % i)
         if ann.contour_area / total_area < min_area_ratio:
@@ -188,11 +213,10 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
             #print("ann %d is duplicate, excuding" % i)
             continue
         if not ref_size:
-            ann_ratio = ann.bbox[2] / float(ann.bbox[3])
             if not expected_ratio_range or (ann_ratio >= expected_ratio_range[0] and ann_ratio <= expected_ratio_range[1]):
                 image_anns.append(ann)
                 ref_size = ann.contour_area
-                #print("select ann %d with area ratio %f" % (i, ann.contour_area / total_area))
+                #print("select ann %d with area ratio %f, aspect ratio %f" % (i, ann.contour_area / total_area, ann_ratio))
             #else:
             #    print("found annotation with wrong aspect ratio %f not in [%f, %f]" % (ann_ratio, expected_ratio_range[0], expected_ratio_range[1]))
             continue
@@ -202,18 +226,15 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
         diff_factor = 0.4 if len(image_anns) < expected_nb_pages else 0.15
         #print("diff is %f / %f" % (abs(ref_size - ann.contour_area) / ann.contour_area, diff_factor))
         if abs(ref_size - ann.contour_area) / ref_size < diff_factor and not ann_included_in(ann, image_anns):
-            ann_ratio = ann.bbox[2] / float(ann.bbox[3])
             if not expected_ratio_range or (ann_ratio >= expected_ratio_range[0] and ann_ratio <= expected_ratio_range[1]):
                 image_anns.append(ann)
-                #print("select ann %d" % i)
+                #print("select ann %d, aspect ratio %f" % (i, ann_ratio))
         elif len(image_anns) < expected_nb_pages and len(potential_split_anns) < expected_nb_pages:
-            #print("add annotation %d to the potential union detection" % i)
+            #print("add annotation %d to the potential union detection, aspect ratio %f" % (i, ann_ratio))
             potential_split_anns.append(ann)
-            #print("select %d as potential" % i)
-        #else:
-        #    break
-    if len(potential_split_anns) and (len(image_anns) == 0 or is_union(image_anns[0], potential_split_anns)):
-        image_anns = potential_split_anns
+        else:
+            break
+    image_anns = handle_unions(image_anns, potential_split_anns)
     # we sort according to the split direction:
     image_anns = order_image_annotation(image_anns)
     if DEBUG:

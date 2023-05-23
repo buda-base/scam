@@ -146,19 +146,19 @@ class BatchRunner:
         other_dir = False
         if img_path.startswith(self.images_path) and self.images_path != self.dest_path:
             img_path = self.dest_path + img_path[len(self.images_path):]
-            if prefix == "cropped_uncompressed":
+            if prefix == "_cropped_uncompressed":
                 other_dir = True
         if "/images/" in img_path:
             other_dir = True
-            if prefix == "cropped_uncompressed":
+            if prefix == "_cropped_uncompressed":
                 img_path = img_path.replace("/images/", "/archive/")
             else:
                 img_path = img_path.replace("/images/", "/images%s/" % prefix)
         if "/sources/" in img_path:
             other_dir = True
-            if prefix == "cropped_compressed":
+            if prefix == "_cropped_compressed":
                 img_path = img_path.replace("/sources/", "/images/")
-            elif prefix == "cropped_uncompressed":
+            elif prefix == "_cropped_uncompressed":
                 img_path = img_path.replace("/sources/", "/archive/")
             else:
                 img_path = img_path.replace("/sources/", "/sources%s/" % prefix)
@@ -204,11 +204,11 @@ class BatchRunner:
     def save_file(self, dirname, fname, data):
         self.log_str += "   save %s\n" % (dirname+fname)
         if self.write_mode == "S3":
-            self.upload_to_s3(data, dirname+fname)
+            return self.upload_to_s3(data, dirname+fname)
 
     def file_exists(self, dirname, fname):
         if self.write_mode == "S3":
-            self.s3key_exists(dirname+fname)
+            return self.s3key_exists(dirname+fname)
 
     def mkdir(self, dirname):
         if self.write_mode == "S3":
@@ -294,7 +294,7 @@ class BatchRunner:
             if "crop" in self.pipeline:
                 # we first try with a lower points per side:
                 success = self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, False, self.points_per_side)
-                if success:
+                if success or self.points_per_side_2 <= self.points_per_side:
                     return
                 self.log_str += "   INFO: failing with pps = %d, retrying with pps = %d" % (self.points_per_side, self.points_per_side_2)
                 # if it didn't work, we try with a higher one:
@@ -320,7 +320,7 @@ def main():
     with open(sys.argv[1], newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
-            br = BatchRunner(row[0], expected_ratio_range = [0.5, 30.0], expected_nb_pages = 1, pipeline=row[1], dryrun=False, rotate=False, aws_profile='image_processing')
+            br = BatchRunner(row[0], points_per_side=16, points_per_side_2=64, expected_ratio_range = [4.0, 10.0], expected_nb_pages = 4, pipeline=row[1], dryrun=False, rotate=True, aws_profile='image_processing')
             br.process_dir()
             print(br.log_str)
 
@@ -330,7 +330,7 @@ def process_individual_images(csv_fname):
         for row in reader:
             imgdir = row[0][:row[0].rfind("/")+1]
             imgfname = row[0][row[0].rfind("/")+1:]
-            br = BatchRunner(imgdir, pipeline="sam:crop", points_per_side=8, points_per_side_2=32, dryrun=False, rotate=True, aws_profile='image_processing')
+            br = BatchRunner(imgdir, pipeline="sam:crop", pre_rotate=90, expected_ratio_range = [4.0, 10.0], expected_nb_pages = 4, points_per_side=8, points_per_side_2=32, dryrun=False, rotate=True, aws_profile='image_processing')
             br.process_img_path(imgfname)
             print(br.log_str)
 
@@ -341,7 +341,7 @@ def test():
     print(br.log_str)
 
 def matho():
-    br = BatchRunner("s3://image-processing.bdrc.io/Matho/", dest_path="s3://image-processing.bdrc.io/Matho-cropped/", expected_ratio_range = [0.5, 30.0], expected_nb_pages = 1, pipeline="sam", dryrun=False, rotate=False, aws_profile='image_processing')
+    br = BatchRunner("s3://image-processing.bdrc.io/Matho/2-up/", dest_path="s3://image-processing.bdrc.io/Matho-cropped/2-up/", expected_ratio_range = [0.5, 30.0], expected_nb_pages = 2, pipeline="crop", dryrun=False, rotate=False, aws_profile='image_processing')
     br.process_dir()
     print(br.log_str)
 
