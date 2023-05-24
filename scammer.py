@@ -15,7 +15,7 @@ from PIL import Image
 import cv2
 import sys
 import csv
-from raw_pillow_opener import register_raw_opener
+from raw_opener import register_raw_opener
 
 
 class BatchRunner:

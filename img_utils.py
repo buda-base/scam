@@ -7,7 +7,7 @@ import gzip
 import numpy as np
 import math
 import logging
-from raw_pillow_opener import register_raw_opener
+from raw_opener import register_raw_opener
 
 #register_raw_opener()
 

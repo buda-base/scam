@@ -3,7 +3,7 @@ torch
 torchvision
 opencv-python
 boto3
-raw-pillow-opener
+rawpy
 mozjpeg-lossless-optimization
 tqdm
 numpy
