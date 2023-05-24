@@ -49,7 +49,7 @@ def is_img(path: str) -> bool:
 
     if len(end4) < 2:
         return False
-    return end4[1].lower() in [".jpg", "jpeg", ".tif", "tiff", ".cr2"]
+    return end4[1].lower() in [".jpg", "jpeg", ".tif", "tiff", ".cr2", ".nef"]
 
 def list_obj_keys(prefix, bucket=BUCKET_NAME):
     obj_keys = []

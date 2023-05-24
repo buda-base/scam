@@ -324,7 +324,7 @@ class BatchRunner:
     def process_img_path(self, img_path, img_dir_info=""):
         self.log_str += " looking at %s\n" % img_path
         img_orig = None
-        if img_path.endswith("cr2"):
+        if img_path.endswith("cr2") or img_path.endswith("nef"):
             register_raw_opener()
         if self.read_mode == "S3":
             img_orig = Image.open(self.gets3blob(Path(self.images_path, img_path)))
