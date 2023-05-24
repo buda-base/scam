@@ -332,7 +332,11 @@ class BatchRunner:
             img_orig = img_orig.rotate(self.pre_rotate, expand=True)
         sam_results = None
         if "sam" in self.pipeline:
-            sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side)
+            try:
+                sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side)
+            except:
+                self.log_str += "   ERROR: couldn't run SAM on %s" % (self.images_path + img_path)
+                return
             if "crop" in self.pipeline:
                 # we first try with a lower points per side:
                 success = self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, False,
