@@ -125,27 +125,29 @@ class BatchRunner:
         obj_keys.sort()
         return filter(is_img, obj_keys)
 
-    def gets3blob(self, blob_source: Path) -> io.BytesIO:
-        """
-        @param blob_source: path to data object
-        @return:
-        """
-
-        if self.read_mode == "S3":
-            try:
-                f = io.BytesIO()
-                self.S3.download_fileobj(self.read_bucket, blob_source, f)
-                return f
-            except botocore.exceptions.ClientError as e:
-                if e.response['Error']['Code'] == '404':
-                    return None
-                else:
-                    raise
-        else:
-            if not os.path.exists(blob_source):
+    def gets3blob(self, s3Key: str) -> io.BytesIO:
+        try:
+            f = io.BytesIO()
+            self.S3.download_fileobj(self.read_bucket, s3Key, f)
+            return f
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == '404':
                 return None
-            with open(blob_source, "rb") as fh:
-                return io.BytesIO(fh.read())
+            else:
+                raise
+
+    def get_files_bytes(self, blob_source: str) -> io.BytesIO:
+        if not os.path.exists(blob_source):
+            return None
+        with open(blob_source, "rb") as fh:
+            return io.BytesIO(fh.read())
+
+    def read_bytes(self, dirname, fname):
+        if self.read_mode == "S3":
+            return self.gets3blob(dirname+fname)
+        else:
+            return self.get_files_bytes(Path(dirname, fname))
+
 
     def s3key_exists(self, s3Key):
         try:
@@ -211,19 +213,15 @@ class BatchRunner:
         return dirname, basename
 
     def list_img_paths(self, source_path):
-        list_func = lambda m: list_img_keys if m == "S3" else list_img_local
         img_keys = []
-        for img_full_key in sorted(list_func(self.read_mode)(self.images_path)):
-            # This is fragile,depending on how S3 or files interpret the trailing slash
-            # img_keys.append(img_full_key[len(self.images_path):])
-            img_keys.append(Path(img_full_key).name)
-
-        #         img_keys.append(img_full_key[len(self.images_path):])
-        # if self.read_mode == "S3":
-        #     for img_full_key in sorted(list_img_keys(self.images_path)):
-        #         img_keys.append(img_full_key[len(self.images_path):])
-        # else:
-        #     img_keys = list_img_local(self.images_path)
+        if self.read_mode == "S3":
+            for img_full_key in sorted(list_img_keys(self.images_path)):
+                # This is fragile,depending on how S3 or files interpret the trailing slash
+                # img_keys.append(img_full_key[len(self.images_path):])
+                img_keys.append(img_full_key[len(self.images_path):])
+        else:
+            for img_full_key in sorted(list_img_local(self.images_path)):
+                img_keys.append(Path(img_full_key).name)
         return img_keys
 
     def save_file(self, dirname, fname, data):
@@ -252,7 +250,7 @@ class BatchRunner:
     def get_save_sam(self, img_path, img_orig, points_per_side):
         pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path, points_per_side)
         if self.skip_if_exists and self.file_exists(pickle_dirname, pickle_fname):
-            blob = self.gets3blob(Path(pickle_dirname, pickle_fname))
+            blob = self.read_bytes(pickle_dirname, pickle_fname)
             blob.seek(0)
             return pickle.loads(gzip.decompress(blob.read()))
         self.log_str += "   generate SAM results for %s , pps: %d\n" % (img_path, points_per_side)
@@ -314,7 +312,7 @@ class BatchRunner:
     def get_sam_results(self, img_path, points_per_side):
         pickle_dirname, pickle_fname = self.img_path_to_pickle_path(self.images_path + img_path, points_per_side)
         self.log_str += "   getting SAM results from %s\n" % (pickle_dirname + pickle_fname)
-        blob = self.gets3blob(Path(pickle_dirname, pickle_fname))
+        blob = self.read_bytes(pickle_dirname, pickle_fname)
         if blob is None:
             self.log_str += "  error! no %s" % (pickle_dirname + pickle_fname)
             return
@@ -326,10 +324,7 @@ class BatchRunner:
         img_orig = None
         if img_path.endswith("cr2") or img_path.endswith("nef"):
             register_raw_opener()
-        if self.read_mode == "S3":
-            img_orig = Image.open(self.gets3blob(Path(self.images_path, img_path)))
-        else:
-            img_orig = Image.open(str(Path(self.images_path, img_path)))
+        img_orig = Image.open(self.read_bytes(self.images_path, img_path))
         img_orig = apply_icc(img_orig)  # maybe icc shouldn't be applied to archive images?
         if self.apply_exif_rotation:
             img_orig = apply_exif_rotation(img_orig)
