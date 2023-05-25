@@ -289,6 +289,8 @@ class BatchRunner:
                     self.images_path + img_path)
                 self.mkdir(cropped_uncompressed_dirname)
                 img_bytes, file_ext = encode_img_uncompressed(extracted_img)
+                if img_bytes is None:
+                    self.log_str += "   ERROR: could not encode TIFF, probably invalid input file"
                 cropped_uncompressed_fname = "%s%s%s" % (
                     cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
                 self.save_file(cropped_uncompressed_dirname, cropped_uncompressed_fname, img_bytes)
