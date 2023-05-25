@@ -324,7 +324,14 @@ class BatchRunner:
         img_orig = None
         if img_path.lower().endswith("cr2") or img_path.lower().endswith("nef"):
             register_raw_opener()
-        img_orig = Image.open(self.read_bytes(self.images_path, img_path))
+        try:
+            img_orig = Image.open(self.read_bytes(self.images_path, img_path))
+        except KeyboardInterrupt:
+            raise
+        except:
+            self.log_str += "   ERROR: PIL cannot open %s" % img_path
+            #print("   PIL cannot open %s" % img_path)
+            return
         img_orig = apply_icc(img_orig)  # maybe icc shouldn't be applied to archive images?
         if self.apply_exif_rotation:
             img_orig = apply_exif_rotation(img_orig)
