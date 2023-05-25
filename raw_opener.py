@@ -2,13 +2,19 @@
 import rawpy
 from PIL import Image, ImageFile
 
+CR2_PREFIX = b'\x49\x49\x2A\x00\x10\x00\x00\x00\x43\x52'
+
 class RawImageFile(ImageFile.ImageFile):
     format = 'RAW'
     format_description = "camera raw image"
 
     def _open(self):
-        raw = rawpy.imread(self.fp)
-        array = raw.postprocess(use_camera_wb=True)
+        array = None
+        try:
+            raw = rawpy.imread(self.fp)
+            array = raw.postprocess(use_camera_wb=True)
+        except:
+            raise TypeError("Not a RAW file")
 
         # size in pixels (width, height)
         self._size = (array.shape[1], array.shape[0])
