@@ -8,7 +8,7 @@ class RawImageFile(ImageFile.ImageFile):
 
     def _open(self):
         raw = rawpy.imread(self.fp)
-        array = raw.postprocess(use_camera_wb=True, use_auto_wb=False, no_auto_bright=True, no_auto_scale=True)
+        array = raw.postprocess(use_camera_wb=True)
 
         # size in pixels (width, height)
         self._size = (array.shape[1], array.shape[0])
@@ -40,10 +40,12 @@ class RawDecoder(ImageFile.PyDecoder):
 def register_raw_opener():
     Image.register_open('RAW', RawImageFile)
     Image.register_decoder('RAW', RawDecoder)
-    Image.register_extensions(RawImageFile.format, ['.nef', 'cr2', 'dng'])
+    Image.register_extensions(RawImageFile.format, ['nef', 'cr2', 'dng'])
 
 def test():
     register_raw_opener()
-    img = Image.open("/tmp/SIDDHIS_MU_DRA_01_0003.cr2")
+    img = Image.open("/tmp/India_001.nef")
     print("dims: %dx%d" % (img.width, img.height))
-    img.save("/tmp/SIDDHIS_MU_DRA_01_0003_camera_wb.jpg")
+    img.save("/tmp/India_001.jpg")
+
+#test()
