@@ -2,7 +2,7 @@ from pathlib import Path
 
 from utils import split_s3_path, is_img, get_gzip_picked_bytes, list_img_keys, list_img_local
 from cal_sam_pickles import get_sam_output
-from img_utils import apply_exif_rotation, apply_icc, extract_img, encode_img_uncompressed, encode_img
+from img_utils import apply_exif_rotation, apply_icc, extract_img, encode_img_uncompressed, encode_img, get_debug_img_bytes
 import os
 import boto3
 import io
@@ -17,6 +17,7 @@ import sys
 import csv
 from raw_opener import register_raw_opener
 
+OUTPUT_QC = False
 
 class BatchRunner:
     def __init__(
@@ -299,16 +300,17 @@ class BatchRunner:
                 cropped_dirname, cropped_fname = self.img_path_to_img_path_base(self.images_path + img_path)
                 self.mkdir(cropped_dirname)
                 img_bytes, file_ext = encode_img(extracted_img)
-
                 # WARNING: cropped_uncompressed_fname_base might be referenced before assignment.
                 # fix up
                 cropped_uncompressed_fname = "%s%s%s" % (
                     cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
                 self.save_file(cropped_uncompressed_dirname, cropped_uncompressed_fname, img_bytes)
                 img_bytes = None
-            # TODO: output QC
-            qc_dirname, qc_fname = self.img_path_to_qc_path_base(img_path)
+        if OUTPUT_QC:
+            qc_dirname, qc_fname = self.img_path_to_qc_path_base(self.images_path + img_path)
             self.mkdir(qc_dirname)
+            debug_img_bytes, debug_img_ext = get_debug_img_bytes(img_orig, image_ann_infos, max_size_px=512)
+            self.save_file(qc_dirname, qc_fname, debug_img_bytes)
         return True
 
     def get_sam_results(self, img_path, points_per_side):

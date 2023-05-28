@@ -17,7 +17,8 @@ pip3 install git+https://github.com/facebookresearch/segment-anything.git
 pip3 install torch torchvision opencv-python boto3 raw-pillow-opener mozjpeg-lossless-optimization tqdm
 ```
 
-If S3 is used, AWS credentials must be accessible by the script. The default profile is `image_processing`.
+#### How it works
+
 
 #### Running
 
