@@ -10,12 +10,13 @@ import gzip
 import pickle
 import botocore
 import tqdm
-from sam_annotation_utils import get_image_ann_list
+from sam_annotation_utils import get_image_ann_list, find_anomalies
 from PIL import Image
 import cv2
 import sys
 import csv
 from raw_opener import register_raw_opener
+import statistics
 
 OUTPUT_QC = False
 
@@ -261,7 +262,7 @@ class BatchRunner:
         self.save_file(pickle_dirname, pickle_fname, gzipped_pickled_bytes)
         return sam_results
 
-    def crop_from_sam_results(self, img_path, img_dir_info, img_orig, sam_results, save_if_fail, points_per_side):
+    def crop_from_sam_results(self, img_path, img_dir_info, img_orig, sam_results, save_if_fail, points_per_side, derived_img_to_stats = {}):
         """
         analyzes the results from SAM and saves the results, returning True
 
@@ -295,6 +296,10 @@ class BatchRunner:
                 cropped_uncompressed_fname = "%s%s%s" % (
                     cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
                 self.save_file(cropped_uncompressed_dirname, cropped_uncompressed_fname, img_bytes)
+                aspect_ratio = image_ann_info.bbox[2] / float(image_ann_info.bbox[3])
+                size_ratio = image_ann_info.contour_area / float(img_orig.height * img_orig.width)
+                stats = {"ar": aspect_ratio, "sr": size_ratio}
+                derived_img_to_stats[cropped_uncompressed_dirname+cropped_uncompressed_fname] = stats
                 img_bytes = None  # gc
             if self.output_compressed:
                 cropped_dirname, cropped_fname = self.img_path_to_img_path_base(self.images_path + img_path)
@@ -323,7 +328,7 @@ class BatchRunner:
         blob.seek(0)
         return pickle.loads(gzip.decompress(blob.read()))
 
-    def process_img_path(self, img_path, img_dir_info=""):
+    def process_img_path(self, img_path, img_dir_info="", derived_img_to_stats = {}):
         self.log_str += " looking at %s\n" % img_path
         img_orig = None
         if img_path.lower().endswith("cr2") or img_path.lower().endswith("nef"):
@@ -351,7 +356,7 @@ class BatchRunner:
             if "crop" in self.pipeline:
                 # we first try with a lower points per side:
                 success = self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, False,
-                                                     self.points_per_side)
+                                                     self.points_per_side, derived_img_to_stats = derived_img_to_stats)
                 if success or self.points_per_side_2 <= self.points_per_side:
                     return
                 self.log_str += "   INFO: failing with pps = %d, retrying with pps = %d" % (
@@ -359,7 +364,7 @@ class BatchRunner:
                 # if it didn't work, we try with a higher one:
                 sam_results = self.get_save_sam(img_path, img_orig, self.points_per_side_2)
                 success = self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, True,
-                                                     self.points_per_side_2)
+                                                     self.points_per_side_2, derived_img_to_stats = derived_img_to_stats)
         else:
             if "crop" not in self.pipeline or (not self.output_compressed and not self.output_uncompressed):
                 print("nothing to do!")
@@ -367,11 +372,29 @@ class BatchRunner:
             sam_results = self.get_sam_results(img_path, self.points_per_side)
             self.crop_from_sam_results(img_path, img_dir_info, img_orig, sam_results, True, self.points_per_side)
 
+    def log_anomalies(self, derived_img_to_stats):
+        all_ar = []
+        all_sr = []
+        for _, dii in derived_img_to_stats.items():
+            all_ar.append(dii["ar"])
+            all_sr.append(dii["sr"])
+        anomalous_ars = find_anomalies(all_ar)
+        mean_ar = statistics.mean(all_ar)
+        anomalous_srs = find_anomalies(all_sr)
+        mean_sr = statistics.mean(all_sr)
+        for din, dii in derived_img_to_stats.items():
+            if dii["ar"] in anomalous_ars:
+                self.log_str += "   WARN: %s has an anomalous aspect ratio of %f (mean = %f)" % (din, dii["ar"], mean_ar)
+            if dii["sr"] in anomalous_srs:
+                self.log_str += "   WARN: %s has an anomalous size ratio of %f (mean = %f)" % (din, dii["sr"], mean_sr)
+
     def process_dir(self):
         self.log_str += "process dir %s" % self.images_path
         img_paths = self.list_img_paths(self.images_path)
+        derived_img_to_stats = {}
         for i, img_path in enumerate(tqdm.tqdm(img_paths)):
-            self.process_img_path(img_path, "%d/%d" % (i + 1, len(img_paths)))
+            self.process_img_path(img_path, "%d/%d" % (i + 1, len(img_paths)), derived_img_to_stats = derived_img_to_stats)
+        self.log_anomalies(derived_img_to_stats)
 
 
 def main():

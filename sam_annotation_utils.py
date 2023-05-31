@@ -1,6 +1,7 @@
 import logging
 import cv2
 import numpy as np
+import statistics
 
 DEBUG = False
 
@@ -65,6 +66,27 @@ class AnnotationInfo:
         _, (width, height), _ = self.minAreaRect
         rect_area = width * height
         return self.contour_area / rect_area
+
+def find_anomalies(data):
+    """
+    Function to Detection Outlier on one-dimentional datasets
+    from https://gist.github.com/wmlba/89bc2f4556b8ee397ca7a5017b497657#file-outlier_std-py
+    """
+    #define a list to accumlate anomalies
+    anomalies = []
+    
+    # Set upper and lower limit to 3 standard deviation
+    data_std = statistics.stdev(data)
+    data_mean = statistics.mean(data)
+    anomaly_cut_off = data_std * 3
+    
+    lower_limit  = data_mean - anomaly_cut_off 
+    upper_limit = data_mean + anomaly_cut_off
+    # Generate outliers
+    for p in data:
+        if p > upper_limit or p < lower_limit:
+            anomalies.append(p)
+    return anomalies
 
 def xywh_xy1xy2wh(bbox):
     return [bbox[0],bbox[1],bbox[0]+bbox[2],bbox[1]+bbox[3],bbox[2],bbox[3]]
