@@ -49,6 +49,10 @@ class AnnotationInfo:
         #print("top, bottom? %d - %d / 0 - %d" % (self.bbox[1], self.bbox[1]+self.bbox[3], self.mask.shape[0]))
         return self.bbox[1] < px and abs(self.bbox[1]+self.bbox[3] - self.mask.shape[0]) < px
 
+    def touches_left_right(self, px=20):
+        #print("top, bottom? %d - %d / 0 - %d" % (self.bbox[1], self.bbox[1]+self.bbox[3], self.mask.shape[0]))
+        return self.bbox[0] < px and abs(self.bbox[0]+self.bbox[2] - self.mask.shape[1]) < px
+
     def get_largest_contour(self):
         """ get the largest contour.
             we can expect that SAM returns masks that are just one contour but it's not
@@ -206,7 +210,11 @@ def handle_unions(image_anns, potential_split_anns):
     # get too big too quickly with a naive approach
     return image_anns
 
-def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, expected_ratio_range=[1.7, 20.0], min_area_ratio=0.01):
+def print_debug(s):
+    if DEBUG:
+        print(s)
+
+def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, expected_ratio_range=[1.7, 20.0], min_area_ratio=0.01, find_borders=False):
     ann_list = []
     for sam_ann in sam_ann_list:
         ann_list.append(AnnotationInfo(sam_ann, original_img_width, original_img_height))
@@ -214,62 +222,137 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
     image_anns = []
     potential_split_anns = []
     ref_size = None
-    total_area = float(original_img_height * original_img_height)
+    total_area = float(original_img_height * original_img_width)
     for i, ann in enumerate(anns_by_area):
         ann_ratio = ann.bbox[2] / float(ann.bbox[3])
-        #print("ann %d, bbox %s, aspect ratio %f" % (i, str(ann.bbox), ann_ratio))
+        print_debug("ann %d, bbox %s, aspect ratio %f" % (i, str(ann.bbox), ann_ratio))
         if DEBUG:
             ann.debug_mask(debug_base_fname+"_%03d" % i)
         if ann.contour_area / total_area < min_area_ratio:
-            #print("reject annotation with ratio = %f < %f" % (ann.contour_area / total_area, min_area_ratio))
+            print_debug("reject annotation with ratio = %f < %f" % (ann.contour_area / total_area, min_area_ratio))
             break
         if ann.nb_edges_touched() > 2:
-            #print("ann %d touches %d edges, excuding" % (i, ann.nb_edges_touched()))
+            print_debug("ann %d touches %d edges, excuding" % (i, ann.nb_edges_touched()))
             continue
         if ann.touches_top_bottom():
-            #print("ann %d touches top and bottom edges, exclude" % i)
+            print_debug("ann %d touches top and bottom edges, exclude" % i)
             continue
+        #if ann.touches_left_right():
+        #    print_debug("ann %d touches top and bottom edges, exclude" % i)
+        #    continue
         if ann.squarishness() < 0.85:
-            #print("ann %d has a squarishness of %f, excuding" % (i, ann.squarishness()))
+            print_debug("ann %d has a squarishness of %f, excuding" % (i, ann.squarishness()))
             continue
         if ann_has_duplicate_in(ann, image_anns) or ann_has_duplicate_in(ann, potential_split_anns):
-            #print("ann %d is duplicate, excuding" % i)
+            print_debug("ann %d is duplicate, excuding" % i)
             continue
         if not ref_size:
             if not expected_ratio_range or (ann_ratio >= expected_ratio_range[0] and ann_ratio <= expected_ratio_range[1]):
                 image_anns.append(ann)
                 ref_size = ann.contour_area
-                #print("select ann %d with area ratio %f, aspect ratio %f" % (i, ann.contour_area / total_area, ann_ratio))
-            #else:
-            #    print("found annotation with wrong aspect ratio %f not in [%f, %f]" % (ann_ratio, expected_ratio_range[0], expected_ratio_range[1]))
+                print_debug("select ann %d with area ratio %f, aspect ratio %f" % (i, ann.contour_area / total_area, ann_ratio))
+            else:
+                print_debug("reject annotation %d with wrong aspect ratio %f not in [%f, %f]" % (i, ann_ratio, expected_ratio_range[0], expected_ratio_range[1]))
             continue
         if ann_included_in(ann, potential_split_anns):
-            #print("ann %d included in potential split, excluding" % i)
+            print_debug("ann %d included in potential split, excluding" % i)
             continue
         diff_factor = 0.4 if len(image_anns) < expected_nb_pages else 0.15
-        #print("diff is %f / %f" % (abs(ref_size - ann.contour_area) / ann.contour_area, diff_factor))
+        print_debug("diff is %f / %f" % (abs(ref_size - ann.contour_area) / ann.contour_area, diff_factor))
         if abs(ref_size - ann.contour_area) / ref_size < diff_factor and not ann_included_in(ann, image_anns):
             if not expected_ratio_range or (ann_ratio >= expected_ratio_range[0] and ann_ratio <= expected_ratio_range[1]):
                 image_anns.append(ann)
-                #print("select ann %d, aspect ratio %f" % (i, ann_ratio))
+                print_debug("select ann %d, aspect ratio %f" % (i, ann_ratio))
         elif len(image_anns) < expected_nb_pages and len(potential_split_anns) < expected_nb_pages:
-            #print("add annotation %d to the potential union detection, aspect ratio %f" % (i, ann_ratio))
+            print_debug("add annotation %d to the potential union detection, aspect ratio %f" % (i, ann_ratio))
             potential_split_anns.append(ann)
-        else:
-            break
+        #else:
+        #    break
     image_anns = handle_unions(image_anns, potential_split_anns)
     # we sort according to the split direction:
     image_anns = order_image_annotation(image_anns)
     if DEBUG:
         for i, image_ann in enumerate(image_anns):
             image_ann.debug_mask(debug_base_fname+"_selected%03d" % i)
+    if find_borders:
+        image_anns = find_cut_borders(image_anns, sam_ann_list)
     return image_anns
 
+def substract_side_ann(ann, to_be_substracted, side = "left"):
+    """
+    given an annotation, substract another annotation that is on a horizontal side
+    (used in find_cut_borders)
+
+    changes ann in place
+    """
+    # changing bbox
+    if side == "left":
+        ann.bbox[2] = ann.bbox[0]+ann.bbox[2] - (to_be_substracted.bbox[0]+to_be_substracted.bbox[2])
+        ann.bbox[0] = to_be_substracted.bbox[0]+to_be_substracted.bbox[2]
+    else:
+        ann.bbox[2] = to_be_substracted.bbox[0] - ann.bbox[0]
+        ann.bbox[1] = to_be_substracted.bbox[0]
+    # minAreaRect... more challenging
+    # only the w parameter needs to be changed, we look at two corners of the minAreaRect of to_be_substracted
+    # and check which one would impact the width the less
+    (tbs_cx, tbs_cy), (tbs_w, tbs_h), tbs_angle = to_be_substracted.minAreaRect
+    (ann_cx, ann_cy), (ann_w, ann_h), ann_angle = ann.minAreaRect
+    tbs_tr_corner = ((tbs_cx+tbw_w)*cos(tbs_angle), (tbs_cy+tbw_h)*cos(tbs_angle))
+    tbs_br_corner = ((tbs_cx+tbw_w)*cos(tbs_angle), (tbs_cy-tbw_h)*cos(tbs_angle))
+    # distance of each corner to the center of ann, taking the angle of ann into account
+    tbs_tr_to_c = (abs(tbs_cx-tbs_tr_corner[0]) - abs(tbs_cy-tbs_tr_corner[1])*tan(ann_angle)) / cos(ann_angle)
+    tbs_br_to_c = (abs(tbs_cx-tbs_br_corner[0]) - abs(tbs_cy-tbs_br_corner[1])*tan(ann_angle)) / cos(ann_angle)
+    shift = ann_w / 2.0 - max(tbs_tr_to_c, tbs_br_to_c)
+    new_ann_w = ann_w - shift / 2.0
+    # compute new center:
+    new_center_x = ann_cx + cos(ann_angle) * shift / 2.0
+    new_center_y = ann_cy + sin(ann_angle) * shift / 2.0
+    if side == "right":
+        new_center_x = ann_cx - cos(ann_angle) * shift / 2.0
+        new_center_y = ann_cy - sin(ann_angle) * shift / 2.0
+    ann.minAreaRect = ((new_center_x, new_center_y), (new_ann_w, ann_h), ann_angle)
+
+
+def find_cut_borders(image_anns, sam_ann_list):
+    """
+    find and cut the margins
+    """
+    new_img_anns = []
+    for img_ann in image_anns:
+        new_img_ann = copy.deepcopy(img_ann)
+        new_img_anns.append(new_img_ann)
+        # for each page, we look for an annotation that is:
+        for ann in sam_ann_list:
+            # squarish
+            if ann.squarishness() < 0.85:
+                continue
+            # included in the image annotation
+            if not ann_included_in(ann, [img_ann]):
+                continue
+            # of the same general height:
+            if abs(img_ann.bbox[3]-ann.bbox[3]) / float(img_ann.bbox[3]) > 0.1:
+                continue
+            # of no more than 10% of the width:
+            if ann.bbox[2] / float(img_ann.bbox[2]) > 0.1:
+                continue
+            # on either the left or right side:
+            left_distance_pct = abs(ann.bbox[0] - img_ann.bbox[0]) / float(img_ann.bbox[2])
+            right_distance_pct = abs(ann.bbox[1] - img_ann.bbox[1]) / float(img_ann.bbox[2])
+            if left_distance_pct > 0.05 and right_distance_pct > 0.05:
+                continue
+            side = "left"
+            if left_distance_pct > 0.05:
+                side = "right"
+            substract_side_ann(new_img_ann, ann, side)
+
 def test():
+    import gzip
+    import pickle
+    from PIL import Image
+    from img_utils import extract_encode_img
     with gzip.open('examples/IMG_56015_1024_sam.pickle.gz', 'rb') as f:
         anns = pickle.load(f)
         img_orig = Image.open("examples/IMG_56015.JPG")
-        apply_icc(img_orig)
         image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height, "examples/IMG_56015")
         ig_img_basedir = "./"
         ig_lname = "I0123RA"
