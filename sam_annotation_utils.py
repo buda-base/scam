@@ -2,6 +2,8 @@ import logging
 import cv2
 import numpy as np
 import statistics
+import copy
+import math
 
 DEBUG = False
 
@@ -162,7 +164,7 @@ def ann_included_in(ann, image_anns):
     ann_area = ann.bbox[2]*ann.bbox[3]
     for other_ann in image_anns:
         iarea = intersect_area(ann, other_ann)
-        if ann_area - iarea / float(ann_area) < 0.1:
+        if (ann_area - iarea) / float(ann_area) < 0.1:
             return True
     return False
 
@@ -275,8 +277,43 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
         for i, image_ann in enumerate(image_anns):
             image_ann.debug_mask(debug_base_fname+"_selected%03d" % i)
     if find_borders:
-        image_anns = find_cut_borders(image_anns, sam_ann_list)
+        image_anns = find_cut_borders(image_anns, anns_by_area)
     return image_anns
+
+def rotate(origin, point, angle):
+    """
+    Rotate a point counterclockwise by a given angle around a given origin.
+
+    The angle should be given in radians.
+
+    https://stackoverflow.com/a/34374437/2560906
+    """
+    ox, oy = origin
+    px, py = point
+
+    qx = ox + math.cos(angle) * (px - ox) - math.sin(angle) * (py - oy)
+    qy = oy + math.sin(angle) * (px - ox) + math.cos(angle) * (py - oy)
+
+    return qx, qy
+
+def xsect(p0, a0, p1, a1):
+    """
+    return the coordinates of the intersection of two lines defined
+    by a point and an angle
+    """
+    x0, y0 = p0
+    x1, y1 = p1
+    if (((a0 / 180) + 180) / 180 == 90):
+        # vertical line at x = x0
+        return (x0, math.tan(a1) * (x0-x1) + y1)
+    elif (((a1 / 180) + 180) / 180 == 90):
+        # vertical line at x = x0
+        return (x1, math.tan(a0) * (x1-x0) + y0)
+    m0 = math.tan(a0) # Line 0: y = m0 (x - x0) + y0
+    m1 = math.tan(a1) # Line 1: y = m1 (x - x1) + y1
+    x = ((m0 * x0 - m1 * x1) - (y0 - y1)) / (m0 - m1)
+    return (x, m0 * (x - x0) + y0)
+
 
 def substract_side_ann(ann, to_be_substracted, side = "left"):
     """
@@ -286,74 +323,93 @@ def substract_side_ann(ann, to_be_substracted, side = "left"):
     changes ann in place
     """
     # changing bbox
+    ann_bbox_lst = list(ann.bbox)
     if side == "left":
-        ann.bbox[2] = ann.bbox[0]+ann.bbox[2] - (to_be_substracted.bbox[0]+to_be_substracted.bbox[2])
-        ann.bbox[0] = to_be_substracted.bbox[0]+to_be_substracted.bbox[2]
+        ann_bbox_lst[2] = ann.bbox[0]+ann.bbox[2] - (to_be_substracted.bbox[0]+to_be_substracted.bbox[2])
+        ann_bbox_lst[0] = to_be_substracted.bbox[0]+to_be_substracted.bbox[2]
     else:
-        ann.bbox[2] = to_be_substracted.bbox[0] - ann.bbox[0]
-        ann.bbox[1] = to_be_substracted.bbox[0]
+        ann_bbox_lst[2] = to_be_substracted.bbox[0] - ann.bbox[0]
+        ann_bbox_lst[1] = to_be_substracted.bbox[0]
+    ann.bbox = tuple(ann_bbox_lst)
     # minAreaRect... more challenging
     # only the w parameter needs to be changed, we look at two corners of the minAreaRect of to_be_substracted
     # and check which one would impact the width the less
     (tbs_cx, tbs_cy), (tbs_w, tbs_h), tbs_angle = to_be_substracted.minAreaRect
+    if tbs_angle > 45:
+        tbs_angle = tbs_angle-90
+        tbs_w, tbs_h = tbs_h, tbs_w
+    tbs_angle_r = math.radians(tbs_angle)
     (ann_cx, ann_cy), (ann_w, ann_h), ann_angle = ann.minAreaRect
-    tbs_tr_corner = ((tbs_cx+tbw_w)*cos(tbs_angle), (tbs_cy+tbw_h)*cos(tbs_angle))
-    tbs_br_corner = ((tbs_cx+tbw_w)*cos(tbs_angle), (tbs_cy-tbw_h)*cos(tbs_angle))
-    # distance of each corner to the center of ann, taking the angle of ann into account
-    tbs_tr_to_c = (abs(tbs_cx-tbs_tr_corner[0]) - abs(tbs_cy-tbs_tr_corner[1])*tan(ann_angle)) / cos(ann_angle)
-    tbs_br_to_c = (abs(tbs_cx-tbs_br_corner[0]) - abs(tbs_cy-tbs_br_corner[1])*tan(ann_angle)) / cos(ann_angle)
+    if ann_angle > 45:
+        ann_angle = ann_angle-90
+        ann_w, ann_h = ann_h, ann_w
+    ann_angle_r = math.radians(ann_angle)
+    # get the top right corner (would work with the bottom right corner too)
+    tbs_tr_corner = rotate((tbs_cx, tbs_cy), (tbs_cx+(tbs_w/2.0), tbs_cy+(tbs_h/2.0)), tbs_angle_r)
+    tbs_br_corner = rotate((tbs_cx, tbs_cy), (tbs_cx+(tbs_w/2.0), tbs_cy-(tbs_h/2.0)), tbs_angle_r)
+    intersect_tr_x, intersect_tr_y = xsect(tbs_tr_corner, ann_angle_r+math.pi/2.0, (ann_cx, ann_cy), ann_angle_r)
+    tbs_tr_to_c = math.hypot(intersect_tr_x - ann_cx, intersect_tr_y - ann_cy)
+    intersect_br_x, intersect_br_y = xsect(tbs_br_corner, ann_angle_r+math.pi/2.0, (ann_cx, ann_cy), ann_angle_r)
+    tbs_br_to_c = math.hypot(intersect_br_x - ann_cx, intersect_br_y - ann_cy)
     shift = ann_w / 2.0 - max(tbs_tr_to_c, tbs_br_to_c)
-    new_ann_w = ann_w - shift / 2.0
+    new_ann_w = ann_w - shift
     # compute new center:
-    new_center_x = ann_cx + cos(ann_angle) * shift / 2.0
-    new_center_y = ann_cy + sin(ann_angle) * shift / 2.0
+    new_center_x = ann_cx + math.cos(ann_angle_r) * shift / 2.0
+    new_center_y = ann_cy + math.sin(ann_angle_r) * shift / 2.0
     if side == "right":
-        new_center_x = ann_cx - cos(ann_angle) * shift / 2.0
-        new_center_y = ann_cy - sin(ann_angle) * shift / 2.0
+        new_center_x = ann_cx - math.cos(ann_angle_r) * shift / 2.0
+        new_center_y = ann_cy - math.sin(ann_angle_r) * shift / 2.0
     ann.minAreaRect = ((new_center_x, new_center_y), (new_ann_w, ann_h), ann_angle)
-
 
 def find_cut_borders(image_anns, sam_ann_list):
     """
     find and cut the margins
     """
+    print_debug("finding and cutting borders")
     new_img_anns = []
-    for img_ann in image_anns:
+    for j, img_ann in enumerate(image_anns):
+        print_debug("looking at ann %d" % j)
         new_img_ann = copy.deepcopy(img_ann)
         new_img_anns.append(new_img_ann)
         # for each page, we look for an annotation that is:
-        for ann in sam_ann_list:
+        for i, ann in enumerate(sam_ann_list):
             # squarish
-            if ann.squarishness() < 0.85:
+            if ann.squarishness() < 0.65:
+                print_debug("ann %d not squarish" % i)
                 continue
             # included in the image annotation
             if not ann_included_in(ann, [img_ann]):
+                print_debug("ann %d not included in" % i)
                 continue
             # of the same general height:
             if abs(img_ann.bbox[3]-ann.bbox[3]) / float(img_ann.bbox[3]) > 0.1:
+                print_debug("ann %d of different height" % i)
                 continue
             # of no more than 10% of the width:
             if ann.bbox[2] / float(img_ann.bbox[2]) > 0.1:
+                print_debug("ann %d more than 10pct of width" % i)
                 continue
             # on either the left or right side:
             left_distance_pct = abs(ann.bbox[0] - img_ann.bbox[0]) / float(img_ann.bbox[2])
             right_distance_pct = abs(ann.bbox[1] - img_ann.bbox[1]) / float(img_ann.bbox[2])
             if left_distance_pct > 0.05 and right_distance_pct > 0.05:
+                print_debug("ann %d too far from sides" % i)
                 continue
             side = "left"
             if left_distance_pct > 0.05:
                 side = "right"
             substract_side_ann(new_img_ann, ann, side)
+    return new_img_anns
 
 def test():
     import gzip
     import pickle
     from PIL import Image
     from img_utils import extract_encode_img
-    with gzip.open('examples/IMG_56015_1024_sam.pickle.gz', 'rb') as f:
+    with gzip.open('examples/20220330153544645_0114.jpg_sam_1024_32.pickle.gz', 'rb') as f:
         anns = pickle.load(f)
-        img_orig = Image.open("examples/IMG_56015.JPG")
-        image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height, "examples/IMG_56015")
+        img_orig = Image.open("examples/20220330153544645_0114.jpeg")
+        image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height, "examples/20220330153544645_0114", expected_ratio_range=[0.3,0.9], find_borders =True)
         ig_img_basedir = "./"
         ig_lname = "I0123RA"
         for i, image_ann_info in enumerate(image_ann_infos):
