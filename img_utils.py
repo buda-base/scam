@@ -42,7 +42,7 @@ def rotate_warp_affine(pil_img, rect):
     returns acceptable results
     """
     opencv_img = np.array(pil_img)
-    binary = opencv_img.dtype == np.bool
+    binary = opencv_img.dtype == bool
     if binary:
         # for some reason warp affine doesn't work on boolean so we convert the matrix to integers
         opencv_img = opencv_img.astype(np.uint8)
@@ -55,7 +55,7 @@ def rotate_warp_affine(pil_img, rect):
     res = cv2.warpAffine(opencv_img, M, (opencv_img.shape[1], opencv_img.shape[0]), flags=cv2.INTER_CUBIC)
     res = cv2.getRectSubPix(res, (int(width), int(height)), center)
     if binary:
-        res = res.astype(np.bool)
+        res = res.astype(bool)
     return Image.fromarray(res)
 
 def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
