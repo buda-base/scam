@@ -296,11 +296,12 @@ class BatchRunner:
                 cropped_uncompressed_fname = "%s%s%s" % (
                     cropped_uncompressed_fname_base, cropped_fname_letter, file_ext)
                 self.save_file(cropped_uncompressed_dirname, cropped_uncompressed_fname, img_bytes)
-                aspect_ratio = image_ann_info.bbox[2] / float(image_ann_info.bbox[3])
-                size_ratio = image_ann_info.contour_area / float(img_orig.height * img_orig.width)
-                stats = {"ar": aspect_ratio, "sr": size_ratio}
-                derived_img_to_stats[cropped_uncompressed_dirname+cropped_uncompressed_fname] = stats
                 img_bytes = None  # gc
+                if image_ann_info:
+                    aspect_ratio = image_ann_info.bbox[2] / float(image_ann_info.bbox[3])
+                    size_ratio = image_ann_info.contour_area / float(img_orig.height * img_orig.width)
+                    stats = {"ar": aspect_ratio, "sr": size_ratio}
+                    derived_img_to_stats[cropped_uncompressed_dirname+cropped_uncompressed_fname] = stats
             if self.output_compressed:
                 cropped_dirname, cropped_fname = self.img_path_to_img_path_base(self.images_path + img_path)
                 self.mkdir(cropped_dirname)
