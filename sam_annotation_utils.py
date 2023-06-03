@@ -78,6 +78,9 @@ def find_anomalies(data):
     Function to Detection Outlier on one-dimentional datasets
     from https://gist.github.com/wmlba/89bc2f4556b8ee397ca7a5017b497657#file-outlier_std-py
     """
+    if len(data) < 5:
+        return []
+
     #define a list to accumlate anomalies
     anomalies = []
     
