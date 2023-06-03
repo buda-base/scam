@@ -42,6 +42,10 @@ def rotate_warp_affine(pil_img, rect):
     returns acceptable results
     """
     opencv_img = np.array(pil_img)
+    binary = opencv_img.dtype == np.bool
+    if binary:
+        # for some reason warp affine doesn't work on boolean so we convert the matrix to integers
+        opencv_img = opencv_img.astype(np.uint8)
     center, (width, height), angle = rect
     if angle > 45:
         angle = angle-90
@@ -50,6 +54,8 @@ def rotate_warp_affine(pil_img, rect):
     # or cv2.INTER_LANCZOS4, but CUBIC looks slightly better(?)
     res = cv2.warpAffine(opencv_img, M, (opencv_img.shape[1], opencv_img.shape[0]), flags=cv2.INTER_CUBIC)
     res = cv2.getRectSubPix(res, (int(width), int(height)), center)
+    if binary:
+        res = res.astype(np.bool)
     return Image.fromarray(res)
 
 def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
