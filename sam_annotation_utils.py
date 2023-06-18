@@ -4,14 +4,23 @@ import numpy as np
 import statistics
 import copy
 import math
+import json
 
-DEBUG = False
+DEBUG = True
 
 class AnnotationInfo:
-    def __init__(self, sam_annotation, original_img_width, original_img_height):
+    def __init__(self, sam_annotation, original_img_width, original_img_height, rotation=0):
         self.sam_annotation = sam_annotation
         self.mask = sam_annotation["segmentation"]
         self.mask = (255*self.mask.astype(np.uint8)).astype('uint8')  #convert to an unsigned byte
+        if rotation != 0:
+            # rotation is in degrees counter clockwise
+            cv2_rot = cv2.ROTATE_90_COUNTERCLOCKWISE
+            if rotation == 270 or rotation == -90:
+                cv2_rot = cv2.ROTATE_90_CLOCKWISE
+            if rotation == 180:
+                cv2_rot = cv2.ROTATE_180
+            self.mask = cv2.rotate(self.mask, cv2_rot)
         # SAM masks often need some cleanup
         cv2.erode(self.mask, kernel=np.ones((30, 30)), iterations=1)
         # resize the mask
@@ -19,8 +28,23 @@ class AnnotationInfo:
         self.contour, self.contour_area = self.get_largest_contour()
         self.minAreaRect = cv2.minAreaRect(self.contour)
         self.bbox = cv2.boundingRect(self.contour)
+        self.warns = []
+
+    def to_scam_json_obj(self):
+        (cx, cy), (w, h), angle = self.minAreaRect
+        if angle > 45:
+            angle = angle-90
+            w, h = h, w
+        return {
+            "minAreaRect": [cx, cy, w, h, angle],
+            "warnings": self.warns
+        }
+
+    def toJSON(self):
+        return json.dumps(self.to_scam_json_obj)
 
     def debug_mask(self, base_fname):
+        print("write %s" % "debug/"+base_fname+"_mask.png")
         cv2.imwrite("debug/"+base_fname+"_mask.png", self.mask)
         contours, _ = cv2.findContours(self.mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         areas = [cv2.contourArea(c) for c in contours]
@@ -236,9 +260,9 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
         if ann.contour_area / total_area < min_area_ratio:
             print_debug("reject annotation with ratio = %f < %f" % (ann.contour_area / total_area, min_area_ratio))
             break
-        if ann.nb_edges_touched() > 2:
-            print_debug("ann %d touches %d edges, excuding" % (i, ann.nb_edges_touched()))
-            continue
+        #if ann.nb_edges_touched() > 2:
+        #    print_debug("ann %d touches %d edges, excuding" % (i, ann.nb_edges_touched()))
+        #    continue
         if ann.touches_top_bottom():
             print_debug("ann %d touches top and bottom edges, exclude" % i)
             continue
@@ -282,6 +306,70 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
     if find_borders:
         image_anns = find_cut_borders(image_anns, anns_by_area)
     return image_anns
+
+def add_scam_results(file_info, sam_ann_list, scam_options):
+    ann_list = []
+    for sam_ann in sam_ann_list:
+        ann_list.append(AnnotationInfo(sam_ann, file_info["width"], file_info["height"], file_info["rotation"]))
+    anns_by_area = sorted(ann_list, key=(lambda x: x.contour_area), reverse=True)
+    image_anns = []
+    potential_split_anns = []
+    ref_size = None
+    total_area = float(file_info["height"] * file_info["width"])
+    for i, ann in enumerate(anns_by_area):
+        ann_ratio = ann.bbox[2] / float(ann.bbox[3])
+        print_debug("ann %d, bbox %s, aspect ratio %f" % (i, str(ann.bbox), ann_ratio))
+        if DEBUG:
+            ann.debug_mask(debug_base_fname+"_%03d" % i)
+        if ann.contour_area / total_area < scam_options["area_ratio_min"]:
+            print_debug("reject annotation with ratio = %f < %f" % (ann.contour_area / total_area, scam_options["area_ratio_min"]))
+            break
+        if scam_options["direction"] == "vertical" and ann.touches_top_bottom():
+            print_debug("ann %d touches top and bottom edges, exclude" % i)
+            continue
+        if scam_options["direction"] == "horizontal" and ann.touches_left_right():
+            print_debug("ann %d touches top and bottom edges, exclude" % i)
+            continue
+        if ann.squarishness() < scam_options["squarishness_min_warn"]:
+            print_debug("ann %d has a squarishness of %f, excuding" % (i, ann.squarishness()))
+            continue
+        if ann.squarishness() < scam_options["squarishness_min"]:
+            ann.warns.append("squarishness")
+        if ann_has_duplicate_in(ann, image_anns) or ann_has_duplicate_in(ann, potential_split_anns):
+            print_debug("ann %d is duplicate, excuding" % i)
+            continue
+        if not ref_size:
+            if not scam_options["wh_ratio_range"] or (ann_ratio >= scam_options["wh_ratio_range"][0] and ann_ratio <= scam_options["wh_ratio_range"][1]):
+                image_anns.append(ann)
+                ref_size = ann.contour_area
+                print_debug("select ann %d with area ratio %f, aspect ratio %f" % (i, ann.contour_area / total_area, ann_ratio))
+            else:
+                print_debug("reject annotation %d with wrong aspect ratio %f not in [%f, %f]" % (i, ann_ratio, scam_options["wh_ratio_range"][0], scam_options["wh_ratio_range"][1]))
+            continue
+        if ann_included_in(ann, potential_split_anns):
+            print_debug("ann %d included in potential split, excluding" % i)
+            continue
+        diff_factor = 0.4 if len(image_anns) < scam_options["nb_pages_expected"] else 0.15
+        print_debug("diff is %f / %f" % (abs(ref_size - ann.contour_area) / ann.contour_area, diff_factor))
+        if abs(ref_size - ann.contour_area) / ref_size < diff_factor and not ann_included_in(ann, image_anns):
+            if not scam_options["wh_ratio_range"] or (ann_ratio >= scam_options["wh_ratio_range"][0] and ann_ratio <= scam_options["wh_ratio_range"][1]):
+                image_anns.append(ann)
+                print_debug("select ann %d, aspect ratio %f" % (i, ann_ratio))
+        elif len(image_anns) < scam_options["nb_pages_expected"] and len(potential_split_anns) < scam_options["nb_pages_expected"]:
+            print_debug("add annotation %d to the potential union detection, aspect ratio %f" % (i, ann_ratio))
+            potential_split_anns.append(ann)
+        #else:
+        #    break
+    image_anns = handle_unions(image_anns, potential_split_anns)
+    # we sort according to the split direction:
+    image_anns = order_image_annotation(image_anns)
+    if DEBUG:
+        for i, image_ann in enumerate(image_anns):
+            image_ann.debug_mask(debug_base_fname+"_selected%03d" % i)
+    file_info["pages"] = []
+    for image_ann in image_anns:
+        ann_obj = image_ann.to_scam_json_obj
+        file_info["pages"].append(ann_obj)
 
 def rotate(origin, point, angle):
     """
@@ -409,10 +497,10 @@ def test():
     import pickle
     from PIL import Image
     from img_utils import extract_encode_img
-    with gzip.open('examples/20220330153544645_0114.jpg_sam_1024_32.pickle.gz', 'rb') as f:
+    with gzip.open('examples/20220330153544645_0104.jpg_sam_1024_32.pickle.gz', 'rb') as f:
         anns = pickle.load(f)
-        img_orig = Image.open("examples/20220330153544645_0114.jpeg")
-        image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height, "examples/20220330153544645_0114", expected_ratio_range=[0.3,0.9], find_borders =True)
+        img_orig = Image.open("examples/20220330153544645_0104.jpeg")
+        image_ann_infos = get_image_ann_list(anns, img_orig.width, img_orig.height, "examples/20220330153544645_0104", expected_ratio_range=[0.3,0.9], find_borders =True)
         ig_img_basedir = "./"
         ig_lname = "I0123RA"
         for i, image_ann_info in enumerate(image_ann_infos):
