@@ -7,7 +7,7 @@ import logging
 from PIL import Image
 from cal_sam_pickles import get_sam_output
 from img_utils import apply_exif_rotation, encode_img
-import tqdm
+from tqdm import tqdm
 
 DEFAULT_PREPROCESS_OPTIONS = {
     "pps": 8,
