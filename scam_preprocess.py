@@ -7,6 +7,7 @@ import logging
 from PIL import Image
 from cal_sam_pickles import get_sam_output
 from img_utils import apply_exif_rotation, encode_img
+import tqdm
 
 DEFAULT_PREPROCESS_OPTIONS = {
     "pps": 8,
@@ -75,7 +76,7 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
         "files": []
     }
     files = scam_json["files"]
-    for img_path in img_paths:
+    for img_path in tqdm(img_paths):
         # pil_img is not rotated
         pil_img = get_pil_img(folder_path, img_path)
         if preprocess_options["use_exif_rotation"]:
