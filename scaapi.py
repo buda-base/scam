@@ -1,12 +1,14 @@
 from datetime import datetime
-from flask import Flask, json, request
+from flask import Flask, json, request, make_response, send_file
 import pickle
 import gzip
 from utils import upload_to_s3, gets3blob
+from sam_annotation_utils import add_scam_results
+import logging
 
 from flask_cors import CORS
 
-api = Flask("SCAM-QC", static_url_path='', static_folder='web/')
+api = Flask("SCAM-QC")
 CORS(api)
 
 VERSION = "0.0.1"
@@ -18,11 +20,13 @@ def get_gz_pickle(pickle_path):
     blob.seek(0)
     return pickle.loads(gzip.decompress(blob.read()))
 
-def get_thumbnail_bytes(folder_path, thumbnail_path):
+def get_thumbnail_bytesio(thumbnail_path):
     """
     returns the bytes of the thumbnail
     """
-    return gets3blob(thumbnail_path)
+    blob = gets3blob(thumbnail_path)
+    blob.seek(0)
+    return blob
 
 DEFAULT_SCAM_OPTIONS = {
     "alter_checked": False,
@@ -56,8 +60,9 @@ def run_scam_folder(folder_path, scam_options = DEFAULT_SCAM_OPTIONS):
         "scam_options": scam_options
     })
     for file_info in scam_json["files"]:
-        if file_info["checked"] and not scam_options["alter_checked"]:
+        if file_info.get("checked") and not scam_options["alter_checked"]:
             continue
+        logging.info("run sam on %s" % file_info["img_path"])
         sam_anns = get_gz_pickle(file_info["pickle_path"])
         add_scam_results(file_info, sam_anns, scam_options)
     return scam_json
@@ -74,7 +79,7 @@ def save_scam_json(folder_path, scam_json_obj):
 
 def get_scam_json(folder_path):
     json_file_path = folder_path+"scam.json"
-    blob = gets3blob(pickle_path)
+    blob = gets3blob(json_file_path)
     if blob is None:
         return None
     blob.seek(0)
@@ -85,6 +90,18 @@ def save_scam_json_api():
     data = request.json
     folder_path = data.get('folder_path')
     scam_json_obj = data.get('scam_json_obj')
+
+@api.route('/get_thumbnail_bytes', methods=['POST'])
+def get_thumbnail_bytes_api():
+    data = request.json
+    thumbnail_path = data.get('thumbnail_path')
+    img_bytesio = get_thumbnail_bytesio(thumbnail_path)
+    if img_bytesio is None:
+        return None
+    mt = "image/jpeg"
+    if thumbnail_path.endswith("png"):
+        mt = "image/png"
+    return send_file(img_bytesio, mimetype=mt)
 
 @api.route('/get_scam_json', methods=['POST'])
 def get_scam_json_api():
@@ -103,9 +120,10 @@ def run_scam_file_api():
 @api.route('/run_scam_folder', methods=['POST'])
 def run_scam_folder_api():
     data = request.json
+    print(data)
     folder_path = data.get('folder_path')
-    folder_path = data.get('scam_options')
+    scam_options = data.get('scam_options')
     return run_scam_folder(folder_path, scam_options)
 
 if __name__ == '__main__':
-    api.run()
+    api.run(debug=True)

@@ -6,7 +6,7 @@ import copy
 import math
 import json
 
-DEBUG = True
+DEBUG = False
 
 class AnnotationInfo:
     def __init__(self, sam_annotation, original_img_width, original_img_height, rotation=0):
@@ -319,8 +319,6 @@ def add_scam_results(file_info, sam_ann_list, scam_options):
     for i, ann in enumerate(anns_by_area):
         ann_ratio = ann.bbox[2] / float(ann.bbox[3])
         print_debug("ann %d, bbox %s, aspect ratio %f" % (i, str(ann.bbox), ann_ratio))
-        if DEBUG:
-            ann.debug_mask(debug_base_fname+"_%03d" % i)
         if ann.contour_area / total_area < scam_options["area_ratio_min"]:
             print_debug("reject annotation with ratio = %f < %f" % (ann.contour_area / total_area, scam_options["area_ratio_min"]))
             break
@@ -363,12 +361,9 @@ def add_scam_results(file_info, sam_ann_list, scam_options):
     image_anns = handle_unions(image_anns, potential_split_anns)
     # we sort according to the split direction:
     image_anns = order_image_annotation(image_anns)
-    if DEBUG:
-        for i, image_ann in enumerate(image_anns):
-            image_ann.debug_mask(debug_base_fname+"_selected%03d" % i)
     file_info["pages"] = []
     for image_ann in image_anns:
-        ann_obj = image_ann.to_scam_json_obj
+        ann_obj = image_ann.to_scam_json_obj()
         file_info["pages"].append(ann_obj)
 
 def rotate(origin, point, angle):

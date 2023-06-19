@@ -7,3 +7,5 @@ rawpy
 mozjpeg-lossless-optimization
 tqdm
 numpy
+flask
+flask-cors
