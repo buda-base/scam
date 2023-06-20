@@ -46,13 +46,10 @@ DEFAULT_SCAM_OPTIONS = {
     "cut_at_fixed": False
 }
 
-def run_scam_folder(folder_path, scam_options = DEFAULT_SCAM_OPTIONS):
+def run_scam_folder(folder_path, scam_json, scam_options = DEFAULT_SCAM_OPTIONS):
     """
-    runs scam on a folder. The folder must have been preprocessed and have a scam.json file
+    runs scam on a complete scam.json file
     """
-    scam_json = get_scam_json(folder_path)
-    if scam_json is None:
-        raise "scam.json not found"
     scam_run_idx = len(scam_json["scam_runs"])
     scam_json["scam_runs"].append({
         "date": datetime.now().isoformat(),
@@ -117,13 +114,14 @@ def run_scam_file_api():
     folder_path = data.get('scam_options')
     return run_scam_image(folder_path, file_info, scam_options)
 
-@api.route('/run_scam_folder', methods=['POST'])
-def run_scam_folder_api():
+@api.route('/run_scam', methods=['POST'])
+def run_scam_api():
     data = request.json
     print(data)
     folder_path = data.get('folder_path')
     scam_options = data.get('scam_options')
-    return run_scam_folder(folder_path, scam_options)
+    scam_json = data.get('scam_json')
+    return run_scam_folder(folder_path, scam_json, scam_options)
 
 if __name__ == '__main__':
     api.run(debug=True)
