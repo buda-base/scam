@@ -109,8 +109,8 @@ def get_scam_json_api():
 def run_scam_file_api():
     data = request.json
     folder_path = data.get('folder_path')
-    folder_path = data.get('file_info')
-    folder_path = data.get('scam_options')
+    file_info = data.get('file_info')
+    scam_options = data.get('scam_options')
     return run_scam_image(folder_path, file_info, scam_options)
 
 @api.route('/run_scam', methods=['POST'])
