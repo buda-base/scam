@@ -88,10 +88,9 @@ def save_scam_json_api():
     folder_path = data.get('folder_path')
     scam_json_obj = data.get('scam_json_obj')
 
-@api.route('/get_thumbnail_bytes', methods=['POST'])
-def get_thumbnail_bytes_api():
-    data = request.json
-    thumbnail_path = data.get('thumbnail_path')
+@api.route('/get_thumbnail_bytes', methods=['GET'])
+def get_thumbnail_bytes_api_get():
+    thumbnail_path = request.args.get('thumbnail_path')
     img_bytesio = get_thumbnail_bytesio(thumbnail_path)
     if img_bytesio is None:
         return None
