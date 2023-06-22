@@ -45,11 +45,11 @@ def is_img(path: str) -> bool:
     """"
     Better to use try: Image.open() but this is faster)
     """
-    end4: [str] = os.path.splitext(path)
+    end4 = os.path.splitext(path)
 
     if len(end4) < 2:
         return False
-    return end4[1].lower() in [".jpg", "jpeg", ".tif", "tiff", ".cr2", ".nef"]
+    return end4[1].lower() in [".jpg", ".jpeg", ".tif", ".tiff", ".cr2", ".nef"]
 
 def list_obj_keys(prefix, bucket=BUCKET_NAME):
     obj_keys = []
