@@ -43,6 +43,8 @@ function App() {
       })
       .then(response => {
         debug("json",response.data);
+
+        setJson(response.data)
       })
       .catch(error => {
         console.error(error);
