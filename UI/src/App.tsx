@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios';
 import debugFactory from "debug"
+import { encode } from "js-base64"
 
 // tmp data
 import data from "./assets/scam.json"
@@ -37,7 +38,7 @@ function App() {
       }, {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: "Basic " + config.auth.join(":")
+          Authorization: "Basic " + encode(config.auth.join(":"))
         },
       })
       .then(response => {
