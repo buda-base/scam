@@ -25,7 +25,7 @@ function App() {
         };
         
         axios
-          .get(apiUrl + "/get_scam_json", requestData, {
+          .post(apiUrl + "/get_scam_json", requestData, {
             headers: {
               'Content-Type': 'application/json',
               Authorization: "Basic " + config.auth.join(":")
