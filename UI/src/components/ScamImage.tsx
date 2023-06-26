@@ -1,43 +1,111 @@
-import React, { FC, useEffect, useState } from "react";
+import React, { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LazyLoadImage } from "react-lazy-load-image-component";
 import LazyLoad from 'react-lazyload';
+import debugFactory from "debug"
+import { encode } from "js-base64"
 
 import { ConfigData, ScamImageData } from "../types";
 import { apiUrl } from "../App";
+import Konva, { Layer, Stage, Image as KImage } from "react-konva";
+import { useInView } from "react-intersection-observer";
+import axios from "axios";
+
+const debug = debugFactory("scam:img")
+
+const scam_options = {
+  "alter_checked": false,
+  "direction": "vertical",
+  "squarishness_min": 0.85,
+  "squarishness_min_warn": 0.7,
+  "nb_pages_expected": 2,
+  "wh_ratio_range": [ 3, 7 ],
+  "wh_ratio_range_warn": [ 1.5, 10 ],
+  "area_ratio_min": 0.2,
+  "area_diff_max": 0.15,
+  "area_diff_max_warn": 0.7,
+  "use_rotation": true,
+  "fixed_width": null,
+  "fixed_height": null,
+  "expand_to_fixed": false,
+  "cut_at_fixed": false
+}
+
+const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigData }) => {
+  const { folder, config, image } = props;
+
+  const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
+  const [scamData, setScamData] = useState<ScamImageData | boolean>(false)
+  const { ref, inView } = useInView({
+    triggerOnce: false,
+    rootMargin: '200% 0px',
+    onChange(inView) {
+      if (inView) {
+        if (!konvaImg) {
+          setKonvaImg(true)
+          const img = new Image();
+          img.src = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path
+          img.onload = function () {
+            setKonvaImg(img)
+          }
+        }
+        if (!scamData) {
+          if (config.auth) {
+            setScamData(true)
+            axios.post(apiUrl + "run_scam_file", {
+              folder_path: folder,
+              scam_options: scam_options,
+              file_info: image
+            }, {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: "Basic " + encode(config.auth.join(":"))
+              },
+            })
+              .then(response => {
+                debug("json", response.data);
+                setScamData(response.data)
+              })
+              .catch(error => {
+                console.error(error);
+              });
+          }
+
+        }
+      } else {
+        //console.log('not in view');
+      }
+    }
+  });
 
 
+  return (<div ref={ref} className="scam-image" style={{ height: image.thumbnail_info.height + 30 }}>
+    <figure>
+      {/* 
+        { inView && <img
+            src={apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path}
+            width={image.thumbnail_info.width}
+            height={image.thumbnail_info.height}
+          /> }
+        */}
 
-
-const ScamImage = (props: { image: ScamImageData, config: ConfigData }) => {
-  const { config, image } = props;
-  
-  const [scamRes, setScamRes] = useState<ScamImageData>({} as ScamImageData)
-
-
-  useEffect(() => {
-    setScamRes(
-      { "height": 2448, "img_path": "SAM_2503.JPG", "pages": [{ "minAreaRect": [1631.500244140625, 358.49993896484375, 3262.99951171875, 716.9998779296875, 0.0], "warnings": [] }, { "minAreaRect": [1645.3409423828125, 1291.401611328125, 2922.633544921875, 839.261779785156, 0.8116922974586487], "warnings": [] }, { "minAreaRect": [1631.5, 2059.5, 3263.0, 761.0, 0.0], "warnings": [] }], "pickle_path": "sam_pickle_gz/Bruno/Reruk/SAM_2503.JPG_sam_pickle.gz", "rotation": 0, "thumbnail_info": { "height": 512, "rotation": 0, "width": 682 }, "thumbnail_path": "thumbnails/Bruno/Reruk/SAM_2503.JPG.jpg", "width": 3264 }
-    )
-  }, [])
-
-
-  return (<div className="scam-image">
-    {/* <LazyLoadImage
-      src={apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path}
-      width={image.thumbnail_info.width}
-      height={image.thumbnail_info.height}
-      /> */}
-    <LazyLoad height={image.thumbnail_info.height + 30} unmountIfInvisible={true} offset={2 * window.innerHeight}>
-      <figure>
-        <img
-        src={apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path}
+      {inView && <Stage
         width={image.thumbnail_info.width}
         height={image.thumbnail_info.height}
-        />
-        <figcaption>{image.img_path}</figcaption>
-      </figure>
-    </LazyLoad>
-    </div>
+      >
+        <Layer>
+          { typeof konvaImg === 'object' && 
+            <KImage
+              image={konvaImg}
+              width={image.thumbnail_info.width}
+              height={image.thumbnail_info.height}
+            /> 
+          }
+        </Layer> 
+      </Stage>
+      }
+      <figcaption>{image.img_path}</figcaption>
+    </figure>
+  </div>
   );
 };
 

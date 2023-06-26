@@ -1464,6 +1464,11 @@ react-dom@^18.2.0:
     loose-envify "^1.1.0"
     scheduler "^0.23.0"
 
+react-intersection-observer@^9.5.1:
+  version "9.5.1"
+  resolved "https://registry.yarnpkg.com/react-intersection-observer/-/react-intersection-observer-9.5.1.tgz#63a6d7c45f7251610ad2f5a5abb85204ee0926ac"
+  integrity sha512-YwcNF/4WsMAG1rLVDQHSbpdEW9vDaIl4QW88d+vqeXNUewFV4AJDQB14oHpAJ3rRCnKRmwu3nqfwwYe6wioNIg==
+
 react-is@^16.13.1:
   version "16.13.1"
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-16.13.1.tgz#789729a4dc36de2999dc156dd6c1d9c18cea56a4"
@@ -1486,11 +1491,6 @@ react-lazy-load-image-component@^1.6.0:
   dependencies:
     lodash.debounce "^4.0.8"
     lodash.throttle "^4.1.1"
-
-react-lazyload@^3.2.0:
-  version "3.2.0"
-  resolved "https://registry.yarnpkg.com/react-lazyload/-/react-lazyload-3.2.0.tgz#497bd06a6dbd7015e3376e1137a67dc47d2dd021"
-  integrity sha512-zJlrG8QyVZz4+xkYZH5v1w3YaP5wEFaYSUWC4CT9UXfK75IfRAIEdnyIUF+dXr3kX2MOtL1lUaZmaQZqrETwgw==
 
 react-reconciler@~0.29.0:
   version "0.29.0"

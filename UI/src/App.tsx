@@ -4,7 +4,7 @@ import debugFactory from "debug"
 import { encode } from "js-base64"
 
 // tmp data
-import data from "./assets/scam.json"
+//import data from "./assets/scam.json"
 
 import ScamImage from "./components/ScamImage"
 import './App.css'
@@ -18,7 +18,9 @@ function App() {
 
   const [config, setConfig] = useState<ConfigData>({} as ConfigData)
   const [images, setImages] = useState<ScamImageData[]>([])
-  const [json, setJson] = useState<ScamData>({} as ScamData)
+  const [json, setJson] = useState<ScamData | boolean>(false)
+
+  const [ folder, setFolder] = useState("Bruno/Reruk/");
 
   // load config file onstartup
   useEffect(() => {
@@ -32,9 +34,10 @@ function App() {
   }, [])
 
   useEffect( () => {
-    if(config.auth) axios
-      .post(apiUrl + "get_scam_json", {
-        folder_path: 'Bruno/Reruk/',
+    if(config.auth && !json) { 
+      setJson(true)
+      axios.post(apiUrl + "get_scam_json", {
+        folder_path: folder,
       }, {
         headers: {
           'Content-Type': 'application/json',
@@ -50,18 +53,18 @@ function App() {
         console.error(error);
 
         // use preloaded local data
-        setJson(data)
+        // setJson(data)
       });
-
-  }, [config])
+    }
+  }, [config, folder])
 
   useEffect( () => {
-    if(json.files) setImages(json.files)
+    if(typeof json === 'object' && json.files) setImages(json.files)
   }, [json])
 
   return (<>
     <header></header>
-    <main>{images.slice(10).map(image => <ScamImage {...{ image, config }}/>)}</main>
+    <main>{images.slice(10).map(image => <ScamImage {...{ folder, image, config }}/>)}</main>
     <footer></footer>
   </>)
 }
