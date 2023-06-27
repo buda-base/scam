@@ -3,7 +3,7 @@ import debugFactory from "debug"
 import { encode } from "js-base64"
 import { Layer, Stage, Image as KImage } from "react-konva";
 import { useInView } from "react-intersection-observer";
-import axios from "axios";
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 
 import { ConfigData, ScamImageData } from "../types";
 import { apiUrl } from "../App";
@@ -16,7 +16,7 @@ const scam_options = {
   "squarishness_min": 0.85,
   "squarishness_min_warn": 0.7,
   "nb_pages_expected": 2,
-  "wh_ratio_range": [ 3, 7 ],
+  "wh_ratio_range": [ 2.0, 7.0 ],
   "wh_ratio_range_warn": [ 1.5, 10 ],
   "area_ratio_min": 0.2,
   "area_diff_max": 0.15,
@@ -40,11 +40,33 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
       if (inView) {
         if (!konvaImg) {
           setKonvaImg(true)
+
+          /* // not working in Firefox
           const img = new Image();
           img.src = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path
           img.onload = function () {
             setKonvaImg(img)
           }
+          */
+         
+
+          const url = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path
+          const cookie: string = document.cookie;
+          const conf: AxiosRequestConfig = {
+            headers: { 
+              Authorization: "Basic " + encode(config.auth.join(":"))
+            },
+            responseType: 'blob' 
+          };
+          axios.get(url, conf)
+            .then((response: AxiosResponse) => {
+              const img: HTMLImageElement = new Image();
+              img.src = URL.createObjectURL(response.data);
+              setKonvaImg(img)
+            })
+            .catch((error: any) => {
+              console.error(error);
+            });
         }
         if (!scamData) {
           if (config.auth) {
@@ -78,14 +100,6 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
 
   return (<div ref={ref} className="scam-image" style={{ height: image.thumbnail_info.height + 30 }}>
     <figure>
-      {/* 
-        { inView && <img
-            src={apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path}
-            width={image.thumbnail_info.width}
-            height={image.thumbnail_info.height}
-          /> }
-        */}
-
       {inView && <Stage
         width={image.thumbnail_info.width}
         height={image.thumbnail_info.height}
