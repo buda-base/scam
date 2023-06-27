@@ -21,6 +21,7 @@ export type KonvaPage = {
 };
 
 export type ScamImageData = {
+  selected?:number;
   height: number;
   img_path: string;
   pickle_path: string;

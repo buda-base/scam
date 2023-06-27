@@ -176,10 +176,10 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
   }
   
   useEffect(()=> {
-    if( typeof scamData === 'object' && scamData.rects ) {
+    if( typeof scamData === 'object' && scamData.rects && scamData.selected != selectedId && selectedId != undefined) {
       // handling z-index the react-konva way (https://konvajs.org/docs/react/zIndex.html)
       const rects = [ ...scamData.rects.filter(r => r.n != selectedId) ].concat([ ...scamData.rects.filter(r => r.n === selectedId) ])
-      setScamData({ ...scamData, rects })  
+      setScamData({ ...scamData, selected: selectedId, rects })  
     }
   }, [scamData, selectedId])
 
