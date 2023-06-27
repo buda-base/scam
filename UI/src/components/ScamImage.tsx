@@ -1,14 +1,12 @@
 import React, { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { LazyLoadImage } from "react-lazy-load-image-component";
-import LazyLoad from 'react-lazyload';
 import debugFactory from "debug"
 import { encode } from "js-base64"
+import { Layer, Stage, Image as KImage } from "react-konva";
+import { useInView } from "react-intersection-observer";
+import axios from "axios";
 
 import { ConfigData, ScamImageData } from "../types";
 import { apiUrl } from "../App";
-import Konva, { Layer, Stage, Image as KImage } from "react-konva";
-import { useInView } from "react-intersection-observer";
-import axios from "axios";
 
 const debug = debugFactory("scam:img")
 
@@ -104,6 +102,11 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
       </Stage>
       }
       <figcaption>{image.img_path}</figcaption>
+      { typeof scamData === 'object' && 
+        <div className="debug">
+        { JSON.stringify(scamData?.pages, null, 2) }
+        </div> 
+      }
     </figure>
   </div>
   );
