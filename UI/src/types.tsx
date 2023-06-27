@@ -11,6 +11,7 @@ export type Page = {
 };
 
 export type KonvaPage = {
+  n:number;
   x:number;
   y:number;
   width:number;

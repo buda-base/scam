@@ -1,9 +1,11 @@
-import React, { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
+    import React, { FC, MouseEventHandler, useEffect, useLayoutEffect, useRef, useState } from "react";
 import debugFactory from "debug"
 import { encode } from "js-base64"
-import { Layer, Stage, Image as KImage, Rect } from "react-konva";
+import { Layer, Stage, Image as KImage, Rect, Transformer } from "react-konva";
+import { KonvaEventObject } from "konva/lib/Node";
 import { useInView } from "react-intersection-observer";
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+import Konva from "konva";
 
 import { ConfigData, ScamImageData, KonvaPage } from "../types";
 import { apiUrl } from "../App";
@@ -26,6 +28,50 @@ const scam_options = {
   "fixed_height": null,
   "expand_to_fixed": false,
   "cut_at_fixed": false
+}
+
+const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, onSelect: () => void } ) => {
+  const { x, y, width, height, rotation, warning } = props.shapeProps;
+  const { isSelected, onSelect } = props
+
+  const shRef = useRef<Konva.Rect>(null)
+  const trRef = useRef<Konva.Transformer>(null)
+
+
+  useEffect(() => {
+    if (isSelected && shRef.current) {
+      trRef.current?.nodes([shRef.current]);
+      trRef.current?.getLayer()?.batchDraw();
+    }
+  }, [isSelected]);
+
+  return (
+    <>
+    <Rect 
+      ref={shRef}
+      {...{ x, y, width, height, rotation }}         
+      {...isSelected?{}:{stroke:warning ? "orange" : "green"}} 
+      fill={"rgba("+(isSelected ? "0,128,255" : warning ? "128,128,0" : "0,255,0")+",0.1)"} 
+      draggable 
+      onClick={onSelect}
+      onTap={onSelect}
+
+    />
+
+    {isSelected && (
+      <Transformer
+        ref={trRef}
+        boundBoxFunc={(oldBox, newBox) => {
+            // limit resize
+            if (newBox.width < 5 || newBox.height < 5) {
+              return oldBox;
+            }
+            return newBox;
+          }}
+      />
+      )}
+    </>
+  )
 }
 
 const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigData }) => {
@@ -86,15 +132,16 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
                   const H = response.data.height
                   const w = response.data.thumbnail_info.width
                   const h = response.data.thumbnail_info.height
-                  response.data.rects = (response.data as ScamImageData).pages?.map(r => {
+                  response.data.rects = (response.data as ScamImageData).pages?.map((r,i) => {
                     const { minAreaRect: rect } = r
+                    const n = i
                     const width = rect[2] * w / W
                     const height = rect[3] * h / H
                     const x = rect[0] * w / W - width / 2
                     const y  = rect[1] * h / H - height / 2
                     const rotation = rect[4]
                     const warning = r.warnings.length > 0
-                    return ({x, y, width, height, rotation, warning})
+                    return ({n, x, y, width, height, rotation, warning})
                   })
                   setScamData(response.data)
                 }
@@ -110,13 +157,42 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
       }
     }
   });
+  const [selectedId, selectShape] = useState<number | null>(null);
+  const checkDeselect = (e: KonvaEventObject<MouseEvent|TouchEvent>) => {
+    const clickedOnEmpty = e.target === e.target.getStage() || e.target.attrs.image;
+    if (clickedOnEmpty) {
+      selectShape(null);
+    }
+  };
+  const checkDeselectDiv:MouseEventHandler<HTMLDivElement> = (e) => {
+    const clickedOnEmpty = (e.target as HTMLDivElement).nodeName != "CANVAS"
+    if (clickedOnEmpty) {
+      selectShape(null);
+    }
+  };
+  const onSelect= (i:number) => {
+    debug("select!",i); 
+    selectShape(i); 
+  }
+  
+  useEffect(()=> {
+    if( typeof scamData === 'object' && scamData.rects ) {
+      // handling z-index the react-konva way (https://konvajs.org/docs/react/zIndex.html)
+      const rects = [ ...scamData.rects.filter(r => r.n != selectedId) ].concat([ ...scamData.rects.filter(r => r.n === selectedId) ])
+      setScamData({ ...scamData, rects })  
+    }
+  }, [scamData, selectedId])
 
-
-  return (<div ref={ref} className="scam-image" style={{ height: image.thumbnail_info.height + 30 }}>
+  return (<div ref={ref} className="scam-image" 
+      style={{ height: image.thumbnail_info.height + 30 }}
+      onClick={checkDeselectDiv}
+    >
     <figure>
       {inView && <Stage
         width={image.thumbnail_info.width}
         height={image.thumbnail_info.height}
+        onMouseDown={checkDeselect}
+        onTouchStart={checkDeselect}
       >
         <Layer>
           { typeof konvaImg === 'object' && <>
@@ -126,9 +202,19 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
               height={image.thumbnail_info.height}
             /> 
             { typeof scamData === 'object' && 
-              scamData?.rects?.map(({ x, y, width, height, rotation, warning }) => (
-                <Rect {...{ x, y, width, height }} stroke={warning ? "orange" : "green"} fill={"rgba("+(warning ? "128,128" : "0,255")+",0,0.1)"} {...{ rotation }}/>
-              ))
+              scamData?.rects?.map((rect,i) => <TransformableRect 
+                  key={i}
+                  shapeProps={rect}
+                  isSelected={rect.n === selectedId}
+                  onSelect={() => onSelect(rect.n)}
+                  /*
+                  onChange={(newAttrs) => {
+                    const rects = rectangles.slice();
+                    rects[i] = newAttrs;
+                    setRectangles(rects);
+                  }}
+                  */
+              />)
             }
             </>
           }

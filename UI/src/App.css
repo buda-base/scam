@@ -1,7 +1,7 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+  /* max-width: 1280px; */
+  margin: 0;
+  /* padding: 2rem; */
   text-align: center;
 }
 
@@ -41,11 +41,35 @@
   color: #888;
 }
 
+body {
+  display:block;
+  margin:0;
+}
+
 
 .scam-image {
+  width:100%;
   position:relative;
-  margin:50px;
+  text-align:center;
+  padding:50px;
+}
+
+.scam-image > figure {
   font-size:0;
+  position:relative;
+  display: inline-block;
+}
+
+.scam-image::before {
+  content:'';
+  width:100%;
+  height:100%;
+  /* background:blue; */
+  display: block;
+  z-index:-1;
+  position: absolute;
+  top:0;
+  left:0;
 }
 
 .scam-image figcaption { 
@@ -59,4 +83,5 @@
 .scam-image .debug { 
   left:100%; top:0; font-size:10px; white-space: pre-wrap; position: absolute;
   text-align: left; display: block; width:400px;column-count: 2; height:100%;column-fill: auto;
+  padding-left:25px;
 }
