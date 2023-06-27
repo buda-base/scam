@@ -56,7 +56,7 @@ function App() {
         // setJson(data)
       });
     }
-  }, [config, folder])
+  }, [config, folder, json])
 
   useEffect( () => {
     if(typeof json === 'object' && json.files) setImages(json.files)

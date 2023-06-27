@@ -5,9 +5,18 @@ export type ConfigData = {
 
 type MinAreaRect = [number, number, number, number, number];
 
-type Page = {
+export type Page = {
   minAreaRect: MinAreaRect;
   warnings: string[];
+};
+
+export type KonvaPage = {
+  x:number;
+  y:number;
+  width:number;
+  height:number;
+  rotation:number;
+  warning:boolean;
 };
 
 export type ScamImageData = {
@@ -23,6 +32,7 @@ export type ScamImageData = {
   thumbnail_path: string;
   width: number;
   pages?:Page[];
+  rects?:KonvaPage[];
 };
 
 type PreprocessOptions = {

@@ -1,11 +1,11 @@
 import React, { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import debugFactory from "debug"
 import { encode } from "js-base64"
-import { Layer, Stage, Image as KImage } from "react-konva";
+import { Layer, Stage, Image as KImage, Rect } from "react-konva";
 import { useInView } from "react-intersection-observer";
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 
-import { ConfigData, ScamImageData } from "../types";
+import { ConfigData, ScamImageData, KonvaPage } from "../types";
 import { apiUrl } from "../App";
 
 const debug = debugFactory("scam:img")
@@ -47,11 +47,9 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
           img.onload = function () {
             setKonvaImg(img)
           }
-          */
-         
+          */        
 
           const url = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path
-          const cookie: string = document.cookie;
           const conf: AxiosRequestConfig = {
             headers: { 
               Authorization: "Basic " + encode(config.auth.join(":"))
@@ -64,7 +62,7 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
               img.src = URL.createObjectURL(response.data);
               setKonvaImg(img)
             })
-            .catch((error: any) => {
+            .catch(error => {
               console.error(error);
             });
         }
@@ -83,7 +81,23 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
             })
               .then(response => {
                 debug("json", response.data);
-                setScamData(response.data)
+                if(response.data) {
+                  const W = response.data.width
+                  const H = response.data.height
+                  const w = response.data.thumbnail_info.width
+                  const h = response.data.thumbnail_info.height
+                  response.data.rects = (response.data as ScamImageData).pages?.map(r => {
+                    const { minAreaRect: rect } = r
+                    const width = rect[2] * w / W
+                    const height = rect[3] * h / H
+                    const x = rect[0] * w / W - width / 2
+                    const y  = rect[1] * h / H - height / 2
+                    const rotation = rect[4]
+                    const warning = r.warnings.length > 0
+                    return ({x, y, width, height, rotation, warning})
+                  })
+                  setScamData(response.data)
+                }
               })
               .catch(error => {
                 console.error(error);
@@ -105,12 +119,18 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
         height={image.thumbnail_info.height}
       >
         <Layer>
-          { typeof konvaImg === 'object' && 
+          { typeof konvaImg === 'object' && <>
             <KImage
               image={konvaImg}
               width={image.thumbnail_info.width}
               height={image.thumbnail_info.height}
             /> 
+            { typeof scamData === 'object' && 
+              scamData?.rects?.map(({ x, y, width, height, rotation, warning }) => (
+                <Rect {...{ x, y, width, height }} stroke={warning ? "orange" : "green"} fill={"rgba("+(warning ? "128,128" : "0,255")+",0,0.1)"} {...{ rotation }}/>
+              ))
+            }
+            </>
           }
         </Layer> 
       </Stage>
