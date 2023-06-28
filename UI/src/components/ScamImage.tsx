@@ -55,7 +55,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
       draggable 
       onClick={onSelect}
       onTap={onSelect}
-      //onMouseUp={onSelect}
+      //onMouseDown={onSelect}
       onDragEnd={(e) => {
         onChange({
           ...props.shapeProps,
@@ -63,7 +63,23 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
           y: e.target.y(),
         });
       }}
-
+      onTransformEnd={(e) => {
+        const node = shRef.current;
+        if(node) {
+          const scaleX = node.scaleX();
+          const scaleY = node.scaleY();
+          node.scaleX(1);
+          node.scaleY(1);
+          onChange({
+            ...props.shapeProps,
+            x: node.x(),
+            y: node.y(),
+            // set minimal value
+            width: Math.max(5, node.width() * scaleX),
+            height: Math.max(node.height() * scaleY),
+          });
+        }
+      }}
     />
 
     {isSelected && (
@@ -95,6 +111,10 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
     const rotation = rect[4]
     const warning = r.warnings.length > 0
     return ({n, x, y, width, height, rotation, warning})
+  }
+
+  const handleZindex = (rects: KonvaPage[]) => {
+    return [ ...rects.filter(r => r.n != selectedId) ].concat([ ...rects.filter(r => r.n === selectedId) ])
   }
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
@@ -194,7 +214,9 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
       if(data.pages) {
         data.pages[p.n].minAreaRect[0] =  W * (p.x + p.width / 2) / w
         data.pages[p.n].minAreaRect[1] =  H * (p.y + p.height / 2) / h
-        data.rects = data.pages.map((r,i) => recomputeCoords(r, i, w, h, W, H))
+        data.pages[p.n].minAreaRect[2] =  W * p.width / w
+        data.pages[p.n].minAreaRect[3] =  H * p.height / h
+        data.rects = handleZindex(data.pages.map((r,i) => recomputeCoords(r, i, w, h, W, H)))        
   
         debug(W,H,w,h,p) //,scamData.pages[p.n].minAreaRect)
         
@@ -203,10 +225,11 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
     }
   }, [scamData])
   
+
   useEffect(()=> {
     if( typeof scamData === 'object' && scamData.rects && scamData.selected != selectedId && selectedId != undefined) {
       // handling z-index the react-konva way (https://konvajs.org/docs/react/zIndex.html)
-      const rects = [ ...scamData.rects.filter(r => r.n != selectedId) ].concat([ ...scamData.rects.filter(r => r.n === selectedId) ])
+      const rects = handleZindex(scamData.rects)
       setScamData({ ...scamData, selected: selectedId, rects })  
     }
   }, [scamData, selectedId])
