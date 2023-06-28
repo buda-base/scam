@@ -74,9 +74,10 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             ...props.shapeProps,
             x: node.x(),
             y: node.y(),
+            rotation: node.rotation(),
             // set minimal value
             width: Math.max(5, node.width() * scaleX),
-            height: Math.max(node.height() * scaleY),
+            height: Math.max(5, node.height() * scaleY),
           });
         }
       }}
@@ -216,6 +217,7 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
         data.pages[p.n].minAreaRect[1] =  H * (p.y + p.height / 2) / h
         data.pages[p.n].minAreaRect[2] =  W * p.width / w
         data.pages[p.n].minAreaRect[3] =  H * p.height / h
+        data.pages[p.n].minAreaRect[4] =  p.rotation
         data.rects = handleZindex(data.pages.map((r,i) => recomputeCoords(r, i, w, h, W, H)))        
   
         debug(W,H,w,h,p) //,scamData.pages[p.n].minAreaRect)
