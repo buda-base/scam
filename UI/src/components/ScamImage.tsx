@@ -1,4 +1,4 @@
-    import React, { FC, MouseEventHandler, useEffect, useLayoutEffect, useRef, useState } from "react";
+    import React, { FC, MouseEventHandler, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import debugFactory from "debug"
 import { encode } from "js-base64"
 import { Layer, Stage, Image as KImage, Rect, Transformer } from "react-konva";
@@ -7,7 +7,7 @@ import { useInView } from "react-intersection-observer";
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import Konva from "konva";
 
-import { ConfigData, ScamImageData, KonvaPage } from "../types";
+import { ConfigData, ScamImageData, KonvaPage, Page } from "../types";
 import { apiUrl } from "../App";
 
 const debug = debugFactory("scam:img")
@@ -30,9 +30,9 @@ const scam_options = {
   "cut_at_fixed": false
 }
 
-const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, onSelect: () => void } ) => {
+const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, onSelect: () => void, onChange: (p: KonvaPage) => void } ) => {
   const { x, y, width, height, rotation, warning } = props.shapeProps;
-  const { isSelected, onSelect } = props
+  const { isSelected, onSelect, onChange } = props
 
   const shRef = useRef<Konva.Rect>(null)
   const trRef = useRef<Konva.Transformer>(null)
@@ -55,6 +55,14 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
       draggable 
       onClick={onSelect}
       onTap={onSelect}
+      //onMouseUp={onSelect}
+      onDragEnd={(e) => {
+        onChange({
+          ...props.shapeProps,
+          x: e.target.x(),
+          y: e.target.y(),
+        });
+      }}
 
     />
 
@@ -77,6 +85,18 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigData }) => {
   const { folder, config, image } = props;
 
+  const recomputeCoords = (r: Page, i: number,w: number,h: number,W: number,H: number) => {
+    const { minAreaRect: rect } = r
+    const n = i
+    const width = rect[2] * w / W
+    const height = rect[3] * h / H
+    const x = rect[0] * w / W - width / 2
+    const y  = rect[1] * h / H - height / 2
+    const rotation = rect[4]
+    const warning = r.warnings.length > 0
+    return ({n, x, y, width, height, rotation, warning})
+  }
+
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
   const [scamData, setScamData] = useState<ScamImageData | boolean>(false)
   const { ref, inView } = useInView({
@@ -85,15 +105,8 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
     onChange(inView) {
       if (inView) {
         if (!konvaImg) {
-          setKonvaImg(true)
 
-          /* // not working in Firefox
-          const img = new Image();
-          img.src = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path
-          img.onload = function () {
-            setKonvaImg(img)
-          }
-          */        
+          setKonvaImg(true)
 
           const url = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path
           const conf: AxiosRequestConfig = {
@@ -114,7 +127,9 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
         }
         if (!scamData) {
           if (config.auth) {
+            
             setScamData(true)
+
             axios.post(apiUrl + "run_scam_file", {
               folder_path: folder,
               scam_options: scam_options,
@@ -132,17 +147,7 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
                   const H = response.data.height
                   const w = response.data.thumbnail_info.width
                   const h = response.data.thumbnail_info.height
-                  response.data.rects = (response.data as ScamImageData).pages?.map((r,i) => {
-                    const { minAreaRect: rect } = r
-                    const n = i
-                    const width = rect[2] * w / W
-                    const height = rect[3] * h / H
-                    const x = rect[0] * w / W - width / 2
-                    const y  = rect[1] * h / H - height / 2
-                    const rotation = rect[4]
-                    const warning = r.warnings.length > 0
-                    return ({n, x, y, width, height, rotation, warning})
-                  })
+                  response.data.rects = (response.data as ScamImageData).pages?.map((r,i) => recomputeCoords(r, i, w, h, W, H))
                   setScamData(response.data)
                 }
               })
@@ -158,22 +163,45 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
     }
   });
   const [selectedId, selectShape] = useState<number | null>(null);
+
   const checkDeselect = (e: KonvaEventObject<MouseEvent|TouchEvent>) => {
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.attrs.image;
     if (clickedOnEmpty) {
       selectShape(null);
     }
-  };
+  };  
   const checkDeselectDiv:MouseEventHandler<HTMLDivElement> = (e) => {
     const clickedOnEmpty = (e.target as HTMLDivElement).nodeName != "CANVAS"
     if (clickedOnEmpty) {
       selectShape(null);
     }
   };
-  const onSelect= (i:number) => {
+
+  const onSelect = (i:number) => {
     debug("select!",i); 
     selectShape(i); 
   }
+
+  const onChange = useCallback((p:KonvaPage) => {
+    if( typeof scamData === 'object' && scamData.pages && scamData.pages.length > p.n) {
+      const data = { ...scamData }
+
+      const W = scamData?.width
+      const H = scamData?.height
+      const w = scamData?.thumbnail_info.width
+      const h = scamData?.thumbnail_info.height
+
+      if(data.pages) {
+        data.pages[p.n].minAreaRect[0] =  W * (p.x + p.width / 2) / w
+        data.pages[p.n].minAreaRect[1] =  H * (p.y + p.height / 2) / h
+        data.rects = data.pages.map((r,i) => recomputeCoords(r, i, w, h, W, H))
+  
+        debug(W,H,w,h,p) //,scamData.pages[p.n].minAreaRect)
+        
+        setScamData(data)
+      }
+    }
+  }, [scamData])
   
   useEffect(()=> {
     if( typeof scamData === 'object' && scamData.rects && scamData.selected != selectedId && selectedId != undefined) {
@@ -185,7 +213,7 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
 
   return (<div ref={ref} className="scam-image" 
       style={{ height: image.thumbnail_info.height + 30 }}
-      onClick={checkDeselectDiv}
+      onMouseDown={checkDeselectDiv}
     >
     <figure>
       {inView && <Stage
@@ -207,13 +235,7 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
                   shapeProps={rect}
                   isSelected={rect.n === selectedId}
                   onSelect={() => onSelect(rect.n)}
-                  /*
-                  onChange={(newAttrs) => {
-                    const rects = rectangles.slice();
-                    rects[i] = newAttrs;
-                    setRectangles(rects);
-                  }}
-                  */
+                  {...{ onChange }}
               />)
             }
             </>

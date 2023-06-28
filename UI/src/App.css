@@ -46,12 +46,16 @@ body {
   margin:0;
 }
 
+main {
+  overflow:hidden;
+}
+
 
 .scam-image {
   width:100%;
   position:relative;
   text-align:center;
-  padding:50px;
+  padding:50px 0;  
 }
 
 .scam-image > figure {
