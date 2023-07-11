@@ -9,6 +9,7 @@ import Konva from "konva";
 
 import { ConfigData, ScamImageData, KonvaPage, Page } from "../types";
 import { apiUrl } from "../App";
+import ImageMenu from "./ImageMenu";
 
 const debug = debugFactory("scam:img")
 
@@ -30,6 +31,8 @@ const scam_options = {
   "cut_at_fixed": false
 }
 
+const padding = 56
+
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, onSelect: () => void, onChange: (p: KonvaPage) => void } ) => {
   const { x, y, width, height, rotation, warning } = props.shapeProps;
   const { isSelected, onSelect, onChange } = props
@@ -49,18 +52,27 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
     <>
     <Rect 
       ref={shRef}
-      {...{ x, y, width, height, rotation }}         
+      {...{ x:x+padding, y:y+padding, width, height, rotation }}         
       {...isSelected?{}:{stroke:warning ? "orange" : "green"}} 
       fill={"rgba("+(isSelected ? "0,128,255" : warning ? "128,128,0" : "0,255,0")+",0.1)"} 
       draggable 
       onClick={onSelect}
       onTap={onSelect}
       //onMouseDown={onSelect}
+      onMouseEnter={e => {
+        // style stage container:
+        const container = e.target.getStage()?.container();
+        if(container) container.style.cursor = "move";
+      }}
+      onMouseLeave={e => {
+        const container = e.target.getStage()?.container();
+        if(container) container.style.cursor = "default";
+      }}
       onDragEnd={(e) => {
         onChange({
           ...props.shapeProps,
-          x: e.target.x(),
-          y: e.target.y(),
+          x: e.target.x()-padding,
+          y: e.target.y()-padding,
         });
       }}
       onTransformEnd={(e) => {
@@ -72,8 +84,8 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
           node.scaleY(1);
           onChange({
             ...props.shapeProps,
-            x: node.x(),
-            y: node.y(),
+            x: node.x()-padding,
+            y: node.y()-padding,
             rotation: node.rotation(),
             // set minimal value
             width: Math.max(5, node.width() * scaleX),
@@ -118,8 +130,41 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
     return [ ...rects.filter(r => r.n != selectedId) ].concat([ ...rects.filter(r => r.n === selectedId) ])
   }
 
+  const getScamResults = useCallback(() => {
+    if (config.auth) {
+      
+      setScamData(true)
+
+      axios.post(apiUrl + "run_scam_file", {
+        folder_path: folder,
+        scam_options: scam_options,
+        file_info: image
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: "Basic " + encode(config.auth.join(":"))
+        },
+      })
+        .then(response => {
+          debug("json", response.data);
+          if(response.data) {
+            const W = response.data.width
+            const H = response.data.height
+            const w = response.data.thumbnail_info.width
+            const h = response.data.thumbnail_info.height
+            response.data.rects = (response.data as ScamImageData).pages?.map((r,i) => recomputeCoords(r, i, w, h, W, H))
+            setScamData(response.data)
+          }
+        })
+        .catch(error => {
+          console.error(error);
+        });
+    }
+  }, [config.auth, folder, image])
+
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
   const [scamData, setScamData] = useState<ScamImageData | boolean>(false)
+  const [showDebug, setShowDebug] = useState(true)
   const { ref, inView } = useInView({
     triggerOnce: false,
     rootMargin: '200% 0px',
@@ -147,35 +192,8 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
             });
         }
         if (!scamData) {
-          if (config.auth) {
-            
-            setScamData(true)
-
-            axios.post(apiUrl + "run_scam_file", {
-              folder_path: folder,
-              scam_options: scam_options,
-              file_info: image
-            }, {
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: "Basic " + encode(config.auth.join(":"))
-              },
-            })
-              .then(response => {
-                debug("json", response.data);
-                if(response.data) {
-                  const W = response.data.width
-                  const H = response.data.height
-                  const w = response.data.thumbnail_info.width
-                  const h = response.data.thumbnail_info.height
-                  response.data.rects = (response.data as ScamImageData).pages?.map((r,i) => recomputeCoords(r, i, w, h, W, H))
-                  setScamData(response.data)
-                }
-              })
-              .catch(error => {
-                console.error(error);
-              });
-          }
+          
+          getScamResults()
 
         }
       } else {
@@ -237,13 +255,13 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
   }, [scamData, selectedId])
 
   return (<div ref={ref} className="scam-image" 
-      style={{ height: image.thumbnail_info.height + 30 }}
+      style={{ height: image.thumbnail_info.height + 2 * padding }}
       onMouseDown={checkDeselectDiv}
     >
     <figure>
       {inView && <Stage
-        width={image.thumbnail_info.width}
-        height={image.thumbnail_info.height}
+        width={image.thumbnail_info.width + padding * 2}
+        height={image.thumbnail_info.height + padding * 2}
         onMouseDown={checkDeselect}
         onTouchStart={checkDeselect}
       >
@@ -253,6 +271,8 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
               image={konvaImg}
               width={image.thumbnail_info.width}
               height={image.thumbnail_info.height}
+              y={padding}
+              x={padding}
             /> 
             { typeof scamData === 'object' && 
               scamData?.rects?.map((rect,i) => <TransformableRect 
@@ -269,11 +289,12 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
       </Stage>
       }
       <figcaption>{image.img_path}</figcaption>
-      { typeof scamData === 'object' && 
+      { showDebug && typeof scamData === 'object' &&  
         <div className="debug">
         { JSON.stringify(scamData?.pages, null, 2) }
         </div> 
       }
+      <ImageMenu />
     </figure>
   </div>
   );

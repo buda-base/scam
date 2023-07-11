@@ -9,6 +9,7 @@ import { encode } from "js-base64"
 import ScamImage from "./components/ScamImage"
 import './App.css'
 import { ConfigData, ScamData, ScamImageData } from './types';
+import BottomBar from './components/BottomBar';
 
 const debug = debugFactory("scam:app")
 
@@ -65,7 +66,7 @@ function App() {
   return (<>
     <header></header>
     <main>{images.slice(10).map(image => <ScamImage {...{ folder, image, config }}/>)}</main>
-    <footer></footer>
+    <footer><BottomBar /></footer>
   </>)
 }
 
