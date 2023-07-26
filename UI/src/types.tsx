@@ -59,3 +59,5 @@ export type ScamData = {
   preprocess_run: PreprocessRun;
   scam_runs: any[];
 };
+
+export type Direction = "vertical" | "horizontal" | "custom" ;

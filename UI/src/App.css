@@ -130,4 +130,5 @@ main {
   display: flex; position: fixed;
   bottom:0; width:100%; height:70px; 
   background:#e2e2e2; box-shadow: 0 -2px 4px rgba(187,187,187,0.5);
+  text-align: left;
 }
