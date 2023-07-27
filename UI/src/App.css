@@ -51,7 +51,7 @@ body {
 main {
   overflow:hidden;
   background:#efefef;
-  width:1440px; margin:0 auto;
+  width:1440px; margin:0 auto; max-width:100%;
   padding-bottom:70px;
 }
 
@@ -101,14 +101,14 @@ main {
 
 .scam-image .debug { 
   font-size:10px; white-space: pre-wrap; position: absolute;
-  left:100%; top:0; width:400px;
+  left:100%; top:0; width:300px;
   text-align: left; display: flex; align-items: center; 
   column-count: 2; height:100%;column-fill: auto;
 }
 
 .scam-image .image-menu {
   position:absolute; visibility: hidden;
-  left:0; bottom:14px; width:100%;
+  left:0; bottom:4px; width:100%;
   display: flex; justify-content: space-between;
   padding:0 60px; box-sizing: border-box;
 }
@@ -116,9 +116,8 @@ main {
 .scam-image:hover .image-menu { 
   visibility: visible;
 }
-.scam-image:hover .image-menu svg {
+.scam-image .image-menu svg {
   font-size:32px;
-  cursor: pointer;
 }
 
 .scam-image:hover .image-menu svg.disabled {
@@ -131,4 +130,20 @@ main {
   bottom:0; width:100%; height:70px; 
   background:#e2e2e2; box-shadow: 0 -2px 4px rgba(187,187,187,0.5);
   text-align: left;
+}
+
+#root > footer > nav {
+  width:1440px; height:100%; max-width:100%;
+  margin:auto;
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+#root > footer > nav svg {
+  font-size:32px;
+}
+
+
+.MuiButtonBase-root:focus,
+.MuiButtonBase-root:active {
+  outline: none;
 }

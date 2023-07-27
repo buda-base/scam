@@ -1,4 +1,4 @@
-    import React, { FC, MouseEventHandler, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+    import React, { FC, MouseEventHandler, useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from "react";
 import debugFactory from "debug"
 import { encode } from "js-base64"
 import { Layer, Stage, Image as KImage, Rect, Transformer } from "react-konva";
@@ -6,31 +6,16 @@ import { KonvaEventObject } from "konva/lib/Node";
 import { useInView } from "react-intersection-observer";
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import Konva from "konva";
+import { useAtom } from "jotai"
 
 import { ConfigData, ScamImageData, KonvaPage, Page } from "../types";
 import { apiUrl } from "../App";
 import ImageMenu from "./ImageMenu";
+import * as state from "../state"
 
 const debug = debugFactory("scam:img")
 
-const scam_options = {
-  "alter_checked": false,
-  "direction": "vertical",
-  "squarishness_min": 0.85,
-  "squarishness_min_warn": 0.7,
-  "nb_pages_expected": 2,
-  "wh_ratio_range": [ 2.0, 7.0 ],
-  "wh_ratio_range_warn": [ 1.5, 10 ],
-  "area_ratio_min": 0.2,
-  "area_diff_max": 0.15,
-  "area_diff_max_warn": 0.7,
-  "use_rotation": true,
-  "fixed_width": null,
-  "fixed_height": null,
-  "expand_to_fixed": false,
-  "cut_at_fixed": false
-}
-
+// space around canvas so that rotation handle is always visible
 const padding = 56
 
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, onSelect: () => void, onChange: (p: KonvaPage) => void } ) => {
@@ -111,8 +96,36 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
   )
 }
 
+const scam_options_base = {
+  "alter_checked": false,
+  "direction": "vertical",
+  "squarishness_min": 0.85,
+  "squarishness_min_warn": 0.7,
+  "nb_pages_expected": 2,
+  "wh_ratio_range": [ 2.0, 7.0 ],
+  "wh_ratio_range_warn": [ 1.5, 10 ],
+  "area_ratio_min": 0.2,
+  "area_diff_max": 0.15,
+  "area_diff_max_warn": 0.7,
+  "use_rotation": true,
+  "fixed_width": null,
+  "fixed_height": null,
+  "expand_to_fixed": false,
+  "cut_at_fixed": false
+}
+
+
 const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigData }) => {
   const { folder, config, image } = props;
+
+  const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
+  const [scamData, setScamData] = useState<ScamImageData | boolean>(false)
+  
+  const [ scamOptions, setScamOptions ] = useState({ direction: '' })
+  const updateScamOptions = (opts: any) => {    
+    //debug("opts:",JSON.stringify(opts, null, 3))
+    setScamOptions({ ...opts })   
+  }
 
   const recomputeCoords = (r: Page, i: number,w: number,h: number,W: number,H: number) => {
     const { minAreaRect: rect } = r
@@ -126,18 +139,15 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
     return ({n, x, y, width, height, rotation, warning})
   }
 
-  const handleZindex = (rects: KonvaPage[]) => {
-    return [ ...rects.filter(r => r.n != selectedId) ].concat([ ...rects.filter(r => r.n === selectedId) ])
-  }
-
   const getScamResults = useCallback(() => {
     if (config.auth) {
-      
+      //debug("opt!", image.thumbnail_path, scamOptions)      
       setScamData(true)
+      setLastRun(Date.now())
 
       axios.post(apiUrl + "run_scam_file", {
         folder_path: folder,
-        scam_options: scam_options,
+        scam_options: { ...scam_options_base, ...scamOptions}, 
         file_info: image
       }, {
         headers: {
@@ -160,16 +170,23 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
           console.error(error);
         });
     }
-  }, [config.auth, folder, image])
+  }, [ config.auth, folder, image, scamOptions ])
 
-  const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
-  const [scamData, setScamData] = useState<ScamImageData | boolean>(false)
-  const [showDebug, setShowDebug] = useState(true)
+  const [willRunOnceOptsAreUpdated, setWillRunOnceOptsAreUpdated] = useState(false)
+  useEffect(() => {
+    if(willRunOnceOptsAreUpdated && scamOptions.direction != '') {
+      //debug("opts?", image.thumbnail_path, scamOptions)
+      getScamResults()
+      setWillRunOnceOptsAreUpdated(false)
+    } 
+  }, [ scamOptions, willRunOnceOptsAreUpdated ])
+
   const { ref, inView } = useInView({
     triggerOnce: false,
     rootMargin: '200% 0px',
-    onChange(inView) {
-      if (inView) {
+    onChange(inV) {
+      //debug("change!",inV,props)
+      if (inV) {
         if (!konvaImg) {
 
           setKonvaImg(true)
@@ -191,17 +208,99 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
               console.error(error);
             });
         }
-        if (!scamData) {
-          
-          getScamResults()
-
+        if (!scamData) {          
+          setWillRunOnceOptsAreUpdated(true)
         }
       } else {
         //console.log('not in view');
       }
     }
   });
+
+  const [lastRun, setLastRun] = useState(2)
+  const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
+
+  useEffect(() => {
+    //debug("lastRun?", lastRun, shouldRunAfter)
+    if(lastRun < shouldRunAfter) {
+      //debug("run with new opts:",JSON.stringify(scamOptions, null,3))
+      if(inView) getScamResults()
+      else setScamData(false)
+    }
+  }, [shouldRunAfter, lastRun, inView, getScamResults])
+
+  if(inView) 
+    return <ScamImageVisible {...props} {...{ divRef: ref, konvaImg, scamData, setScamData, recomputeCoords, updateScamOptions }} />
+  else 
+    return (
+    <div ref={ref} className="scam-image not-visible" 
+      style={{ height: image.thumbnail_info.height + 2 * padding }}
+    >
+      <figure>
+        <figcaption>{image.img_path}</figcaption>
+      </figure>
+  </div>)
+}
+
+const ScamImageVisible = (props: { 
+  folder:string, 
+  image: ScamImageData, 
+  config: ConfigData, 
+  divRef: any, 
+  konvaImg: HTMLImageElement | boolean,
+  scamData: ScamImageData | boolean, 
+  setScamData: any,
+  recomputeCoords: any,
+  updateScamOptions: any }) => {
+  const { folder, config, image, divRef, konvaImg, scamData, setScamData, recomputeCoords, updateScamOptions } = props;
+
+  const [orient] = useAtom(state.orientAtom) 
+  const [direc] = useAtom(state.direcAtom) 
+  const [minRatio] = useAtom(state.minRatioAtom)
+  const [maxRatio] = useAtom(state.maxRatioAtom)
+  const [nbPages] = useAtom(state.nbPagesAtom)
+
+  useEffect(() => {
+    updateScamOptions({ 
+      "wh_ratio_range": orient == "custom" 
+                        ? [ minRatio, maxRatio ] 
+                        : orient == "horizontal" 
+                          ? [ 2.0, 7.0 ]
+                          : [ 0.15, 0.85], // TODO: check values for vertical mode    
+      "wh_ratio_range_warn": [ 1.5, 10 ], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
+      "nb_pages_expected": orient == "custom" ? nbPages : 2,
+      "direction":  orient == "custom" 
+                    ? direc 
+                    : orient === 'horizontal' 
+                      ? 'vertical' 
+                      : 'horizontal',
+    })
+  }, [ orient, direc, minRatio, maxRatio, nbPages ])
+
+  useEffect(() => {
+    updateScamOptions({ 
+      "wh_ratio_range": orient == "custom" 
+                        ? [ minRatio, maxRatio ] 
+                        : orient == "horizontal" 
+                          ? [ 2.0, 7.0 ]
+                          : [ 0.15, 0.85], // TODO: check values for vertical mode    
+      "wh_ratio_range_warn": [ 1.5, 10 ], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
+      "nb_pages_expected": orient == "custom" ? nbPages : 2,
+      "direction":  orient == "custom" 
+                    ? direc 
+                    : orient === 'horizontal' 
+                      ? 'vertical' 
+                      : 'horizontal',
+    })
+  }, [])
+ 
   const [selectedId, selectShape] = useState<number | null>(null);
+
+  const handleZindex = useCallback((rects: KonvaPage[]) => {
+    return [ ...rects.filter(r => r.n != selectedId) ].concat([ ...rects.filter(r => r.n === selectedId) ])
+  }, [selectedId])
+
+  const [showDebug, setShowDebug] = useState(true)
 
   const checkDeselect = (e: KonvaEventObject<MouseEvent|TouchEvent>) => {
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.attrs.image;
@@ -243,7 +342,7 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
         setScamData(data)
       }
     }
-  }, [scamData])
+  }, [handleZindex, scamData])
   
 
   useEffect(()=> {
@@ -252,14 +351,14 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
       const rects = handleZindex(scamData.rects)
       setScamData({ ...scamData, selected: selectedId, rects })  
     }
-  }, [scamData, selectedId])
+  }, [scamData, selectedId, handleZindex])
 
-  return (<div ref={ref} className="scam-image" 
+  return (<div ref={divRef} className="scam-image" 
       style={{ height: image.thumbnail_info.height + 2 * padding }}
       onMouseDown={checkDeselectDiv}
     >
     <figure>
-      {inView && <Stage
+      <Stage
         width={image.thumbnail_info.width + padding * 2}
         height={image.thumbnail_info.height + padding * 2}
         onMouseDown={checkDeselect}
@@ -287,7 +386,6 @@ const ScamImage = (props: { folder:string, image: ScamImageData, config: ConfigD
           }
         </Layer> 
       </Stage>
-      }
       <figcaption>{image.img_path}</figcaption>
       { showDebug && typeof scamData === 'object' &&  
         <div className="debug">
