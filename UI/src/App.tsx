@@ -6,7 +6,7 @@ import { encode } from "js-base64"
 // tmp data
 //import data from "./assets/scam.json"
 
-import ScamImage from "./components/ScamImage"
+import { ScamImageContainer } from "./components/ScamImage"
 import './App.css'
 import { ConfigData, ScamData, ScamImageData } from './types';
 import BottomBar from './components/BottomBar';
@@ -65,7 +65,7 @@ function App() {
 
   return (<>
     <header></header>
-    <main>{images.slice(10).map(image => <ScamImage {...{ folder, image, config }}/>)}</main>
+    <main>{images.map(image => <ScamImageContainer {...{ folder, image, config }}/>)}</main>
     <footer><BottomBar /></footer>
   </>)
 }
