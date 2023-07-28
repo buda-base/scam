@@ -61,3 +61,13 @@ export type ScamData = {
 };
 
 export type Direction = "vertical" | "horizontal" | "custom" ;
+
+export type ScamDataState = 'new' | 'modified' | 'savedDraft' | 'savedOnline'
+
+export type SavedScamData = {
+  [str: string]: {
+    time: number;
+    data: ScamImageData;
+    state: ScamDataState;
+  }
+}

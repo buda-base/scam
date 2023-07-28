@@ -24,7 +24,7 @@ const BottomBar = (props: { /*folder:string, image: ScamImageData, config: Confi
 
   const handleClose = () => { setShowSettings(false); };
 
-  const handleRun = () => { setShouldRunAfter(Date.now()) };
+  const handleRun = () => { setShouldRunAfter(Date.now()); setShowSettings(false);  };
 
 
   return (<nav className="bot">
