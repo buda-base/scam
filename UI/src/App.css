@@ -109,10 +109,14 @@ main {
 }
 
 .scam-image .debug { 
-  font-size:10px; white-space: pre-wrap; position: absolute;
-  left:100%; top:0; width:300px;
-  text-align: left; display: flex; align-items: center; 
-  column-count: 2; height:100%;column-fill: auto;
+  font-size:10px; position: absolute;
+  left:100%; top:0; width:320px;height:100%;  
+  overflow:auto; 
+}
+.scam-image .debug div { 
+  display: flex; align-items: center; 
+  white-space: pre-wrap; text-align: left;  
+  min-height:100%; column-count: 2;
 }
 
 .scam-image .image-menu {

@@ -5,11 +5,13 @@ import debugFactory from "debug"
 import { useCallback } from 'react';
 
 import { ScamImageData } from '../types';
+import { theme } from './theme';
 
 const debug = debugFactory("scam:imenu");
 
-const ImageMenu = (props: { selectedId: number|null, removeId: (n: number) => void }) => {
-  const { selectedId, removeId} = props;
+const ImageMenu = (props: { selectedId: number|null, addNew: boolean,
+    removeId: (n: number) => void, setAddNew: (b:boolean) => void }) => {
+  const { selectedId, addNew, removeId, setAddNew} = props;
 
   //debug("menu", selectedId)
 
@@ -17,6 +19,10 @@ const ImageMenu = (props: { selectedId: number|null, removeId: (n: number) => vo
     //debug("remove:", selectedId)
     if(selectedId != null) removeId(selectedId)
   }, [removeId, selectedId])
+
+  const handleAdd = () => {
+    setAddNew(!addNew)
+  }
 
   return (<div className="image-menu">
     <span>
@@ -32,8 +38,8 @@ const ImageMenu = (props: { selectedId: number|null, removeId: (n: number) => vo
       </IconButton>
     </span>
     <span>
-      <IconButton>
-        <AddBox />
+      <IconButton onClick={handleAdd}>
+        <AddBox {...addNew?{sx:{color:theme.palette.primary.main}}:{}}/>
       </IconButton>
       <IconButton onClick={handleDelete} disabled={selectedId === null} >
         <DeleteForever />
