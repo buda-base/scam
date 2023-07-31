@@ -71,3 +71,9 @@ export type SavedScamData = {
     state: ScamDataState;
   }
 }
+
+export type LocalData = {
+  drafts: {
+    [str:string]: SavedScamData
+  }
+}

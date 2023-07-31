@@ -9,7 +9,7 @@ import Konva from "konva";
 import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
 
-import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState } from "../types";
+import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData } from "../types";
 import { apiUrl } from "../App";
 import ImageMenu from "./ImageMenu";
 import * as state from "../state"
@@ -115,7 +115,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 }
 
 
-export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData }) => {
+export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: ScamImageData }) => {
   const { image } = props;
 
   const { ref, inView } = useInView({
@@ -143,13 +143,15 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
 
 let unmount = false
 
-const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any }) => {
-  const { folder, config, image, divRef } = props;
+const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: ScamImageData }) => {
+  const { folder, config, image, divRef, draft } = props;
 
   const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const savedData = allScamData[image.thumbnail_path]
+
+  const [modified, setModified] = useAtom(state.modified)
 
   const [scamData, setScamData] = useState<ScamImageData | boolean>(savedData?.time <= shouldRunAfter ? savedData.data : false)
   const [lastRun, setLastRun] = useState(savedData?.time <= shouldRunAfter ? savedData.time : 0)
@@ -242,6 +244,19 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     if (config.auth && scamData != true && lastRun < shouldRunAfter) {
 
+      if(draft && !scamData) {
+        //debug("draft:", draft);
+        setScamData(draft)
+        dispatch({
+          type: 'ADD_DATA',
+          payload: {
+            id: image.thumbnail_path,
+            val: { data: draft, state: 'draft', time: shouldRunAfter }
+          }
+        })
+        return
+      }
+ 
       setScamData(true)
       setLastRun(Date.now())
 
@@ -344,6 +359,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
             val: { data, state: 'modified', time: shouldRunAfter }
           }
         })
+
+        setModified(true)
       }
     }
   }, [scamData])

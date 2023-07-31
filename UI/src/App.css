@@ -1,8 +1,17 @@
+
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
+
+
+* { font-family:"Noto Sans";}
+
 #root {
   /* max-width: 1280px; */
   margin: 0;
   /* padding: 2rem; */
   text-align: center;
+  font-family:"Noto Sans";
+
 }
 
 .logo {

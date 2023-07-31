@@ -15,16 +15,17 @@ export const nbPagesAtom = atom(2)
 
 export const shouldRunAfterAtom = atom(1)
 
-export const scamDataReducer = (state, action) => {
-    
-//  debug("state:", state, action)
-
+export const scamDataReducer = (state: any, action: { type: string; payload: { id: string; val: ScamImageData } }) => {
   switch (action.type) {
     case 'ADD_DATA':
       return { ...state, [action.payload.id]: action.payload.val };
+    case 'LOAD_DRAFT':
+      return { [action.payload.id]: action.payload.val };
     default:
       return state;
   }
 }
 
-export const allScamDataAtom = atomWithReducer<SavedScamData>({}, scamDataReducer)
+export const allScamDataAtom = atomWithReducer<SavedScamData, any>({}, scamDataReducer)
+
+export const modified = atom(false)
