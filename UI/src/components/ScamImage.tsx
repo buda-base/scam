@@ -115,7 +115,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 }
 
 
-export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: ScamImageData }) => {
+export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: ScamImageData, loadDraft: boolean|undefined }) => {
   const { image } = props;
 
   const { ref, inView } = useInView({
@@ -143,8 +143,8 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
 
 let unmount = false
 
-const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: ScamImageData }) => {
-  const { folder, config, image, divRef, draft } = props;
+const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: ScamImageData, loadDraft: boolean | undefined }) => {
+  const { folder, config, image, divRef, draft, loadDraft } = props;
 
   const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
@@ -244,7 +244,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     if (config.auth && scamData != true && lastRun < shouldRunAfter) {
 
-      if(draft && !scamData) {
+      if(loadDraft === undefined) return
+      else if(loadDraft && draft && !scamData) {
         //debug("draft:", draft);
         setScamData(draft)
         dispatch({
@@ -296,7 +297,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [ config.auth, folder, image, scamData, scamOptions, lastRun, shouldRunAfter ])
+  }, [ config.auth, folder, image, scamData, scamOptions, lastRun, shouldRunAfter, loadDraft ])
 
   
   useEffect(() => {
@@ -305,7 +306,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   useEffect(() => {
     getScamResults()
-  }, [ shouldRunAfter ])
+  }, [ shouldRunAfter, loadDraft ])
 
   /*
     useEffect(() => {
