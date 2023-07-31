@@ -321,7 +321,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     }
   };
   const checkDeselectDiv: MouseEventHandler<HTMLDivElement> = (e) => {
-    const clickedOnEmpty = (e.target as HTMLDivElement).nodeName != "CANVAS"
+    //debug("deselec", (e.target as HTMLDivElement).nodeName)
+    const clickedOnEmpty = !["CANVAS", "SVG", "PATH", "BUTTON"].includes((e.target as HTMLDivElement).nodeName.toUpperCase())
     if (clickedOnEmpty) {
       selectShape(null);
     }
@@ -331,6 +332,33 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     debug("select!", i);
     selectShape(i);
   }
+  
+  const removeId = useCallback((id: number) => {
+    if(typeof scamData === 'object' && scamData.pages && scamData.rects) {
+      debug("remove:", id, scamData.pages[id])
+      
+      const newData = { ...scamData }
+
+      const W = scamData?.width
+      const H = scamData?.height
+      const w = scamData?.thumbnail_info.width
+      const h = scamData?.thumbnail_info.height
+        
+      newData.pages = [...scamData.pages.filter((im,n) => n !== id)]
+      newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
+
+      setScamData(newData)
+      dispatch({
+        type: 'ADD_DATA',
+        payload: {
+          id: image.thumbnail_path,
+          val: { data: newData, state: 'modified', time: shouldRunAfter }
+        }
+      })
+      setModified(true)
+      selectShape(null)
+    }
+  }, [ scamData ])
 
   const onChange = useCallback((p: KonvaPage) => {
     if (typeof scamData === 'object' && scamData.pages && scamData.pages.length > p.n) {
@@ -352,7 +380,6 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         debug(W, H, w, h, p) //,scamData.pages[p.n].minAreaRect)
 
         setScamData(data)
-
         dispatch({
           type: 'ADD_DATA',
           payload: {
@@ -360,12 +387,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
             val: { data, state: 'modified', time: shouldRunAfter }
           }
         })
-
         setModified(true)
       }
     }
   }, [scamData])
-
 
   useEffect(() => {
     if (typeof scamData === 'object' && scamData.rects && scamData.selected != selectedId && selectedId != undefined) {
@@ -414,7 +439,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           {JSON.stringify(scamData?.pages, null, 2)}
         </div>
       }
-      <ImageMenu />
+      <ImageMenu {...{ selectedId, removeId }}/>
     </figure>
   </div>
   );

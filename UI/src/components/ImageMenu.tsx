@@ -1,10 +1,22 @@
 
 import { IconButton } from '@mui/material';
-import { Rotate90DegreesCw, VisibilityOff, Close, AddBox } from '@mui/icons-material';
+import { Rotate90DegreesCw, VisibilityOff, DeleteForever, AddBox } from '@mui/icons-material';
+import debugFactory from "debug"
+import { useCallback } from 'react';
 
+import { ScamImageData } from '../types';
 
-const ImageMenu = (props: { /*folder:string, image: ScamImageData, config: ConfigData*/ }) => {
-  //const { folder, config, image } = props;
+const debug = debugFactory("scam:imenu");
+
+const ImageMenu = (props: { selectedId: number|null, removeId: (n: number) => void }) => {
+  const { selectedId, removeId} = props;
+
+  //debug("menu", selectedId)
+
+  const handleDelete = useCallback(() => {
+    //debug("remove:", selectedId)
+    if(selectedId != null) removeId(selectedId)
+  }, [removeId, selectedId])
 
   return (<div className="image-menu">
     <span>
@@ -23,8 +35,8 @@ const ImageMenu = (props: { /*folder:string, image: ScamImageData, config: Confi
       <IconButton>
         <AddBox />
       </IconButton>
-      <IconButton disabled>
-        <Close /*className={"disabled"}*/ />
+      <IconButton onClick={handleDelete} disabled={selectedId === null} >
+        <DeleteForever />
       </IconButton>
     </span>
   </div>)
