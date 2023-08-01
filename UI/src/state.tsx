@@ -2,7 +2,7 @@ import { atom } from "jotai"
 import { atomWithReducer } from "jotai/utils"
 import debugFactory from "debug"
 
-import { ScamImageData, SavedScamData } from "./types"
+import { ScamImageData, SavedScamDataMap } from "./types"
 
 const debug = debugFactory("scam:state")
 
@@ -26,6 +26,6 @@ export const scamDataReducer = (state: any, action: { type: string; payload: { i
   }
 }
 
-export const allScamDataAtom = atomWithReducer<SavedScamData, any>({}, scamDataReducer)
+export const allScamDataAtom = atomWithReducer<SavedScamDataMap, any>({}, scamDataReducer)
 
 export const modified = atom(false)

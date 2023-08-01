@@ -65,15 +65,18 @@ export type Direction = "vertical" | "horizontal" | "custom" ;
 export type ScamDataState = 'new' | 'modified' | 'savedDraft' | 'savedOnline'
 
 export type SavedScamData = {
-  [str: string]: {
-    time: number;
-    data: ScamImageData;
-    state: ScamDataState;
-  }
+  time: number;
+  data: ScamImageData;
+  state: ScamDataState;
+  image: ScamImageData;
+}
+
+export type SavedScamDataMap = {
+  [str: string]: SavedScamData
 }
 
 export type LocalData = {
   drafts: {
-    [str:string]: SavedScamData
+    [str:string]: SavedScamDataMap
   }
 }

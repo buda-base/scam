@@ -97,6 +97,12 @@ function App() {
     setLoadDraft(true)
   }
 
+  useEffect(() => {
+    if(loadDraft && drafts) {
+      Object.values(drafts).map(v => setImageData(v.image))
+    }
+  }, [loadDraft, drafts])
+
   return (
     <ThemeProvider theme={theme}>
       <Dialog open={loadDraft === undefined && Object.keys(drafts).length ? true : false} onClose={() => handleClose()} disableScrollLock={true}>
@@ -123,7 +129,7 @@ function App() {
         </DialogActions>
       </Dialog>
       <header></header>
-      <main>{images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path]?.data, setImageData }}/>)}</main>
+      <main>{images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData }}/>)}</main>
       <footer><BottomBar {...{ folder }}/></footer>
     </ThemeProvider>
   )

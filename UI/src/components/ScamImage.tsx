@@ -9,7 +9,7 @@ import Konva from "konva";
 import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
 
-import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData } from "../types";
+import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData } from "../types";
 import { apiUrl } from "../App";
 import ImageMenu from "./ImageMenu";
 import * as state from "../state"
@@ -91,8 +91,8 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             node.scaleY(1);
             onChange({
               ...props.shapeProps,
-              x: node.x() - padding - handleX,
-              y: node.y() - padding - handleY,
+              x: node.x() - padding - handleX * scaleX,
+              y: node.y() - padding - handleY * scaleY,
               rotation: node.rotation(),
               // set minimal value
               width: Math.max(5, node.width() * scaleX),
@@ -119,7 +119,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 }
 
 
-export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: ScamImageData, loadDraft: boolean|undefined, setImageData: (data:ScamImageData) => void }) => {
+export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, setImageData: (data:ScamImageData) => void }) => {
   const { image } = props;
 
   const { ref, inView } = useInView({
@@ -147,7 +147,7 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
 
 let unmount = false
 
-const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: ScamImageData, loadDraft: boolean | undefined, setImageData:(data:ScamImageData)=>void }) => {
+const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, loadDraft: boolean | undefined, setImageData:(data:ScamImageData)=>void }) => {
   const { folder, config, image, divRef, draft, loadDraft, setImageData } = props;
 
   const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
@@ -264,12 +264,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       if(loadDraft === undefined) return
       else if(loadDraft && draft && !scamData) {
         //debug("draft:", draft);
-        setScamData(draft)
+        setScamData(draft.data)
         dispatch({
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data: draft, state: 'draft', time: shouldRunAfter }
+            val: { data: draft, state: 'draft', time: shouldRunAfter, image }
           }
         })
         return
@@ -369,7 +369,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         type: 'ADD_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data: newData, state: 'modified', time: shouldRunAfter }
+          val: { data: newData, state: 'modified', time: shouldRunAfter, image }
         }
       })
       setModified(true)
@@ -406,7 +406,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data, state: 'modified', time: shouldRunAfter }
+            val: { data, state: 'modified', time: shouldRunAfter, image }
           }
         })
         setModified(true)
@@ -481,8 +481,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const rotate = useCallback((angle: number) => {
     const rotation = (image.rotation + angle + 360) % 360    
-    setImageData({...image, rotation })    
-    //debug("rota:", angle, rotation)    
+    setImageData({...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation })    
+    setModified(true)
   }, [ image, shouldRunAfter ])
 
   const actualW = (portrait ? image.thumbnail_info.height : image.thumbnail_info.width)
