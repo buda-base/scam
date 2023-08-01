@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import axios from 'axios';
 import debugFactory from "debug"
 import { encode } from "js-base64"
@@ -75,6 +75,15 @@ function App() {
     if(typeof json === 'object' && json.files) setImages(json.files)
   }, [json])
 
+  const setImageData = useCallback((data:ScamImageData) => {
+    if(typeof json !== 'object') return
+    const idx = json.files.findIndex((im) => im.thumbnail_path === data.thumbnail_path)
+    debug("set:", data, data.thumbnail_path, idx)
+    const newJson = { ...json }
+    newJson.files[idx] = { ...data }
+    setJson(newJson)
+  }, [json])
+
   const handleClose = async (discard?: boolean) => {
     setLoadDraft(false)
     if(discard) {
@@ -114,7 +123,7 @@ function App() {
         </DialogActions>
       </Dialog>
       <header></header>
-      <main>{images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path]?.data }}/>)}</main>
+      <main>{images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path]?.data, setImageData }}/>)}</main>
       <footer><BottomBar {...{ folder }}/></footer>
     </ThemeProvider>
   )

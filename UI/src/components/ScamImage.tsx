@@ -36,10 +36,10 @@ const scam_options = {
 
 const padding = 56
 
-const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean,
+const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
   const { x, y, width, height, rotation, warning } = props.shapeProps;
-  const { isSelected, addNew, onSelect, onChange } = props
+  const { isSelected, addNew, portrait, onSelect, onChange } = props
 
   const shRef = useRef<Konva.Rect>(null)
   const trRef = useRef<Konva.Transformer>(null)
@@ -52,11 +52,14 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
     }
   }, [isSelected]);
 
+  const handleX = portrait ? height/2 : width/2
+  const handleY = portrait ? width/2 : height/2
+
   return (
     <>
       <Rect
         ref={shRef}
-        {...{ x: x + padding, y: y + padding, width, height, rotation }}
+        {...{ x: x + padding + handleX, y: y + padding + handleY, width, height, rotation, offsetX: handleX, offsetY: handleY }}
         {...isSelected ? {} : { stroke: warning ? "orange" : "green" }}
         fill={"rgba(" + (isSelected ? "0,128,255" : warning ? "128,128,0" : "0,255,0") + ",0.1)"}
         draggable={!addNew}
@@ -75,8 +78,8 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
         onDragEnd={(e) => {
           onChange({
             ...props.shapeProps,
-            x: e.target.x() - padding,
-            y: e.target.y() - padding,
+            x: e.target.x() - padding - handleX,
+            y: e.target.y() - padding - handleY,
           });
         }}
         onTransformEnd={(e) => {
@@ -88,8 +91,8 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             node.scaleY(1);
             onChange({
               ...props.shapeProps,
-              x: node.x() - padding,
-              y: node.y() - padding,
+              x: node.x() - padding - handleX,
+              y: node.y() - padding - handleY,
               rotation: node.rotation(),
               // set minimal value
               width: Math.max(5, node.width() * scaleX),
@@ -116,7 +119,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 }
 
 
-export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: ScamImageData, loadDraft: boolean|undefined }) => {
+export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: ScamImageData, loadDraft: boolean|undefined, setImageData: (data:ScamImageData) => void }) => {
   const { image } = props;
 
   const { ref, inView } = useInView({
@@ -144,8 +147,8 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
 
 let unmount = false
 
-const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: ScamImageData, loadDraft: boolean | undefined }) => {
-  const { folder, config, image, divRef, draft, loadDraft } = props;
+const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: ScamImageData, loadDraft: boolean | undefined, setImageData:(data:ScamImageData)=>void }) => {
+  const { folder, config, image, divRef, draft, loadDraft, setImageData } = props;
 
   const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
@@ -158,6 +161,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [lastRun, setLastRun] = useState(savedData?.time <= shouldRunAfter ? savedData.time : 0)
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
+  const [portrait, setPortrait] = useState(false)
+  useEffect(() => {
+    setPortrait([90,270].includes(image.rotation) ? true : false)
+  }, [image.rotation])
 
   const [showDebug, setShowDebug] = useState(true)
   const [selectedId, selectShape] = useState<number | null>(null);
@@ -172,11 +179,18 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const scamOptions = useMemo(() => ({
     ...scam_options,
+
+    /*
+    "squarishness_min": orient == 'horizontal' ? 0.85 : 1/0.85,
+    "area_ratio_min": orient == 'horizontal' ? 0.2 : 1/0.2,
+    "area_diff_max": orient == 'horizontal' ? 0.15 : 1/0.15,
+    */
+   
     "wh_ratio_range": orient == "custom"
       ? [minRatio, maxRatio]
       : orient == "horizontal"
         ? [2.0, 7.0]
-        : [0.15, 0.85], // TODO: check values for vertical mode    
+        : [0.143, 0.5], // TODO: check values for vertical mode    
     "wh_ratio_range_warn": [1.5, 10], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
     "nb_pages_expected": orient == "custom" ? nbPages : 2,
     "direction": orient == "custom"
@@ -245,7 +259,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   }, [ config.auth, image.thumbnail_path, konvaImg ])
 
   const getScamResults = useCallback(() => {
-    if (config.auth && scamData != true && lastRun < shouldRunAfter) {
+    if (config.auth && scamData != true && (lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
 
       if(loadDraft === undefined) return
       else if(loadDraft && draft && !scamData) {
@@ -309,7 +323,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   useEffect(() => {
     getScamResults()
-  }, [ shouldRunAfter, loadDraft ])
+  }, [ shouldRunAfter, loadDraft, image.rotation ])
 
   /*
     useEffect(() => {
@@ -465,14 +479,23 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     }
   };
 
+  const rotate = useCallback((angle: number) => {
+    const rotation = (image.rotation + angle + 360) % 360    
+    setImageData({...image, rotation })    
+    //debug("rota:", angle, rotation)    
+  }, [ image, shouldRunAfter ])
+
+  const actualW = (portrait ? image.thumbnail_info.height : image.thumbnail_info.width)
+  const actualH = (portrait ? image.thumbnail_info.width : image.thumbnail_info.height)
+
   return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "")}
-    style={{ height: image.thumbnail_info.height + 2 * padding }}
+    style={{ height: actualH + 2 * padding }}
     onMouseDown={checkDeselectDiv}
   >
     <figure>
       <Stage
-        width={image.thumbnail_info.width + padding * 2}
-        height={image.thumbnail_info.height + padding * 2}
+        width={actualW + padding * 2}
+        height={actualH + padding * 2}
         onMouseDown={addNew ? handleMouseDown : checkDeselect}
         onMouseUp={handleMouseUp}
         onMouseMove={handleMouseMove}
@@ -484,11 +507,20 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               image={konvaImg}
               width={image.thumbnail_info.width}
               height={image.thumbnail_info.height}
-              y={padding}
-              x={padding}
+              //x={padding + ([90,180].includes(image.rotation) ? actualW : 0)}
+              //y={padding + ([180,270].includes(image.rotation) ? actualH : 0)}
+              x={actualW / 2 + padding}
+              y={actualH / 2 + padding}
+              rotation={image.rotation}
+              offsetX={image.thumbnail_info.width / 2}
+              offsetY={image.thumbnail_info.height / 2}
               onMouseEnter={(e) => {
                 const container = e.target.getStage()?.container();
                 if (container && addNew) container.style.cursor = "copy";
+              }}
+              onMouseMove={(e) => {
+                const container = e.target.getStage()?.container();
+                if (container && !addNew && container.style.cursor != "default") container.style.cursor = "default";
               }}
               onMouseLeave={(e) => {
                 const container = e.target.getStage()?.container();
@@ -503,7 +535,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
                 shapeProps={rect}
                 isSelected={rect.n === selectedId}
                 onSelect={() => onSelect(rect.n)}
-                {...{ onChange, addNew }}
+                {...{ onChange, addNew, portrait }}
               />)
             )
           }
@@ -527,7 +559,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           </div>
         </div>
       }
-      <ImageMenu {...{ selectedId, addNew, removeId, setAddNew }}/>
+      <ImageMenu {...{ selectedId, addNew, removeId, setAddNew, selectShape, rotate }}/>
     </figure>
   </div>
   );

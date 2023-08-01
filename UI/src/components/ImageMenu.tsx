@@ -10,8 +10,8 @@ import { theme } from './theme';
 const debug = debugFactory("scam:imenu");
 
 const ImageMenu = (props: { selectedId: number|null, addNew: boolean,
-    removeId: (n: number) => void, setAddNew: (b:boolean) => void }) => {
-  const { selectedId, addNew, removeId, setAddNew} = props;
+    removeId: (n: number) => void, setAddNew: (b:boolean) => void, selectShape:(n:number|null) => void, rotate:(n:number) => void }) => {
+  const { selectedId, addNew, removeId, setAddNew, selectShape, rotate } = props;
 
   //debug("menu", selectedId)
 
@@ -21,6 +21,7 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean,
   }, [removeId, selectedId])
 
   const handleAdd = () => {
+    if(!addNew) selectShape(null)
     setAddNew(!addNew)
   }
 
@@ -30,11 +31,11 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean,
       <IconButton>
         <VisibilityOff />
       </IconButton>
-      <IconButton>
-        <Rotate90DegreesCw style={{ transform: "rotate(45deg)" }}/>
+      <IconButton onClick={() => rotate(90)}>
+        <Rotate90DegreesCw style={{ transform: "rotate(45deg)" }} />
       </IconButton>
-      <IconButton>
-        <Rotate90DegreesCw style={{ transform: "scaleY(-1) rotate(-135deg)" }}/>
+      <IconButton onClick={() => rotate(-90)}>
+        <Rotate90DegreesCw style={{ transform: "scaleY(-1) rotate(-135deg)" }} />
       </IconButton>
     </span>
     <span>
