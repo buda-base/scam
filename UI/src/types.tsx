@@ -69,6 +69,7 @@ export type SavedScamData = {
   data: ScamImageData;
   state: ScamDataState;
   image: ScamImageData;
+  visible: boolean;
 }
 
 export type SavedScamDataMap = {

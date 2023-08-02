@@ -98,6 +98,8 @@ main {
   left:0;
 }
 
+.scam-image .visible-false img { opacity: 50%; margin:10px; }
+
 .scam-image figcaption { 
   display: block; 
   justify-content: center;
@@ -107,6 +109,8 @@ main {
   position:absolute;
   top:calc(50% - 12px);right:100%;
 }
+
+.scam-image .visible-false figcaption { top:20px; }
 
 .scam-image .debug { 
   font-size:10px; position: absolute;
@@ -125,6 +129,11 @@ main {
   display: flex; justify-content: space-between;
   padding:0 60px; box-sizing: border-box;
 }
+
+.scam-image .visible-false .image-menu { top:15px; bottom:auto;}
+
+.scam-image .visible-false .image-menu > span:last-child { visibility: hidden;}
+.scam-image .visible-false .image-menu > span:first-child > button:not(:first-child) { visibility: hidden;}
 
 .scam-image:hover .image-menu { 
   visibility: visible;

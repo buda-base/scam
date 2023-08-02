@@ -127,10 +127,11 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
     rootMargin: '200% 0px'
   });
 
+  const [visible, setVisible] = useState(true)
   
   if (inView) {    
     //debug("scanImageContainer:", image.thumbnail_path, JSON.stringify(props, null, 3))
-    return <ScamImage {...props} divRef={ref} />
+    return <ScamImage {...props} divRef={ref} {...{visible, setVisible}}/>
   }
   else {    
     return (
@@ -147,8 +148,9 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
 
 let unmount = false
 
-const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, loadDraft: boolean | undefined, setImageData:(data:ScamImageData)=>void }) => {
-  const { folder, config, image, divRef, draft, loadDraft, setImageData } = props;
+const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, loadDraft: boolean | undefined, 
+    setImageData:(data:ScamImageData)=>void, setVisible:(b:boolean) => void }) => {
+  const { folder, config, image, divRef, draft, loadDraft, visible, setImageData, setVisible } = props;
 
   const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
@@ -263,7 +265,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    if (config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
+    if (visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
       if(loadDraft === undefined) return
       else if(loadDraft && draft && !scamData) {        
@@ -273,9 +275,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data: draft.data, state: 'draft', time: shouldRunAfter, image: draft.image }
+            val: { data: draft.data, state: 'draft', time: shouldRunAfter, image: draft.image, visible: draft.visible }
           }
         })
+        if(visible != draft.visible) setVisible(draft.visible)
         return
       }
  
@@ -312,7 +315,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               type: 'ADD_DATA',
               payload: {
                 id: image.thumbnail_path,
-                val: { data: response.data, state, time: shouldRunAfter, image }
+                val: { data: response.data, state, time: shouldRunAfter, image, visible }
               }
             })
           }
@@ -376,7 +379,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         type: 'ADD_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data: newData, state: 'modified', time: shouldRunAfter, image }
+          val: { data: newData, state: 'modified', time: shouldRunAfter, image, visible }
         }
       })
       setModified(true)
@@ -413,7 +416,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data, state: 'modified', time: shouldRunAfter, image }
+            val: { data, state: 'modified', time: shouldRunAfter, image, visible }
           }
         })
         setModified(true)
@@ -494,15 +497,29 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     setLastRun(1)
   }, [ image, shouldRunAfter ])
 
+  const toggleVisible = useCallback(() => {
+    dispatch({
+      type: 'ADD_DATA',
+      payload: {
+        id: image.thumbnail_path,
+        val: { data: scamData, state: 'modified', time: shouldRunAfter, image, visible: !visible }
+      }
+    })
+    setVisible(!visible)
+    setModified(true)
+  }, [visible])
+
   const actualW = (portrait ? image.thumbnail_info.height : image.thumbnail_info.width)
   const actualH = (portrait ? image.thumbnail_info.width : image.thumbnail_info.height)
 
   return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "")}
-    style={{ height: actualH + 2 * padding }}
+    style={{ height: visible ? actualH + 2 * padding : 80 }}
     onMouseDown={checkDeselectDiv}
   >
-    <figure>
-      <Stage
+    <figure className={"visible-"+visible} 
+        {... !visible ? { style: { width: image.thumbnail_info.width + padding * 2, height: 100 } }:{} }>
+      { !visible && typeof konvaImg == "object" && <img src={konvaImg?.src} style={{transform: "rotate("+image.rotation+"deg)", maxWidth:80, maxHeight:80 - 2 * padding }}/> }
+      { visible  && <Stage
         width={actualW + padding * 2}
         height={actualH + padding * 2}
         onMouseDown={addNew ? handleMouseDown : checkDeselect}
@@ -559,16 +576,16 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
             />
           )}
         </Layer>
-      </Stage>
+      </Stage> }
       <figcaption>{image.img_path}</figcaption>
-      {showDebug && typeof scamData === 'object' &&
+      {showDebug && visible && typeof scamData === 'object' &&
         <div className="debug">
           <div>
           {JSON.stringify(scamData?.pages, null, 2)}
           </div>
         </div>
       }
-      <ImageMenu {...{ selectedId, addNew, removeId, setAddNew, selectShape, rotate }}/>
+      <ImageMenu {...{ selectedId, addNew, visible, removeId, setAddNew, selectShape, rotate, toggleVisible }}/>
     </figure>
   </div>
   );
