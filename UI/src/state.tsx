@@ -13,12 +13,12 @@ export const minRatioAtom = atom(1.0)
 export const maxRatioAtom = atom(2.0)
 export const nbPagesAtom = atom(2)
 
-export const shouldRunAfterAtom = atom(1)
+export const shouldRunAfterAtom = atom(123)
 
 export const scamDataReducer = (state: any, action: { type: string; payload: { id: string; val: ScamImageData } }) => {
   switch (action.type) {
     case 'ADD_DATA':
-      return { ...state, [action.payload.id]: action.payload.val };
+      return { ...state, [action.payload.id]: { ...action.payload.val } };
     case 'LOAD_DRAFT':
       return { [action.payload.id]: action.payload.val };
     default:

@@ -157,7 +157,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const [modified, setModified] = useAtom(state.modified)
 
-  const [scamData, setScamData] = useState<ScamImageData | boolean>(savedData?.time <= shouldRunAfter ? savedData.data : false)
+  const [scamData, setScamData] = useState<ScamImageData | boolean>(savedData?.time >= shouldRunAfter ? savedData.data : false)
   const [lastRun, setLastRun] = useState(savedData?.time <= shouldRunAfter ? savedData.time : 0)
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
@@ -258,25 +258,29 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     }
   }, [ config.auth, image.thumbnail_path, konvaImg ])
 
-  const getScamResults = useCallback(() => {
-    if (config.auth && scamData != true && (lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
+  //debug("im:",image.thumbnail_path,lastRun,shouldRunAfter,image,scamData)
 
+  const getScamResults = useCallback(() => {
+    const now = Date.now()
+
+    if (config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
+      
       if(loadDraft === undefined) return
-      else if(loadDraft && draft && !scamData) {
+      else if(loadDraft && draft && !scamData) {        
         //debug("draft:", draft);
         setScamData(draft.data)
         dispatch({
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data: draft, state: 'draft', time: shouldRunAfter, image }
+            val: { data: draft.data, state: 'draft', time: shouldRunAfter, image: draft.image }
           }
         })
         return
       }
  
       setScamData(true)
-      setLastRun(Date.now())
+      setLastRun(now)
 
       //debug("getScamResults:",image.thumbnail_path)
 
@@ -300,12 +304,15 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
             const h = response.data.thumbnail_info.height
             response.data.rects = (response.data as ScamImageData).pages?.map((r, i) => recomputeCoords(r, i, w, h, W, H))
 
+            let state = 'new'
+            if(typeof scamData === "object" && scamData.rotation != image.rotation) state = 'modified'
+
             setScamData(response.data)
             dispatch({
               type: 'ADD_DATA',
               payload: {
                 id: image.thumbnail_path,
-                val: { data: response.data, state: 'new', time: shouldRunAfter }
+                val: { data: response.data, state, time: shouldRunAfter, image }
               }
             })
           }
@@ -323,7 +330,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   useEffect(() => {
     getScamResults()
-  }, [ shouldRunAfter, loadDraft, image.rotation ])
+  }, [ shouldRunAfter, loadDraft, lastRun ])
 
   /*
     useEffect(() => {
@@ -431,6 +438,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       if(!vect) return
       const { x, y } = vect
       setNewPage([{ x, y, width: 0, height: 0, n: scamData.pages?.length, rotation:0, warning:false }]);
+      selectShape(scamData.pages?.length)
     }
   };
 
@@ -483,6 +491,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     const rotation = (image.rotation + angle + 360) % 360    
     setImageData({...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation })    
     setModified(true)
+    setLastRun(1)
   }, [ image, shouldRunAfter ])
 
   const actualW = (portrait ? image.thumbnail_info.height : image.thumbnail_info.width)

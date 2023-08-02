@@ -46,12 +46,14 @@ const BottomBar = (props: { folder:string /*, image: ScamImageData, config: Conf
     setModified(false)
   }, [allScamData, folder])
 
+  /*
   useEffect( () =>  {
 
     debug("data:",allScamData)
 
   }, [allScamData])
-
+  */
+ 
   return (<nav className="bot">
     <IconButton onClick={() => setShowSettings(true)}>
       <Settings />
