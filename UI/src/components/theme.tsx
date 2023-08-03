@@ -31,5 +31,16 @@ export const theme = createTheme({
     fontFamily: [ 
       "Noto Sans" 
     ].join(",")
+  },
+  /* // no need but good to know!
+  components: {
+    MuiIconButton: {
+      styleOverrides:{
+        root: {
+          "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.04)" }
+        }
+      }
+    }
   }
+  */
 });

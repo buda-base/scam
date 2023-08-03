@@ -20,7 +20,7 @@ import { ColorButton } from "./theme"
 
 const debug = debugFactory("scam:bbar")
 
-const BottomBar = (props: { folder:string /*, image: ScamImageData, config: ConfigData*/ }) => {
+export const BottomBar = (props: { folder:string }) => {
   const { folder } = props;
 
   const [showSettings, setShowSettings] = useState(false)
@@ -62,7 +62,7 @@ const BottomBar = (props: { folder:string /*, image: ScamImageData, config: Conf
       <ColorButton onClick={() => saveDraft()} disabled={!modified}>save draft</ColorButton>
       <ColorButton sx={{ marginLeft:"8px" }} /*onClick={() => setShowSettings(true)}*/ disabled>publish</ColorButton>
     </div>
-    <Dialog open={showSettings} onClose={handleClose} disableScrollLock={true}>
+    <Dialog open={showSettings} onClose={handleClose} disableScrollLock={true} >
       <DialogTitle>Run SCAM</DialogTitle>
       <DialogContent>
         {/* <DialogContentText>
@@ -87,5 +87,3 @@ const BottomBar = (props: { folder:string /*, image: ScamImageData, config: Conf
     </Dialog>
   </nav>)
 }
-
-export default BottomBar
