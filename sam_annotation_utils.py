@@ -21,6 +21,8 @@ class AnnotationInfo:
             if rotation == 180:
                 cv2_rot = cv2.ROTATE_180
             self.mask = cv2.rotate(self.mask, cv2_rot)
+            if rotation == 90 or rotation == 270 or rotation == -90:
+                original_img_width, original_img_height = original_img_height, original_img_width
         # SAM masks often need some cleanup
         cv2.erode(self.mask, kernel=np.ones((30, 30)), iterations=1)
         # resize the mask
