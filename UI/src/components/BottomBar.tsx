@@ -1,5 +1,5 @@
 import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, Button, ButtonProps } from "@mui/material"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Settings, Close } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import {
@@ -13,7 +13,7 @@ import {
 import { useAtom } from "jotai";
 import debugFactory from "debug"
 
-import { LocalData, SavedScamData } from "../types"
+import { LocalData, SavedScamData, ScamOptionsMap } from "../types"
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
@@ -34,17 +34,42 @@ export const BottomBar = (props: { folder:string }) => {
 
   const handleRun = () => { setShouldRunAfter(Date.now()); setShowSettings(false);  };
 
+  const [orient, setOrient] = useAtom(state.orientAtom)
+  const [direc, setDirec] = useAtom(state.direcAtom)
+  const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
+  const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
+  const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+
+  const scamOptions:ScamOptionsMap = useMemo(() => ({
+    "wh_ratio_range": orient == "custom"
+      ? [minRatio, maxRatio]
+      : orient == "horizontal"
+        ? [2.0, 7.0]
+        : [0.6, 0.8], // TODO: check values for vertical mode    
+    "wh_ratio_range_warn": [1.5, 10], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
+    "nb_pages_expected": orient == "custom" ? nbPages : 2,
+    "direction": orient == "custom"
+      ? direc
+      : orient === 'horizontal'
+        ? 'vertical'
+        : 'horizontal'
+  }), [ orient, direc, minRatio, maxRatio, nbPages ])
+  
   const saveDraft = useCallback(async () => {
     const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
     if(!local.drafts) local.drafts = {}
-    local.drafts[folder] = { ...local.drafts[folder], ...Object.keys(allScamData).reduce( (acc,a) => {
-      const val = allScamData[a]
-      if(["draft", "modified"].includes(val.state)) return ({ ...acc, [a]: val })
-      return acc
-    }, {}) }
+    local.drafts[folder] = { 
+      ...local.drafts[folder], 
+      images: { ...Object.keys(allScamData).reduce( (acc,a) => {
+        const val = allScamData[a]
+        if(["draft", "modified"].includes(val.state)) return ({ ...acc, [a]: val })
+        return acc
+      }, {}) },
+      options: orient != "custom" ? { orientation: orient } : { ...scamOptions }
+    }
     localStorage.setItem("scamUI", JSON.stringify(local))
     setModified(false)
-  }, [allScamData, folder])
+  }, [allScamData, folder, scamOptions, setModified])
 
   
   useEffect( () =>  {

@@ -35,10 +35,10 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
         { visible && <VisibilityOff /> }
         { !visible && <Visibility /> }
       </IconButton>
-      <IconButton onClick={() => rotate(-90)} >
+      <IconButton onClick={() => rotate(90)} >
         <Rotate90DegreesCw style={{ transform: "scaleY(-1) rotate(-135deg)" }} />
       </IconButton>
-      <IconButton onClick={() => rotate(90)} >
+      <IconButton onClick={() => rotate(-90)} >
         <Rotate90DegreesCw style={{ transform: "rotate(45deg)" }} />
       </IconButton>
     </span>

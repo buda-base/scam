@@ -4,6 +4,9 @@ import debugFactory from "debug"
 import { encode } from "js-base64"
 import { ThemeProvider } from '@mui/material/styles';
 import { useSearchParams } from "react-router-dom";
+import { Close } from '@mui/icons-material';
+import { Dialog, DialogTitle, DialogContent, IconButton, DialogActions, TextField } from '@mui/material';
+import { useAtom } from 'jotai';
 
 // tmp data
 //import data from "./assets/scam.json"
@@ -14,9 +17,7 @@ import { ConfigData, LocalData, SavedScamData, ScamData, ScamImageData } from '.
 import { BottomBar } from './components/BottomBar';
 import { TopBar } from './components/TopBar';
 import { ColorButton, theme } from "./components/theme"
-import { Close } from '@mui/icons-material';
-import { Dialog, DialogTitle, DialogContent, IconButton, DialogActions, TextField } from '@mui/material';
-
+import * as state from "./state"
 
 const debug = debugFactory("scam:app")
 
@@ -33,13 +34,18 @@ function App() {
   const [ folder, setFolder ] = useState(searchParams.get("folder") || "");
   const [ error, setError ] = useState("")
 
+  const [ drafts, setDrafts ] = useState({} as  { [str:string] : SavedScamData })
+  const [ loadDraft, setLoadDraft ] = useState<boolean|undefined>(false)
 
-  const [ drafts, setDrafts ] = useState(
-    ( ( JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) [folder] || {}
-  )
+  const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
+  
+  const [modified, setModified] = useAtom(state.modified)
 
-  const [loadDraft, setLoadDraft] = useState<boolean|undefined>(Object.keys(drafts).length ? undefined : false)
-
+  const [orient, setOrient] = useAtom(state.orientAtom)
+  const [direc, setDirec] = useAtom(state.direcAtom)
+  const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
+  const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
+  const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
 
   // load config file onstartup
   useEffect(() => {
@@ -54,9 +60,9 @@ function App() {
 
   useEffect( () => {
 
-    debug("folder?",folder)
+    debug("folder?", folder, json)
 
-    if(config.auth &&  folder && (!json || typeof json === 'object' && jsonPath && (jsonPath != json?.folder_path) || folder != jsonPath)) { 
+    if(config.auth && folder && (!json || typeof json === 'object' && jsonPath && !jsonPath.match(new RegExp("^"+folder+"/?$")))) {
 
       if(!folder.endsWith("/")) { 
         setFolder(folder+"/")
@@ -77,9 +83,10 @@ function App() {
 
         setJson(response.data)
         setSearchParams({ folder })
+        setError("")
       })
       .catch(error => {
-        console.error(error);
+        debug(error, json);
         
         setError(error.message)
 
@@ -90,7 +97,7 @@ function App() {
       setImages([])
       setJson(false)
     }
-  }, [config, folder, json])
+  }, [config, folder, json, jsonPath, setSearchParams])
 
   useEffect( () => {
     if(typeof json === 'object' && json.files) setImages(json.files)
@@ -120,9 +127,30 @@ function App() {
 
   
   useEffect(() => {
+    debug("folder!", folder)    
+    setJson(false)
+    setModified(false)
     setError("")
+    dispatch({ type: 'RESET_DATA' })
+    setImages([])
+    if(folder) {
+      const hasDraft = ((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) 
+      setDrafts( hasDraft[folder]?.images || {} )
+      setLoadDraft( hasDraft[folder]?.images ? undefined : false )
+      const options = hasDraft[folder]?.options
+      if(options) {
+        if(options.orientation) setOrient(options.orientation as string)
+        else {
+          setOrient("custom")
+          setDirec(options.direction as string)
+          setMinRatio((options["wh_ratio_range"] as number[])[0])
+          setMaxRatio((options["wh_ratio_range"] as number[])[1])
+          setNbPages(options["nb_pages_expected"] as number)
+        }
+      }
+    }
+    
   }, [folder])
-  
   
   useEffect(() => {
     if(typeof json === 'object' && jsonPath != json.folder_path) setJsonPath(json.folder_path)
@@ -161,9 +189,9 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       {reloadDialog}
-      <header className={"folder-empty-"+(folder === "" || error != "" && !json)}><TopBar {...{ folder, error, jsonPath, setFolder }}/></header>
-      <main>{json && images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData }}/>)}</main>
-      { json && <footer><BottomBar {...{ folder, setFolder }}/></footer>}
+      <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, error, jsonPath, setFolder }}/></header>
+      <main>{images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData }}/>)}</main>
+      { typeof json == "object" && <footer><BottomBar {...{ folder, setFolder }}/></footer>}
     </ThemeProvider>
   )
 }

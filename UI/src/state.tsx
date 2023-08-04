@@ -9,8 +9,8 @@ const debug = debugFactory("scam:state")
 // global settings
 export const orientAtom = atom("horizontal") 
 export const direcAtom = atom("horizontal") 
-export const minRatioAtom = atom(1.0)
-export const maxRatioAtom = atom(2.0)
+export const minRatioAtom = atom(0.145)
+export const maxRatioAtom = atom(0.5)
 export const nbPagesAtom = atom(2)
 
 export const shouldRunAfterAtom = atom(123)
@@ -21,6 +21,8 @@ export const scamDataReducer = (state: any, action: { type: string; payload: { i
       return { ...state, [action.payload.id]: { ...action.payload.val } };
     case 'LOAD_DRAFT':
       return { [action.payload.id]: action.payload.val };
+    case 'RESET_DATA':
+      return {  };
     default:
       return state;
   }

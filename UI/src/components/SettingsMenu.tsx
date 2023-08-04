@@ -13,6 +13,8 @@ const SettingsMenu = (props: { /*folder:string, image: ScamImageData, config: Co
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
   
+  //const [modified, setModified] = useAtom(state.modified)
+
   const [editRatio, setEditRatio] = useState(false)
 
   const theme = useTheme()

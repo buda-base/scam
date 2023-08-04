@@ -9,14 +9,14 @@ import Konva from "konva";
 import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
 
-import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData } from "../types";
+import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap } from "../types";
 import { apiUrl } from "../App";
 import ImageMenu from "./ImageMenu";
 import * as state from "../state"
 
 const debug = debugFactory("scam:img")
 
-const scam_options = {
+const scam_options: ScamOptionsMap = {
   "alter_checked": false,
   "direction": "vertical",
   "squarishness_min": 0.85,
@@ -155,12 +155,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
-  const savedData = allScamData[image.thumbnail_path]
+  const globalData = allScamData[image.thumbnail_path]
 
   const [modified, setModified] = useAtom(state.modified)
 
-  const [scamData, setScamData] = useState<ScamImageData | boolean>(savedData?.time >= shouldRunAfter ? savedData.data : false)
-  const [lastRun, setLastRun] = useState(savedData?.time <= shouldRunAfter ? savedData.time : 0)
+  const [scamData, setScamData] = useState<ScamImageData | boolean>(globalData?.time >= shouldRunAfter ? globalData.data : false)
+  const [lastRun, setLastRun] = useState(globalData?.time <= shouldRunAfter ? globalData.time : 0)
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
   const [portrait, setPortrait] = useState(false)
@@ -179,7 +179,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
 
-  const scamOptions = useMemo(() => ({
+  const scamOptions:ScamOptionsMap = useMemo(() => ({
     ...scam_options,
 
     /*
@@ -192,7 +192,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       ? [minRatio, maxRatio]
       : orient == "horizontal"
         ? [2.0, 7.0]
-        : [0.143, 0.5], // TODO: check values for vertical mode    
+        : [0.6, 0.8], // TODO: check values for vertical mode    
     "wh_ratio_range_warn": [1.5, 10], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
     "nb_pages_expected": orient == "custom" ? nbPages : 2,
     "direction": orient == "custom"
@@ -265,6 +265,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
+    debug("gSR!", loadDraft, draft, globalData)    
+
     if (visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
       if(loadDraft === undefined) return
@@ -324,7 +326,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [ config.auth, folder, image, scamData, scamOptions, lastRun, shouldRunAfter, loadDraft ])
+  }, [loadDraft, draft, visible, config.auth, scamData, lastRun, shouldRunAfter, image, folder, scamOptions, controller.signal, dispatch, setVisible])
 
   
   useEffect(() => {
@@ -537,7 +539,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               //y={padding + ([180,270].includes(image.rotation) ? actualH : 0)}
               x={actualW / 2 + padding}
               y={actualH / 2 + padding}
-              rotation={image.rotation}
+              rotation={360 - image.rotation}
               offsetX={image.thumbnail_info.width / 2}
               offsetY={image.thumbnail_info.height / 2}
               onMouseEnter={(e) => {

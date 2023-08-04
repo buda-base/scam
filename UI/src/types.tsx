@@ -76,8 +76,15 @@ export type SavedScamDataMap = {
   [str: string]: SavedScamData
 }
 
+export type ScamOptionsMap = {
+  [k:string]: boolean | number | string | number[] | null
+}
+
 export type LocalData = {
   drafts: {
-    [str:string]: SavedScamDataMap
+    [str:string]: {
+      images: SavedScamDataMap;
+      options: ScamOptionsMap 
+    }
   }
 }
