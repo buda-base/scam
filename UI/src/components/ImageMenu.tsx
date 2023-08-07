@@ -1,8 +1,8 @@
 
 import { IconButton } from '@mui/material';
-import { Rotate90DegreesCw, VisibilityOff, Visibility, DeleteForever, AddBox } from '@mui/icons-material';
+import { Rotate90DegreesCw, VisibilityOff, Visibility, DeleteForever, AddBox, TaskAlt, Check, CheckCircle } from '@mui/icons-material';
 import debugFactory from "debug"
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useAtom } from 'jotai';
 
 import { ScamImageData } from '../types';
@@ -11,10 +11,10 @@ import * as state from "../state"
 
 const debug = debugFactory("scam:imenu");
 
-const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:boolean,
+const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:boolean, checked: boolean,
     removeId: (n: number) => void, setAddNew: (b:boolean) => void, selectShape:(n:number|null) => void, rotate:(n:number) => void,
-    toggleVisible:() => void }) => {
-  const { selectedId, addNew, visible, removeId, setAddNew, selectShape, rotate, toggleVisible } = props;
+    toggleVisible:() => void, toggleCheck: () => void }) => {
+  const { selectedId, addNew, visible, checked, removeId, setAddNew, selectShape, rotate, toggleVisible, toggleCheck } = props;
 
   //debug("menu", selectedId)
 
@@ -30,11 +30,19 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
 
   return (<div className="image-menu">
     <span>
-      
-      <IconButton onClick={toggleVisible}>
+      <IconButton onClick={toggleCheck}>
+        { checked 
+          ? <CheckCircle sx={{color:"green"}} />        
+          : <TaskAlt /> }
+      </IconButton>
+      <IconButton onClick={toggleVisible} className="visibility">
         { visible && <VisibilityOff /> }
         { !visible && <Visibility /> }
       </IconButton>
+
+    </span>
+    <span>
+      
       <IconButton onClick={() => rotate(90)} >
         <Rotate90DegreesCw style={{ transform: "scaleY(-1) rotate(-135deg)" }} />
       </IconButton>
@@ -44,7 +52,7 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
     </span>
     <span>
       <IconButton onClick={handleAdd} >
-        <AddBox {...addNew?{sx:{color:theme.palette.primary.main}}:{}}/>
+        <AddBox {...addNew?{sx:{color:"black"}}:{}}/>
       </IconButton>
       <IconButton onClick={handleDelete} disabled={selectedId === null} >
         <DeleteForever />

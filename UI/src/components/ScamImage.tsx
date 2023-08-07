@@ -8,6 +8,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import Konva from "konva";
 import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
+import { Warning, WarningAmber } from "@mui/icons-material";
 
 import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap } from "../types";
 import { apiUrl } from "../App";
@@ -128,10 +129,11 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
   });
 
   const [visible, setVisible] = useState(true)
+  const [checked, setChecked] = useState(false)
   
   if (inView) {    
     //debug("scanImageContainer:", image.thumbnail_path, JSON.stringify(props, null, 3))
-    return <ScamImage {...props} divRef={ref} {...{visible, setVisible}}/>
+    return <ScamImage {...props} divRef={ref} {...{visible, checked, setVisible, setChecked}}/>
   }
   else {    
     return (
@@ -148,9 +150,10 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
 
 let unmount = false
 
-const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, loadDraft: boolean | undefined, 
-    setImageData:(data:ScamImageData)=>void, setVisible:(b:boolean) => void }) => {
-  const { folder, config, image, divRef, draft, loadDraft, visible, setImageData, setVisible } = props;
+const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
+    loadDraft: boolean | undefined, checked: boolean,
+    setImageData:(data:ScamImageData)=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void }) => {
+  const { folder, config, image, divRef, draft, loadDraft, visible, checked, setImageData, setVisible, setChecked } = props;
 
   const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
@@ -173,6 +176,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [addNew, setAddNew] = useState(false)
   const [newPage, setNewPage] = useState<KonvaPage[]>([]);
 
+  const [warning, setWarning] = useState(false)
+  
   const [orient, setOrient] = useAtom(state.orientAtom)
   const [direc, setDirec] = useAtom(state.direcAtom)
   const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
@@ -214,9 +219,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     return ({ n, x, y, width, height, rotation, warning })
   }
 
-  const handleZindex = (rects: KonvaPage[]) => {
+  const handleZindex = useCallback((rects: KonvaPage[]) => {
     return [...rects.filter(r => r.n != selectedId)].concat([...rects.filter(r => r.n === selectedId)])
-  }
+  }, [selectedId])
 
   let controller = new AbortController();   
 
@@ -267,7 +272,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
     debug("gSR!", loadDraft, draft, globalData)    
 
-    if (visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
+    if (!checked && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
       if(loadDraft === undefined) return
       else if(loadDraft && draft && !scamData) {        
@@ -277,10 +282,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data: draft.data, state: 'draft', time: shouldRunAfter, image: draft.image, visible: draft.visible }
+            val: { data: draft.data, state: 'draft', time: shouldRunAfter, image: draft.image, visible: draft.visible, checked: draft.checked }
           }
         })
         if(visible != draft.visible) setVisible(draft.visible)
+        if(checked != draft.checked) setChecked(draft.checked)
         return
       }
  
@@ -317,7 +323,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               type: 'ADD_DATA',
               payload: {
                 id: image.thumbnail_path,
-                val: { data: response.data, state, time: shouldRunAfter, image, visible }
+                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked }
               }
             })
           }
@@ -326,7 +332,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [loadDraft, draft, visible, config.auth, scamData, lastRun, shouldRunAfter, image, folder, scamOptions, controller.signal, dispatch, setVisible])
+  }, [loadDraft, draft, globalData, visible, config.auth, scamData, lastRun, shouldRunAfter, image, folder, scamOptions, controller.signal, dispatch, setVisible, checked])
 
   
   useEffect(() => {
@@ -381,13 +387,13 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         type: 'ADD_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data: newData, state: 'modified', time: shouldRunAfter, image, visible }
+          val: { data: newData, state: 'modified', time: shouldRunAfter, image, visible, checked }
         }
       })
       setModified(true)
       selectShape(null)
     }
-  }, [ scamData ])
+  }, [checked, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
 
   const onChange = useCallback((p: KonvaPage, add?: boolean) => {
     if (typeof scamData === 'object' && scamData.pages) {
@@ -418,13 +424,13 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data, state: 'modified', time: shouldRunAfter, image, visible }
+            val: { data, state: 'modified', time: shouldRunAfter, image, visible, checked }
           }
         })
         setModified(true)
       }
     }
-  }, [scamData])
+  }, [checked, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
 
   useEffect(() => {
     if (typeof scamData === 'object' && scamData.rects && scamData.selected != selectedId && selectedId != undefined) {
@@ -504,23 +510,45 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       type: 'ADD_DATA',
       payload: {
         id: image.thumbnail_path,
-        val: { data: scamData, state: 'modified', time: shouldRunAfter, image, visible: !visible }
+        val: { data: scamData, state: 'modified', time: shouldRunAfter, image, visible: !visible, checked }
       }
     })
     setVisible(!visible)
     setModified(true)
-  }, [visible])
+  }, [checked, dispatch, image, scamData, setModified, setVisible, shouldRunAfter, visible])
+
+  const toggleCheck = useCallback(() => {
+    dispatch({
+      type: 'ADD_DATA',
+      payload: {
+        id: image.thumbnail_path,
+        val: { data: scamData, state: 'modified', time: shouldRunAfter, image, visible, checked: !checked }
+      }
+    })
+    setChecked(!checked)
+    setModified(true)
+  }, [checked, dispatch, image, scamData, setModified, shouldRunAfter, visible])  
+  
+  useEffect( () => {
+    if(typeof scamData === 'object') { 
+      if(scamData?.rects?.length != scamOptions["nb_pages_expected"] || scamData?.rects?.some(r => r.warning)) {
+        setWarning(true)
+      } else {
+        setWarning(false)
+      }
+    }
+  }, [ scamData, scamOptions ])
 
   const actualW = (portrait ? image.thumbnail_info.height : image.thumbnail_info.width)
   const actualH = (portrait ? image.thumbnail_info.width : image.thumbnail_info.height)
 
-  return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "")}
+  return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "")}
     style={{ height: visible ? actualH + 2 * padding : 80 }}
     onMouseDown={checkDeselectDiv}
   >
     <figure className={"visible-"+visible} 
-        {... !visible ? { style: { width: image.thumbnail_info.width + padding * 2, height: 100 } }:{} }>
-      { !visible && typeof konvaImg == "object" && <img src={konvaImg?.src} style={{transform: "rotate("+image.rotation+"deg)", maxWidth:80, maxHeight:80 - 2 * padding }}/> }
+        {... !visible ? { style: { width: image.thumbnail_info.width + padding * 2, height: 80 } }:{} }>
+      { !visible && typeof konvaImg == "object" && <img src={konvaImg?.src} className={"mini"+((image.rotation + 360) % 360 != 0 ? " rotated": "")} style={{transform: "rotate("+image.rotation+"deg)" }}/> }
       { visible  && <Stage
         width={actualW + padding * 2}
         height={actualH + padding * 2}
@@ -579,7 +607,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           )}
         </Layer>
       </Stage> }
-      <figcaption>{image.img_path}</figcaption>
+      <figcaption>{image.img_path}
+        { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px" }} /> }
+        {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
+      </figcaption>
       {showDebug && visible && typeof scamData === 'object' &&
         <div className="debug">
           <div>
@@ -587,7 +618,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           </div>
         </div>
       }
-      <ImageMenu {...{ selectedId, addNew, visible, removeId, setAddNew, selectShape, rotate, toggleVisible }}/>
+      <ImageMenu {...{ selectedId, addNew, visible, checked, removeId, setAddNew, selectShape, rotate, toggleVisible, toggleCheck }}/>
     </figure>
   </div>
   );

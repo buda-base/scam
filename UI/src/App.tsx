@@ -127,7 +127,7 @@ function App() {
 
   
   useEffect(() => {
-    debug("folder!", folder)    
+    debug("folder!", folder, loadDraft)    
     setJson(false)
     setModified(false)
     setError("")
@@ -137,20 +137,23 @@ function App() {
       const hasDraft = ((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) 
       setDrafts( hasDraft[folder]?.images || {} )
       setLoadDraft( hasDraft[folder]?.images ? undefined : false )
-      const options = hasDraft[folder]?.options
-      if(options) {
-        if(options.orientation) setOrient(options.orientation as string)
-        else {
-          setOrient("custom")
-          setDirec(options.direction as string)
-          setMinRatio((options["wh_ratio_range"] as number[])[0])
-          setMaxRatio((options["wh_ratio_range"] as number[])[1])
-          setNbPages(options["nb_pages_expected"] as number)
-        }
+    }
+  }, [folder])
+
+  useEffect(() => {
+    const hasDraft = ((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) 
+    const options = hasDraft[folder]?.options
+    if(options && loadDraft) {
+      if(options.orientation) setOrient(options.orientation as string)
+      else {
+        setOrient("custom")
+        setDirec(options.direction as string)
+        setMinRatio((options["wh_ratio_range"] as number[])[0])
+        setMaxRatio((options["wh_ratio_range"] as number[])[1])
+        setNbPages(options["nb_pages_expected"] as number)
       }
     }
-    
-  }, [folder])
+  }, [loadDraft])
   
   useEffect(() => {
     if(typeof json === 'object' && jsonPath != json.folder_path) setJsonPath(json.folder_path)

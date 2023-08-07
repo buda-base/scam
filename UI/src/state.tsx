@@ -16,6 +16,7 @@ export const nbPagesAtom = atom(2)
 export const shouldRunAfterAtom = atom(123)
 
 export const scamDataReducer = (state: any, action: { type: string; payload: { id: string; val: ScamImageData } }) => {
+  debug("!!", action)
   switch (action.type) {
     case 'ADD_DATA':
       return { ...state, [action.payload.id]: { ...action.payload.val } };
