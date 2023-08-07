@@ -272,7 +272,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
     debug("gSR!", loadDraft, draft, globalData)    
 
-    if (!checked && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
+    if (visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
       if(loadDraft === undefined) return
       else if(loadDraft && draft && !scamData) {        
@@ -289,6 +289,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         if(checked != draft.checked) setChecked(draft.checked)
         return
       }
+
+      if(checked) return 
  
       setScamData(true)
       setLastRun(now)
