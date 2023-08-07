@@ -3,9 +3,11 @@ import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, IconButto
 import debugFactory from "debug"
 import { useState, useMemo, MouseEventHandler, useCallback, ChangeEventHandler, useEffect, KeyboardEventHandler } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAtom } from "jotai";
 
 import { ColorButton } from "./theme";
 import { Close, Folder, FolderOpen } from "@mui/icons-material";
+import * as state from "../state"
 
 const debug = debugFactory("scam:bbar")
 
@@ -15,6 +17,9 @@ export const TopBar = (props: { folder:string, error: string, jsonPath:string, s
   const [ path, setPath ] = useState(folder)
   
   const [ showDialog, setShowDialog ] = useState(false)
+  const [ confirmAct, setConfirmAct ] = useState<boolean|undefined>(undefined)
+
+  const [modified, setModified] = useAtom(state.modified)
   
   const handleOpen = useCallback(() => {
     if(!jsonPath.match(new RegExp("^"+path+"/?$")) || error) {
@@ -42,19 +47,31 @@ export const TopBar = (props: { folder:string, error: string, jsonPath:string, s
   }, [])
 
   const navigate = useNavigate();
-  const handleNav = () => {
+  const handleNav = useCallback(() => {
     setFolder("")
     navigate("/")
-  }
+  }, [])
   
   useEffect( () => {
     if(jsonPath) setPath(jsonPath)
   }, [jsonPath])
 
-  debug(folder, error, jsonPath, showDialog)
+  const handleConfirm = useCallback( (leave: boolean) => {
+    setConfirmAct(leave)
+  }, [ modified ])
+  
+  debug(folder, error, jsonPath, showDialog, confirmAct)
+
+  const confirmDialog = useMemo( () => (
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    <Dialog open={confirmAct == true} disableScrollLock={true} >
+      <DialogTitle>Lose changes?</DialogTitle>
+
+    </Dialog>
+  ), [ confirmAct ])
 
   const folderDialog = useMemo(() => (
-    <Dialog open={folder == "" || error != "" || showDialog} onClose={handleClose} disableScrollLock={true} hideBackdrop={!showDialog || folder != jsonPath}>
+    <Dialog open={confirmAct == false && (folder == "" || error != "" || showDialog)} onClose={handleClose} disableScrollLock={true} hideBackdrop={!showDialog || folder != jsonPath}>
       <DialogTitle>Choose folder</DialogTitle>
       <DialogContent>
         { (showDialog && folder == jsonPath) && 
@@ -82,20 +99,21 @@ export const TopBar = (props: { folder:string, error: string, jsonPath:string, s
         <ColorButton onClick={handleOpen} /*disabled={path == folder}*/>Open</ColorButton>
       </DialogActions>
     </Dialog>
-    ), [folder, error, showDialog, handleClose, path, handlePath, couldHandleOpen, handleOpen])
+    ), [confirmAct, folder, error, showDialog, handleClose, jsonPath, path, handlePath, couldHandleOpen, handleOpen])
   
   return <nav className="top">
+    {confirmDialog}
     {folderDialog}
     <div></div>
     <div className="nav">
     { folder && <>
-        <div onClick={handleDialog}>
+        <div onClick={() => handleConfirm(false)}>
           <IconButton sx={{color:"black"}}>
             <FolderOpen />
           </IconButton>
           <span>{jsonPath}</span>
         </div>
-        <IconButton sx={{color:"black"}} onClick={handleNav}> 
+        <IconButton sx={{color:"black"}} onClick={() => handleConfirm(true)}> 
           <Close />
         </IconButton>
       </>}
