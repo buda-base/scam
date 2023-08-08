@@ -20,19 +20,12 @@ import { ColorButton } from "./theme"
 
 const debug = debugFactory("scam:bbar")
 
-export const BottomBar = (props: { folder:string }) => {
-  const { folder } = props;
-
-  const [showSettings, setShowSettings] = useState(false)
+export const SaveButtons = (props: { folder: string, onConfirmed?:() => void }) => {
+  const { folder, onConfirmed } = props;
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
-  const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
   const [modified, setModified] = useAtom(state.modified)
-
-  const handleClose = () => { setShowSettings(false); };
-
-  const handleRun = () => { setShouldRunAfter(Date.now()); setShowSettings(false);  };
 
   const [orient, setOrient] = useAtom(state.orientAtom)
   const [direc, setDirec] = useAtom(state.direcAtom)
@@ -53,8 +46,8 @@ export const BottomBar = (props: { folder:string }) => {
       : orient === 'horizontal'
         ? 'vertical'
         : 'horizontal'
-  }), [ orient, direc, minRatio, maxRatio, nbPages ])
-  
+  }), [ orient, direc, minRatio, maxRatio, nbPages ])    
+
   const saveDraft = useCallback(async () => {
     const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
     if(!local.drafts) local.drafts = {}
@@ -69,8 +62,28 @@ export const BottomBar = (props: { folder:string }) => {
     }
     localStorage.setItem("scamUI", JSON.stringify(local))
     setModified(false)
-  }, [allScamData, folder, scamOptions, setModified])
+    if(onConfirmed) onConfirmed()
+  }, [allScamData, folder, onConfirmed, orient, scamOptions, setModified])
 
+  return (
+    <>
+      <ColorButton onClick={() => saveDraft()} disabled={!modified}>save draft</ColorButton>
+      <ColorButton sx={{ marginLeft:"8px" }} disabled>publish</ColorButton>
+    </>
+  )
+}
+
+export const BottomBar = (props: { folder:string }) => {
+  const { folder } = props;
+
+  const [showSettings, setShowSettings] = useState(false)
+
+  const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
+  const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)
+
+  const handleClose = () => { setShowSettings(false); };
+
+  const handleRun = () => { setShouldRunAfter(Date.now()); setShowSettings(false);  };
   
   useEffect( () =>  {
 
@@ -84,8 +97,7 @@ export const BottomBar = (props: { folder:string }) => {
       <Settings />
     </IconButton>
     <div>
-      <ColorButton onClick={() => saveDraft()} disabled={!modified}>save draft</ColorButton>
-      <ColorButton sx={{ marginLeft:"8px" }} /*onClick={() => setShowSettings(true)}*/ disabled>publish</ColorButton>
+      <SaveButtons {...{ folder }} />
     </div>
     <Dialog open={showSettings} onClose={handleClose} disableScrollLock={true} >
       <DialogTitle>Run SCAM</DialogTitle>

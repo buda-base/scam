@@ -1,13 +1,16 @@
 
-import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, IconButton } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, IconButton, Button, FormLabel, InputLabel, useTheme } from "@mui/material";
 import debugFactory from "debug"
 import { useState, useMemo, MouseEventHandler, useCallback, ChangeEventHandler, useEffect, KeyboardEventHandler } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAtom } from "jotai";
+import { useBeforeunload } from 'react-beforeunload';
 
 import { ColorButton } from "./theme";
 import { Close, Folder, FolderOpen } from "@mui/icons-material";
 import * as state from "../state"
+import { SaveButtons } from "./BottomBar";
+import { LocalData } from "../types";
 
 const debug = debugFactory("scam:bbar")
 
@@ -20,7 +23,16 @@ export const TopBar = (props: { folder:string, error: string, jsonPath:string, s
   const [ confirmAct, setConfirmAct ] = useState<boolean|undefined>(undefined)
 
   const [modified, setModified] = useAtom(state.modified)
+    
+  const theme = useTheme()
   
+  const [sessions, setSessions] = useState<string[]>([])
+
+  useEffect(() => {
+    const hasSessions = Object.keys(((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).sessions || {} ))
+    setSessions(hasSessions)
+  }, [])
+
   const handleOpen = useCallback(() => {
     if(!jsonPath.match(new RegExp("^"+path+"/?$")) || error) {
       setFolder(path)
@@ -36,7 +48,8 @@ export const TopBar = (props: { folder:string, error: string, jsonPath:string, s
 
   const handleClose = useCallback(() => {
     if(showDialog) setShowDialog(false)
-  }, [showDialog])
+    if(confirmAct != undefined) setConfirmAct(undefined)
+  }, [confirmAct, showDialog])
 
   const couldHandleOpen:KeyboardEventHandler = useCallback((e) => {
     if(e.code == "Enter") handleOpen()
@@ -50,28 +63,61 @@ export const TopBar = (props: { folder:string, error: string, jsonPath:string, s
   const handleNav = useCallback(() => {
     setFolder("")
     navigate("/")
-  }, [])
+  }, [navigate, setFolder])
   
   useEffect( () => {
     if(jsonPath) setPath(jsonPath)
   }, [jsonPath])
 
   const handleConfirm = useCallback( (leave: boolean) => {
-    setConfirmAct(leave)
-  }, [ modified ])
+    if(modified) {
+      setConfirmAct(leave)
+    } else {
+      if(leave) handleNav()
+      else handleDialog()
+    }
+  }, [handleDialog, handleNav, modified])
   
+  const onConfirmed = useCallback(()=> {
+    if(confirmAct) handleNav()
+    else handleDialog()
+  }, [confirmAct, handleDialog, handleNav])
+
   debug(folder, error, jsonPath, showDialog, confirmAct)
+  
+  const unload = useCallback((event:Event) => {
+    if(modified) { 
+      event.preventDefault()
+    }
+  }, [modified])
+  useBeforeunload(unload);
 
   const confirmDialog = useMemo( () => (
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    <Dialog open={confirmAct == true} disableScrollLock={true} >
-      <DialogTitle>Lose changes?</DialogTitle>
-
+    <Dialog open={modified && confirmAct != undefined && !showDialog} disableScrollLock={true} >
+      <DialogTitle>Folder modified</DialogTitle>
+      <DialogContent>
+          <IconButton
+            edge="end"
+            color="inherit"
+            onClick={handleClose}
+            aria-label="close"
+            style={{ position: 'absolute', top: 2, right: 14 }}
+          >
+            <Close />
+          </IconButton> 
+          Save changes to '{folder}'?
+        </DialogContent>
+      <DialogActions sx={{padding:"16px"}}>
+        <ColorButton onClick={handleClose}>Cancel</ColorButton>
+        <ColorButton onClick={onConfirmed}>No</ColorButton>
+        <SaveButtons { ...{ folder, onConfirmed }}/>
+      </DialogActions>
     </Dialog>
-  ), [ confirmAct ])
+  ), [confirmAct, folder, handleClose, modified, onConfirmed, showDialog])
 
   const folderDialog = useMemo(() => (
-    <Dialog open={confirmAct == false && (folder == "" || error != "" || showDialog)} onClose={handleClose} disableScrollLock={true} hideBackdrop={!showDialog || folder != jsonPath}>
+    <Dialog open={(confirmAct == false || !modified) && (folder == "" || error != "" || showDialog)} onClose={handleClose} disableScrollLock={true} hideBackdrop={!showDialog || folder != jsonPath}>
       <DialogTitle>Choose folder</DialogTitle>
       <DialogContent>
         { (showDialog && folder == jsonPath) && 
@@ -93,13 +139,22 @@ export const TopBar = (props: { folder:string, error: string, jsonPath:string, s
           helperText={error ? <>Could't open '{folder}':<br/><i>{error}</i></> : ""}
           onChange={handlePath}
           onKeyDown={couldHandleOpen}
+          sx={{ width:"100%", minWidth:"90px" }}
         />
+        <div style={{ marginTop:16 }}>
+          <InputLabel shrink={true}>Previously open folders</InputLabel>
+          <div style={{ marginLeft: -9, marginTop:-4 }}>
+            { sessions.map(s => <Button sx={{ fontSize:16, textTransform: "none", padding:"0px 8px" }}>
+                <Link style={{color:theme.palette.primary.main}} to={"/?folder="+s} onClick={handleClose}>{s}</Link>
+              </Button>)}
+            </div>
+        </div>
       </DialogContent>
       <DialogActions sx={{padding:"16px"}}>
         <ColorButton onClick={handleOpen} /*disabled={path == folder}*/>Open</ColorButton>
       </DialogActions>
     </Dialog>
-    ), [confirmAct, folder, error, showDialog, handleClose, jsonPath, path, handlePath, couldHandleOpen, handleOpen])
+    ), [confirmAct, modified, folder, error, showDialog, handleClose, jsonPath, path, handlePath, couldHandleOpen, sessions, handleOpen])
   
   return <nav className="top">
     {confirmDialog}

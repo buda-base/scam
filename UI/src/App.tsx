@@ -3,7 +3,7 @@ import axios from 'axios';
 import debugFactory from "debug"
 import { encode } from "js-base64"
 import { ThemeProvider } from '@mui/material/styles';
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { Close } from '@mui/icons-material';
 import { Dialog, DialogTitle, DialogContent, IconButton, DialogActions, TextField } from '@mui/material';
 import { useAtom } from 'jotai';
@@ -30,8 +30,23 @@ function App() {
   const [json, setJson] = useState<ScamData | boolean>(false)
   const [jsonPath, setJsonPath] = useState("")
 
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams({});
-  const [ folder, setFolder ] = useState(searchParams.get("folder") || "");
+  const paramFolder = searchParams.get("folder") || "";
+  const [ folder, setFolder ] = useState(paramFolder);
+  
+  useEffect(() => {
+    debug("loca?",paramFolder,location)
+    if(paramFolder) {
+      if(paramFolder != folder) { 
+        setFolder(paramFolder)
+      }
+    } else {
+      setFolder("")      
+    }
+
+  }, [paramFolder, folder, location])
+
   const [ error, setError ] = useState("")
 
   const [ drafts, setDrafts ] = useState({} as  { [str:string] : SavedScamData })
@@ -46,6 +61,13 @@ function App() {
   const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+
+  const saveSession = useCallback(async () => {
+    const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+    if(!local.sessions) local.sessions = {}
+    local.sessions[folder] = Date.now()
+    localStorage.setItem("scamUI", JSON.stringify(local))
+  }, [ folder ])
 
   // load config file onstartup
   useEffect(() => {
@@ -64,7 +86,7 @@ function App() {
 
     if(config.auth && folder && (!json || typeof json === 'object' && jsonPath && !jsonPath.match(new RegExp("^"+folder+"/?$")))) {
 
-      if(!folder.endsWith("/")) { 
+      if(folder && !folder.endsWith("/")) { 
         setFolder(folder+"/")
         return
       }
@@ -84,6 +106,8 @@ function App() {
         setJson(response.data)
         setSearchParams({ folder })
         setError("")
+
+        saveSession()
       })
       .catch(error => {
         debug(error, json);
@@ -167,7 +191,7 @@ function App() {
   }, [loadDraft, drafts])
 
   const reloadDialog = useMemo(() => (
-    <Dialog open={loadDraft === undefined && Object.keys(drafts).length ? true : false} onClose={() => handleClose()} disableScrollLock={true} >
+    <Dialog open={folder && loadDraft === undefined && Object.keys(drafts).length ? true : false} onClose={() => handleClose()} disableScrollLock={true} >
       <DialogTitle>Draft found</DialogTitle>
       <DialogContent>
         Load previous edits for '{folder}'?

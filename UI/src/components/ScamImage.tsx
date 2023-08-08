@@ -263,14 +263,14 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [ config.auth, image.thumbnail_path, konvaImg ])
+  }, [config.auth, controller.signal, image.thumbnail_path, konvaImg])
 
   //debug("im:",image.thumbnail_path,lastRun,shouldRunAfter,image,scamData)
 
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    debug("gSR!", loadDraft, draft, globalData)    
+    //debug("gSR!", loadDraft, draft, globalData)    
 
     if (visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       

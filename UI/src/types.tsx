@@ -87,5 +87,8 @@ export type LocalData = {
       images: SavedScamDataMap;
       options: ScamOptionsMap 
     }
+  }, 
+  sessions: {
+    [str:string]: number
   }
 }
