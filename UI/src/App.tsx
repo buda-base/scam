@@ -218,7 +218,7 @@ function App() {
       {reloadDialog}
       <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, error, jsonPath, setFolder }}/></header>
       <main>{images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData }}/>)}</main>
-      { typeof json == "object" && <footer><BottomBar {...{ folder, setFolder }}/></footer>}
+      { typeof json == "object" && <footer><BottomBar {...{ folder, ...typeof json === 'object'?{json}:{}, setFolder }}/></footer>}
     </ThemeProvider>
   )
 }

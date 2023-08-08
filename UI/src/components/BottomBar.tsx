@@ -13,15 +13,15 @@ import {
 import { useAtom } from "jotai";
 import debugFactory from "debug"
 
-import { LocalData, SavedScamData, ScamOptionsMap } from "../types"
+import { LocalData, SavedScamData, ScamData, ScamOptionsMap } from "../types"
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
 
 const debug = debugFactory("scam:bbar")
 
-export const SaveButtons = (props: { folder: string, onConfirmed?:() => void }) => {
-  const { folder, onConfirmed } = props;
+export const SaveButtons = (props: { folder: string, json?:ScamData, onConfirmed?:() => void }) => {
+  const { folder, json, onConfirmed } = props;
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
 
@@ -65,16 +65,20 @@ export const SaveButtons = (props: { folder: string, onConfirmed?:() => void }) 
     if(onConfirmed) onConfirmed()
   }, [allScamData, folder, onConfirmed, orient, scamOptions, setModified])
 
+  const publish = useCallback(async () => {
+    debug("publish", json, allScamData)
+  }, [])
+
   return (
     <>
-      <ColorButton onClick={() => saveDraft()} disabled={!modified}>save draft</ColorButton>
-      <ColorButton sx={{ marginLeft:"8px" }} disabled>publish</ColorButton>
+      <ColorButton onClick={saveDraft} disabled={!modified}>save draft</ColorButton>
+      <ColorButton sx={{ marginLeft:"8px" }} onClick={publish} disabled={!modified}>publish</ColorButton>
     </>
   )
 }
 
-export const BottomBar = (props: { folder:string }) => {
-  const { folder } = props;
+export const BottomBar = (props: { folder:string, json?:ScamData,  }) => {
+  const { folder, json } = props;
 
   const [showSettings, setShowSettings] = useState(false)
 
@@ -92,12 +96,29 @@ export const BottomBar = (props: { folder:string }) => {
   }, [allScamData])
   
 
+  const [filter, setFilter] = useAtom(state.filter)
+
   return (<nav className="bot">
-    <IconButton onClick={() => setShowSettings(true)}>
-      <Settings />
-    </IconButton>
+    <Box>
+      <IconButton onClick={() => setShowSettings(true)}>
+        <Settings />
+      </IconButton>
+      <TextField
+        SelectProps={{ 
+          MenuProps : { disableScrollLock: true }
+        }}
+        sx={{ minWidth: 100, marginLeft: "16px" }}
+        select
+        variant="standard"
+        value={filter}
+        label="Filter images"
+        onChange={(r) => setFilter(r.target.value)}
+      >
+        { ["all", "warning", "unchecked" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+      </TextField>
+    </Box>
     <div>
-      <SaveButtons {...{ folder }} />
+      <SaveButtons {...{ folder, json }} />
     </div>
     <Dialog open={showSettings} onClose={handleClose} disableScrollLock={true} >
       <DialogTitle>Run SCAM</DialogTitle>

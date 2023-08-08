@@ -183,6 +183,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+  
+  const [filter, setFilter] = useAtom(state.filter)
 
   const scamOptions:ScamOptionsMap = useMemo(() => ({
     ...scam_options,
@@ -544,7 +546,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const actualW = (portrait ? image.thumbnail_info.height : image.thumbnail_info.width)
   const actualH = (portrait ? image.thumbnail_info.width : image.thumbnail_info.height)
 
-  return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "")}
+  return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
+      + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" )}
     style={{ height: visible ? actualH + 2 * padding : 80 }}
     onMouseDown={checkDeselectDiv}
   >

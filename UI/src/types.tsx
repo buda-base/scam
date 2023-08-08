@@ -92,3 +92,5 @@ export type LocalData = {
     [str:string]: number
   }
 }
+
+export type Filter = 'all' | 'warning' | 'unchecked'
