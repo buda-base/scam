@@ -31,6 +31,7 @@ class BatchRunner:
             min_area_ratio=0.1,
             output_uncompressed=True,
             output_compressed=False,
+            direction="vertical",
             dest_path=None,
             points_per_side=8,
             points_per_side_2=32,
@@ -54,6 +55,7 @@ class BatchRunner:
         self.cropped_images_path = None
         self.qc_images_path = None
         self.write_bucket = None
+        self.direction = direction
         self.log_str = ""
         self.local_debug_dir = "debug/"
         self.sam_resize = sam_resize
@@ -273,7 +275,8 @@ class BatchRunner:
                                              debug_base_fname=os.path.basename(img_path),
                                              expected_nb_pages=self.expected_nb_pages,
                                              min_area_ratio=self.min_area_ratio,
-                                             expected_ratio_range=self.expected_ratio_range)
+                                             expected_ratio_range=self.expected_ratio_range
+                                             direction=self.direction)
         if len(image_ann_infos) != self.expected_nb_pages:
             if not save_if_fail:
                 return False
@@ -413,9 +416,9 @@ def main():
 # expected_nb_pages = 2
 # points_per_side=8
 # points_per_side_2=32
-            br = BatchRunner(row[0], points_per_side=8, points_per_side_2=32, expected_ratio_range=[4.0, 10.0],
-                             expected_nb_pages=2, pipeline=row[1], dryrun=False, rotate=True, pre_rotate=0,
-                             aws_profile='image_processing')
+            br = BatchRunner(row[0], points_per_side=16, points_per_side_2=64, expected_ratio_range=[2.5, 8.0],
+                             expected_nb_pages=1, pipeline="sam:crop", dryrun=False, rotate=False, pre_rotate=0,
+                             aws_profile='image_processing', direction="vertical")
             br.process_dir()
             print(br.log_str)
 

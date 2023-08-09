@@ -245,7 +245,7 @@ def print_debug(s):
     if DEBUG:
         print(s)
 
-def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, expected_ratio_range=[1.7, 20.0], min_area_ratio=0.01, find_borders=False):
+def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, debug_base_fname="", expected_nb_pages=2, expected_ratio_range=[1.7, 20.0], min_area_ratio=0.01, find_borders=False, direction="vertical"):
     ann_list = []
     for sam_ann in sam_ann_list:
         ann_list.append(AnnotationInfo(sam_ann, original_img_width, original_img_height))
@@ -265,12 +265,12 @@ def get_image_ann_list(sam_ann_list, original_img_width, original_img_height, de
         #if ann.nb_edges_touched() > 2:
         #    print_debug("ann %d touches %d edges, excuding" % (i, ann.nb_edges_touched()))
         #    continue
-        if ann.touches_top_bottom():
-            print_debug("ann %d touches top and bottom edges, exclude" % i)
+        if direction == "vertical" and ann.touches_top_bottom():
+            #print_debug("ann %d touches top and bottom edges, exclude" % i)
             continue
-        #if ann.touches_left_right():
-        #    print_debug("ann %d touches top and bottom edges, exclude" % i)
-        #    continue
+        if direction == "horizontal" and ann.touches_left_right():
+            #print_debug("ann %d touches top and bottom edges, exclude" % i)
+            continue
         if ann.squarishness() < 0.85:
             print_debug("ann %d has a squarishness of %f, excuding" % (i, ann.squarishness()))
             continue
