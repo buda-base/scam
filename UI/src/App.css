@@ -103,9 +103,26 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   left:0;
 }
 
+.scam-image.filter-warning.warning-true.checked-true,
 .scam-image.filter-warning.warning-false,
 .scam-image.filter-unchecked.checked-true {
-  height:1px !important; overflow: hidden;
+  height:45px !important; overflow: hidden;
+}
+
+
+.scam-image.filter-warning.warning-true.checked-true > figure > div,
+.scam-image.filter-warning.warning-false > figure > div,
+.scam-image.filter-unchecked.checked-true > figure > div {
+  /* display:none;  */
+  /* visibility: hidden;  */
+  height:45px;
+}
+
+
+.scam-image.filter-warning.warning-true.checked-true > figure figcaption,
+.scam-image.filter-warning.warning-false > figure figcaption,
+.scam-image.filter-unchecked.checked-true > figure figcaption {
+  margin-top:0; font-style:italic; opacity:0.5; 
 }
 
 .scam-image.has-warning {
