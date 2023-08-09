@@ -114,8 +114,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 .scam-image.filter-warning.warning-false > figure > div,
 .scam-image.filter-unchecked.checked-true > figure > div {
   /* display:none;  */
-  /* visibility: hidden;  */
-  height:45px;
+  visibility: hidden; height:45px;
 }
 
 
