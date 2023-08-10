@@ -23,7 +23,7 @@ def gets3blob(s3Key, bucket=BUCKET_NAME):
             raise
 
 def upload_to_s3(data, s3_key):
-    S3.put_object(Bucket=BUCKET_NAME, Key=s3_key, Body=data)
+    return S3.put_object(Bucket=BUCKET_NAME, Key=s3_key, Body=data)
 
 def get_gzip_picked_bytes(o):
     out = io.BytesIO()
