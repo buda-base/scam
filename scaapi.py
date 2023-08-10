@@ -87,6 +87,8 @@ def save_scam_json_api():
     data = request.json
     folder_path = data.get('folder_path')
     scam_json_obj = data.get('scam_json_obj')
+    save_scam_json(folder_path, scam_json_obj)
+    return
 
 @api.route('/get_thumbnail_bytes', methods=['GET'])
 def get_thumbnail_bytes_api_get():
