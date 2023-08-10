@@ -73,6 +73,7 @@ def save_scam_json(folder_path, scam_json_obj):
     scam_json_str = json.dumps(scam_json_obj, indent=2)
     json_file_path = folder_path+"scam.json"
     upload_to_s3(scam_json_str.encode('utf-8'), json_file_path)
+    return
 
 def get_scam_json(folder_path):
     json_file_path = folder_path+"scam.json"
