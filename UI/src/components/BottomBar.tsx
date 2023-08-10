@@ -83,11 +83,16 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       ...json, 
       files: json?.files.map(j => {
         const obj = allScamData[j.thumbnail_path] || {}
-        const data = { 
-          ...j, 
-          ...obj.data || {},
-          ...!obj.visible ? {hidden: true} : {},
-          checked: obj.checked
+        let data = { 
+          ...j,
+          ...obj.data || {}
+        }
+        if(data.hidden) delete data.hidden
+        if(data.checked) delete data.checked
+        data = { 
+          ...data,
+          ...obj.visible == false ? { hidden: true }  : {},
+          ...obj.checked ? { checked: true } : {}
         }
         if(data.rects) delete data.rects
         return data
@@ -111,6 +116,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
 
       setSaving(false)
       setPopChecked(false)
+      setModified(false)
     })
     .catch(error => {
       debug(error, json);
@@ -121,7 +127,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
     });
 
     
-  }, [allScamData, checked, config.auth, folder, json])
+  }, [allScamData, checked, config.auth, folder, json, setModified])
 
   const handleClosePop = () => {
     setPopChecked(false)

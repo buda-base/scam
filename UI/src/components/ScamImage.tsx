@@ -128,8 +128,8 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
     rootMargin: '200% 0px'
   });
 
-  const [visible, setVisible] = useState(true)
-  const [checked, setChecked] = useState(false)
+  const [visible, setVisible] = useState(image.hidden ? false : true)
+  const [checked, setChecked] = useState(image.checked ? true : false)
   
   if (inView) {    
     //debug("scanImageContainer:", image.thumbnail_path, JSON.stringify(props, null, 3))
@@ -157,12 +157,28 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
+  const recomputeCoords = (r: Page, i: number, w: number, h: number, W: number, H: number) => {
+    const { minAreaRect: rect } = r
+    const n = i
+    const width = rect[2] * w / W
+    const height = rect[3] * h / H
+    const x = rect[0] * w / W - width / 2
+    const y = rect[1] * h / H - height / 2
+    const rotation = rect[4]
+    const warning = r.warnings.length > 0
+    return ({ n, x, y, width, height, rotation, warning })
+  }
+
+  const uploadedData = image?.pages ? { 
+      ...image, 
+      rects: image.pages.map((r, i) => recomputeCoords(r, i, image.thumbnail_info.width, image.thumbnail_info.height, image.width, image.height))
+    } : null
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const globalData = allScamData[image.thumbnail_path]
 
   const [modified, setModified] = useAtom(state.modified)
 
-  const [scamData, setScamData] = useState<ScamImageData | boolean>(globalData?.time >= shouldRunAfter ? globalData.data : false)
+  const [scamData, setScamData] = useState<ScamImageData | boolean>(uploadedData || (globalData?.time >= shouldRunAfter ? globalData.data : false))
   const [lastRun, setLastRun] = useState(globalData?.time <= shouldRunAfter ? globalData.time : 0)
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
@@ -208,18 +224,6 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         ? 'vertical'
         : 'horizontal'
   }), [ orient, direc, minRatio, maxRatio, nbPages ])
-
-  const recomputeCoords = (r: Page, i: number, w: number, h: number, W: number, H: number) => {
-    const { minAreaRect: rect } = r
-    const n = i
-    const width = rect[2] * w / W
-    const height = rect[3] * h / H
-    const x = rect[0] * w / W - width / 2
-    const y = rect[1] * h / H - height / 2
-    const rotation = rect[4]
-    const warning = r.warnings.length > 0
-    return ({ n, x, y, width, height, rotation, warning })
-  }
 
   const handleZindex = useCallback((rects: KonvaPage[]) => {
     return [...rects.filter(r => r.n != selectedId)].concat([...rects.filter(r => r.n === selectedId)])
@@ -272,7 +276,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    //debug("gSR!", loadDraft, draft, globalData)    
+    debug("gSR!", loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
 
     if (visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
@@ -292,8 +296,19 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         return
       }
 
+      if(typeof scamData == "object" && image.pages && !globalData) {
+        dispatch({
+          type: 'ADD_DATA',
+          payload: {
+            id: image.thumbnail_path,
+            val: { data: { ...scamData }, state: 'uploaded', time: shouldRunAfter, image: image, visible, checked }
+          }
+        })
+        return
+      }
+
       if(checked) return 
- 
+
       setScamData(true)
       setLastRun(now)
 
