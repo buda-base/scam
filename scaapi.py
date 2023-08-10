@@ -72,8 +72,7 @@ def run_scam_image(folder_path, file_info, scam_options):
 def save_scam_json(folder_path, scam_json_obj):
     scam_json_str = json.dumps(scam_json_obj, indent=2)
     json_file_path = folder_path+"scam.json"
-    upload_to_s3(scam_json_str.encode('utf-8'), json_file_path)
-    return
+    return upload_to_s3(scam_json_str.encode('utf-8'), json_file_path)
 
 def get_scam_json(folder_path):
     json_file_path = folder_path+"scam.json"
@@ -88,8 +87,7 @@ def save_scam_json_api():
     data = request.json
     folder_path = data.get('folder_path')
     scam_json_obj = data.get('scam_json_obj')
-    save_scam_json(folder_path, scam_json_obj)
-    return
+    return save_scam_json(folder_path, scam_json_obj)
 
 @api.route('/get_thumbnail_bytes', methods=['GET'])
 def get_thumbnail_bytes_api_get():
