@@ -1,6 +1,7 @@
 import { Button, ButtonProps, createTheme, styled } from "@mui/material";
 
 const ColorButtonStyle = styled(Button)<ButtonProps>(({ theme }) => ({
+  minWidth: "120px",
   fontSize: "12px",
   fontWeight: "800",
   lineHeight: "16px",

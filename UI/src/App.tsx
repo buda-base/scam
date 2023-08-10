@@ -216,9 +216,9 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       {reloadDialog}
-      <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, error, jsonPath, setFolder }}/></header>
+      <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, config, error, jsonPath, setFolder }}/></header>
       <main>{images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData }}/>)}</main>
-      { typeof json == "object" && <footer><BottomBar {...{ folder, ...typeof json === 'object'?{json}:{}, setFolder }}/></footer>}
+      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json}:{}, setFolder }}/></footer>}
     </ThemeProvider>
   )
 }

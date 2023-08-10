@@ -1,5 +1,5 @@
-import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, Button, ButtonProps } from "@mui/material"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, Button, ButtonProps, Popover, FormControlLabel, Checkbox, Popper, Paper } from "@mui/material"
+import { ChangeEvent, ChangeEventHandler, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Settings, Close } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import {
@@ -12,16 +12,19 @@ import {
 } from '@mui/material';
 import { useAtom } from "jotai";
 import debugFactory from "debug"
+import { encode } from "js-base64";
 
-import { LocalData, SavedScamData, ScamData, ScamOptionsMap } from "../types"
+import { ConfigData, LocalData, SavedScamData, ScamData, ScamOptionsMap } from "../types"
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
+import { apiUrl } from "../App";
+import axios from "axios";
 
 const debug = debugFactory("scam:bbar")
 
-export const SaveButtons = (props: { folder: string, json?:ScamData, onConfirmed?:() => void }) => {
-  const { folder, json, onConfirmed } = props;
+export const SaveButtons = (props: { folder: string, config: ConfigData, json?:ScamData, onConfirmed?:() => void }) => {
+  const { folder, json, config, onConfirmed } = props;
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
 
@@ -32,6 +35,13 @@ export const SaveButtons = (props: { folder: string, json?:ScamData, onConfirmed
   const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+
+  const [popChecked, setPopChecked] = useState(false)
+  const [checked, setChecked] = useState(false)
+  const spanRef = useRef<HTMLSpanElement>(null)
+
+  const [ saving, setSaving ] = useState(false)
+  const [ error, setError ] = useState("")
 
   const scamOptions:ScamOptionsMap = useMemo(() => ({
     "wh_ratio_range": orient == "custom"
@@ -66,19 +76,100 @@ export const SaveButtons = (props: { folder: string, json?:ScamData, onConfirmed
   }, [allScamData, folder, onConfirmed, orient, scamOptions, setModified])
 
   const publish = useCallback(async () => {
-    debug("publish", json, allScamData)
-  }, [])
+    
+    setSaving(true)
+
+    const toSave = { 
+      ...json, 
+      files: json?.files.map(j => {
+        const obj = allScamData[j.thumbnail_path] || {}
+        const data = { 
+          ...j, 
+          ...obj.data || {},
+          ...!obj.visible ? {hidden: true} : {},
+          checked: obj.checked
+        }
+        if(data.rects) delete data.rects
+        return data
+      }),
+      checked
+    }
+    
+    debug("publish", json, allScamData, toSave)
+
+    axios.post(apiUrl + "save_scam_json", {
+      folder_path: folder,
+      scam_json_obj: toSave
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: "Basic " + encode(config.auth.join(":"))
+      },
+    })
+    .then(response => {
+      debug("json",response.data);
+
+      setSaving(false)
+      setPopChecked(false)
+    })
+    .catch(error => {
+      debug(error, json);
+      
+      setSaving(false)
+      setError(error.message)
+
+    });
+
+    
+  }, [allScamData, checked, config.auth, folder, json])
+
+  const handleClosePop = () => {
+    setPopChecked(false)
+    setError("")
+  }
+
+  const handleChecked = (e: ChangeEvent<HTMLInputElement>) => {
+    setChecked(e.target.checked)
+  }
+
+  const handlePublish = useCallback( () => {    
+    if(error) handleClosePop()
+    else if(!popChecked) setPopChecked(true)
+    else publish()
+  }, [error, popChecked, publish])
 
   return (
     <>
-      <ColorButton onClick={saveDraft} disabled={!modified}>save draft</ColorButton>
-      <ColorButton sx={{ marginLeft:"8px" }} onClick={publish} disabled={!modified}>publish</ColorButton>
+      { (popChecked || error != "") && <div onClick={handleClosePop}>
+        <div className="popper-bg"></div>
+        <div className="popper-bg-bar"></div>
+      </div>
+      }
+      <Popper open={popChecked || error != ""} anchorEl={spanRef.current} popperOptions={{ placement: "bottom-end" }}>
+        <Paper className={"paper error-"+(error != "" ? true : false)} >
+          { !error 
+            ? <FormControlLabel control={<Checkbox checked={checked} onChange={handleChecked}/>} label="ready to be processed" /> 
+            : <>Failed to save<br/>(<i>{error}</i>)</> }
+        </Paper>
+      </Popper>
+      <ColorButton onClick={saveDraft} disabled={!modified || popChecked}>save draft</ColorButton>
+      <span ref={spanRef}>
+        <ColorButton className={saving?"saving":""} sx={{ marginLeft:"8px" }} onClick={handlePublish} disabled={!modified || !config.auth ||  saving}>{ 
+          saving 
+          ? "_" 
+          : error 
+            ? "cancel"
+            : popChecked 
+              ? "ok"
+              : "upload" 
+        }</ColorButton>
+      </span>
     </>
   )
 }
 
-export const BottomBar = (props: { folder:string, json?:ScamData,  }) => {
-  const { folder, json } = props;
+export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData,  }) => {
+  const { folder, config, json } = props;
 
   const [showSettings, setShowSettings] = useState(false)
 
@@ -118,7 +209,7 @@ export const BottomBar = (props: { folder:string, json?:ScamData,  }) => {
       </TextField>
     </Box>
     <div>
-      <SaveButtons {...{ folder, json }} />
+      <SaveButtons {...{ folder, config, json }} />
     </div>
     <Dialog open={showSettings} onClose={handleClose} disableScrollLock={true} >
       <DialogTitle>Run SCAM</DialogTitle>

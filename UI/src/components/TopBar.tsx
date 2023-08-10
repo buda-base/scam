@@ -10,12 +10,12 @@ import { ColorButton } from "./theme";
 import { Close, Folder, FolderOpen } from "@mui/icons-material";
 import * as state from "../state"
 import { SaveButtons } from "./BottomBar";
-import { LocalData } from "../types";
+import { ConfigData, LocalData } from "../types";
 
 const debug = debugFactory("scam:bbar")
 
-export const TopBar = (props: { folder:string, error: string, jsonPath:string, setFolder:(s:string) => void }) => {
-  const { folder, error, jsonPath, setFolder } = props;
+export const TopBar = (props: { folder:string, config: ConfigData, error: string, jsonPath:string, setFolder:(s:string) => void }) => {
+  const { folder, config, error, jsonPath, setFolder } = props;
 
   const [ path, setPath ] = useState(folder)
   
@@ -111,7 +111,7 @@ export const TopBar = (props: { folder:string, error: string, jsonPath:string, s
       <DialogActions sx={{padding:"16px"}}>
         <ColorButton onClick={handleClose}>Cancel</ColorButton>
         <ColorButton onClick={onConfirmed}>No</ColorButton>
-        <SaveButtons { ...{ folder, onConfirmed }}/>
+        <SaveButtons { ...{ folder, config, onConfirmed }}/>
       </DialogActions>
     </Dialog>
   ), [confirmAct, folder, handleClose, modified, onConfirmed, showDialog])
