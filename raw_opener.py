@@ -12,7 +12,7 @@ class RawImageFile(ImageFile.ImageFile):
         array = None
         try:
             raw = rawpy.imread(self.fp)
-            array = raw.postprocess(use_camera_wb=True)
+            array = raw.postprocess()
         except:
             raise TypeError("Not a RAW file")
 
