@@ -32,6 +32,7 @@ export const scamDataReducer = (state: any, action: { type: string; payload: { i
 export const allScamDataAtom = atomWithReducer<SavedScamDataMap, any>({}, scamDataReducer)
 
 export const modified = atom(false)
+export const drafted = atom(false)
 
 export const filter = atom('all')
 

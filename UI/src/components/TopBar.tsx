@@ -23,6 +23,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
   const [ confirmAct, setConfirmAct ] = useState<boolean|undefined>(undefined)
 
   const [modified, setModified] = useAtom(state.modified)
+  const [drafted, setDrafted] = useAtom(state.drafted)
     
   const theme = useTheme()
   
@@ -86,10 +87,10 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
   debug(folder, error, jsonPath, showDialog, confirmAct)
   
   const unload = useCallback((event:Event) => {
-    if(modified) { 
+    if(modified && !drafted) { 
       event.preventDefault()
     }
-  }, [modified])
+  }, [modified, drafted])
   useBeforeunload(unload);
 
   const confirmDialog = useMemo( () => (
@@ -114,7 +115,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
         <SaveButtons { ...{ folder, config, onConfirmed }}/>
       </DialogActions>
     </Dialog>
-  ), [confirmAct, folder, handleClose, modified, onConfirmed, showDialog])
+  ), [config, confirmAct, folder, handleClose, modified, onConfirmed, showDialog])
 
   const folderDialog = useMemo(() => (
     <Dialog open={(confirmAct == false || !modified) && (folder == "" || error != "" || showDialog)} onClose={handleClose} disableScrollLock={true} hideBackdrop={!showDialog || folder != jsonPath}>
@@ -141,20 +142,20 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
           onKeyDown={couldHandleOpen}
           sx={{ width:"100%", minWidth:"90px" }}
         />
-        <div style={{ marginTop:16 }}>
+        { sessions.length > 0 && <div style={{ marginTop:16 }}>
           <InputLabel shrink={true}>Previously open folders</InputLabel>
           <div style={{ marginLeft: -9, marginTop:-4 }}>
             { sessions.map(s => <Button sx={{ fontSize:16, textTransform: "none", padding:"0px 8px" }}>
                 <Link style={{color:theme.palette.primary.main}} to={"/?folder="+s} onClick={handleClose}>{s}</Link>
               </Button>)}
             </div>
-        </div>
+        </div> }
       </DialogContent>
       <DialogActions sx={{padding:"16px"}}>
         <ColorButton onClick={handleOpen} /*disabled={path == folder}*/>Open</ColorButton>
       </DialogActions>
     </Dialog>
-    ), [confirmAct, modified, folder, error, showDialog, handleClose, jsonPath, path, handlePath, couldHandleOpen, sessions, handleOpen])
+    ), [confirmAct, modified, folder, error, showDialog, handleClose, jsonPath, path, handlePath, couldHandleOpen, sessions, handleOpen, theme.palette.primary.main])
   
   return <nav className="top">
     {confirmDialog}

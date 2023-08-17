@@ -18,7 +18,7 @@ import { ConfigData, LocalData, SavedScamData, ScamData, ScamOptionsMap } from "
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
-import { apiUrl } from "../App";
+import { apiUrl, discardDraft } from "../App";
 import axios from "axios";
 
 const debug = debugFactory("scam:bbar")
@@ -29,6 +29,8 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
 
   const [modified, setModified] = useAtom(state.modified)
+  const [published, setPublished] = useState(false)
+  const [drafted, setDrafted] = useAtom(state.drafted)
 
   const [orient, setOrient] = useAtom(state.orientAtom)
   const [direc, setDirec] = useAtom(state.direcAtom)
@@ -42,6 +44,13 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
 
   const [ saving, setSaving ] = useState(false)
   const [ error, setError ] = useState("")
+
+  useEffect(() => {
+    if(modified) {
+      setDrafted(false)
+      setPublished(false)
+    }
+  }, [modified])
 
   const scamOptions:ScamOptionsMap = useMemo(() => ({
     "wh_ratio_range": orient == "custom"
@@ -71,9 +80,10 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       options: orient != "custom" ? { orientation: orient } : { ...scamOptions }
     }
     localStorage.setItem("scamUI", JSON.stringify(local))
-    setModified(false)
+    //setModified(false)
+    setDrafted(true)
     if(onConfirmed) onConfirmed()
-  }, [allScamData, folder, onConfirmed, orient, scamOptions, setModified])
+  }, [allScamData, folder, onConfirmed, orient, scamOptions])
 
   const publish = useCallback(async () => {
     
@@ -117,6 +127,9 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       setSaving(false)
       setPopChecked(false)
       setModified(false)
+      setPublished(true)
+      discardDraft(folder)
+      setDrafted(true)
     })
     .catch(error => {
       debug(error, json);
@@ -158,9 +171,9 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
             : <>Failed to save<br/>(<i>{error}</i>)</> }
         </Paper>
       </Popper>
-      <ColorButton onClick={saveDraft} disabled={!modified || popChecked}>save draft</ColorButton>
+      <ColorButton onClick={saveDraft} disabled={!modified || drafted || popChecked}>save draft</ColorButton>
       <span ref={spanRef}>
-        <ColorButton className={saving?"saving":""} sx={{ marginLeft:"8px" }} onClick={handlePublish} disabled={!modified || !config.auth ||  saving}>{ 
+        <ColorButton className={saving?"saving":""} sx={{ marginLeft:"8px" }} onClick={handlePublish} disabled={!modified || published || !config.auth ||  saving}>{ 
           saving 
           ? "_" 
           : error 

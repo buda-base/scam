@@ -23,6 +23,12 @@ const debug = debugFactory("scam:app")
 
 export const apiUrl = 'https://scamqcapi.bdrc.io/'        
 
+export const discardDraft = async (folder: string) => {
+  const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+  if(local.drafts && local.drafts[folder]) delete local.drafts[folder] 
+  localStorage.setItem("scamUI", JSON.stringify(local))
+}
+
 function App() {
 
   const [config, setConfig] = useState<ConfigData>({} as ConfigData)
@@ -55,6 +61,7 @@ function App() {
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   
   const [modified, setModified] = useAtom(state.modified)
+  const [drafted, setDrafted] = useAtom(state.drafted)
 
   const [orient, setOrient] = useAtom(state.orientAtom)
   const [direc, setDirec] = useAtom(state.direcAtom)
@@ -139,14 +146,13 @@ function App() {
   const handleClose = useCallback(async (discard?: boolean) => {
     setLoadDraft(false)
     if(discard) {
-      const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
-      if(local.drafts && local.drafts[folder]) delete local.drafts[folder] 
-      localStorage.setItem("scamUI", JSON.stringify(local))
+      discardDraft(folder)
     }
   }, [folder])
 
   const handleLoad = () => {
     setLoadDraft(true)
+    setDrafted(true)
   }
 
   
@@ -159,6 +165,7 @@ function App() {
     setImages([])
     if(folder) {
       const hasDraft = ((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) 
+      if(hasDraft[folder]?.images) setModified(true)
       setDrafts( hasDraft[folder]?.images || {} )
       setLoadDraft( hasDraft[folder]?.images ? undefined : false )
     }
