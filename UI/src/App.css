@@ -265,9 +265,9 @@ button.saving::after {
   /* background-color: rgba(0,0,0,0.5); */
 }
 .popper-bg-bar {
-  position: fixed; height:60px; left:0; right:150px; bottom:0px; 
-  /* background-color: rgba(0,0,0,0.5); */
+  position: fixed; height:60px; left:0; right:max(125px, (100% - 1440px) / 2 + 125px); bottom:0px; pointer-events: none;
   z-index:2;
+  /* background-color: rgba(0,0,0,0.5); */
 }
 
 .paper { margin-bottom: 8px ; }

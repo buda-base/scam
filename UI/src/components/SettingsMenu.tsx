@@ -4,7 +4,7 @@ import { useAtom } from "jotai"
 
 import * as state from "../state"
 
-const SettingsMenu = (props: { /*folder:string, image: ScamImageData, config: ConfigData*/ }) => {
+const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: ConfigData } */) => {
   //const { folder, config, image } = props;
 
   const [orient, setOrient] = useAtom(state.orientAtom) 

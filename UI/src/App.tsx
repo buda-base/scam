@@ -144,6 +144,7 @@ function App() {
   }, [json])
 
   const handleClose = useCallback(async (discard?: boolean) => {
+    setModified(false)
     setLoadDraft(false)
     if(discard) {
       discardDraft(folder)

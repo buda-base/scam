@@ -12,7 +12,7 @@ import * as state from "../state"
 import { SaveButtons } from "./BottomBar";
 import { ConfigData, LocalData } from "../types";
 
-const debug = debugFactory("scam:bbar")
+const debug = debugFactory("scam:tbar")
 
 export const TopBar = (props: { folder:string, config: ConfigData, error: string, jsonPath:string, setFolder:(s:string) => void }) => {
   const { folder, config, error, jsonPath, setFolder } = props;
@@ -84,7 +84,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
     else handleDialog()
   }, [confirmAct, handleDialog, handleNav])
 
-  debug(folder, error, jsonPath, showDialog, confirmAct)
+  //debug(folder, error, jsonPath, showDialog, confirmAct)
   
   const unload = useCallback((event:Event) => {
     if(modified && !drafted) { 

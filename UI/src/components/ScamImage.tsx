@@ -83,7 +83,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             y: e.target.y() - padding - handleY,
           });
         }}
-        onTransformEnd={(e) => {
+        onTransformEnd={() => {
           const node = shRef.current;
           if (node) {
             const scaleX = node.scaleX();
@@ -276,7 +276,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    debug("gSR!", loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
+    //debug("gSR!", loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
 
     if (visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
@@ -398,7 +398,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       const w = scamData?.thumbnail_info.width
       const h = scamData?.thumbnail_info.height
         
-      newData.pages = [...scamData.pages.filter((im,n) => n !== id)]
+      newData.pages = [...scamData.pages.filter((_im,n) => n !== id)]
       newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
 
       setScamData(newData)

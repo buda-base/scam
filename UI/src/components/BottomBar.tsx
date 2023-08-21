@@ -45,6 +45,8 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const [ saving, setSaving ] = useState(false)
   const [ error, setError ] = useState("")
 
+  //debug("mod:", modified, drafted, published)
+
   useEffect(() => {
     if(modified) {
       setDrafted(false)
