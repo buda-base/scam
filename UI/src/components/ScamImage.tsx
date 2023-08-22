@@ -263,6 +263,20 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   }, [selectedId])
 
   let controller = new AbortController();   
+  const stageRef = useRef()
+
+  const handleKeyDown = useCallback((e: { key: string; }) => {
+    debug("kd:", image.thumbnail_path, e, selectedId)
+    return
+    if (selectedId != null) { // && e.key === "Del") {
+        console.log('key pressed!', e);
+    }
+  }, [ selectedId ]);
+
+  useEffect(()=> {
+    window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);      
+  }, [ handleKeyDown ])
 
   useEffect(() => {
     //debug("mount:", image.thumbnail_path, controller.signal.aborted)
@@ -270,11 +284,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     if(controller.signal.aborted) {
       controller = new AbortController();   
     }
-
+    
     return () => {
       //debug("unmount:",image.thumbnail_path)
       unmount = true
       controller.abort()
+      window.removeEventListener('keydown', handleKeyDown);
     }
   }, [])
 
@@ -495,15 +510,21 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   }, [scamData, selectedId])
 
   const handleMouseDown = (event:KonvaEventObject<MouseEvent>) => {
-    if (typeof scamData !== 'object' || !scamData.pages) return
-    if (newPage.length === 0) {
-      const stage = event.target.getStage()
-      if(!stage) return
-      const vect = stage.getPointerPosition() 
-      if(!vect) return
-      const { x, y } = vect
-      setNewPage([{ x, y, width: 0, height: 0, n: scamData.pages?.length, rotation:0, warning:false }]);
-      selectShape(scamData.pages?.length)
+    const container = event.target.getStage()?.container();
+    if (addNew || container?.style.cursor == "copy") {
+      if (typeof scamData !== 'object' || !scamData.pages) return
+      if (newPage.length === 0) {
+        setAddNew(true)
+        const stage = event.target.getStage()
+        if(!stage) return
+        const vect = stage.getPointerPosition() 
+        if(!vect) return
+        const { x, y } = vect
+        setNewPage([{ x, y, width: 0, height: 0, n: scamData.pages?.length, rotation:0, warning:false }]);
+        selectShape(scamData.pages?.length)
+      }
+    } else {
+      checkDeselect(event)
     }
   };
 
@@ -607,7 +628,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       { visible  && <Stage
         width={actualW + padding * 2}
         height={actualH + padding * 2}
-        onMouseDown={addNew ? handleMouseDown : checkDeselect}
+        onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
         onMouseMove={handleMouseMove}
         onTouchStart={checkDeselect}        
@@ -627,11 +648,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               offsetY={image.thumbnail_info.height / 2}
               onMouseEnter={(e) => {
                 const container = e.target.getStage()?.container();
-                if (container && addNew) container.style.cursor = "copy";
+                if (container/* && addNew*/) container.style.cursor = "copy";
               }}
               onMouseMove={(e) => {
                 const container = e.target.getStage()?.container();
-                if (container && !addNew && container.style.cursor != "default") container.style.cursor = "default";
+                if (container /*&& !addNew*/ && container.style.cursor != "copy") container.style.cursor = "copy";
               }}
               onMouseLeave={(e) => {
                 const container = e.target.getStage()?.container();
