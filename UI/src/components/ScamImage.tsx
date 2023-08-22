@@ -105,6 +105,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 
       {isSelected && (
         <Transformer
+          keepRatio={false}
           ref={trRef}
           boundBoxFunc={(oldBox, newBox) => {
             // limit resize
@@ -150,6 +151,48 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
 
 let unmount = false
 
+
+export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: number, H: number) => {
+  const { minAreaRect: rect } = r
+  const n = i
+  const width = rect[2] * w / W
+  const height = rect[3] * h / H
+  const x = rect[0] * w / W - width / 2
+  const y = rect[1] * h / H - height / 2
+  const rotation = rect[4]
+  const warning = r.warnings.length > 0
+  return ({ n, x, y, width, height, rotation, warning })
+}
+
+export const withRotatedHandle = (r: Page) => {
+  const { minAreaRect: rect } = r
+  let width = rect[2] 
+  let height = rect[3] 
+  let rotation = rect[4]
+  let rotatedHandle = r.rotatedHandle
+  if(width > height) {
+    width = rect[3] 
+    height = rect[2]
+    if(!rotatedHandle) rotation = (rotation + 90) % 360 
+    else rotation = (rotation - 90) % 360 
+    rotatedHandle = !rotatedHandle
+  }
+  return ({ ...r, minAreaRect: [ rect[0], rect[1], width, height, rotation ], rotatedHandle })
+}
+
+export const withoutRotatedHandle = (r: Page) => {
+  const { minAreaRect: rect, warnings } = r
+  let width = rect[2] 
+  let height = rect[3] 
+  let rotation = rect[4]
+  if(r.rotatedHandle) {
+    width = rect[3] 
+    height = rect[2]
+    rotation = (rotation - 90) % 360 
+  }
+  return ({ warnings, minAreaRect: [ rect[0], rect[1], width, height, rotation ] })
+}
+
 const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
     loadDraft: boolean | undefined, checked: boolean,
     setImageData:(data:ScamImageData)=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void }) => {
@@ -157,21 +200,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
-  const recomputeCoords = (r: Page, i: number, w: number, h: number, W: number, H: number) => {
-    const { minAreaRect: rect } = r
-    const n = i
-    const width = rect[2] * w / W
-    const height = rect[3] * h / H
-    const x = rect[0] * w / W - width / 2
-    const y = rect[1] * h / H - height / 2
-    const rotation = rect[4]
-    const warning = r.warnings.length > 0
-    return ({ n, x, y, width, height, rotation, warning })
-  }
-
+  let tmpPages ;
   const uploadedData = image?.pages ? { 
       ...image, 
-      rects: image.pages.map((r, i) => recomputeCoords(r, i, image.thumbnail_info.width, image.thumbnail_info.height, image.width, image.height))
+      pages: (tmpPages = image.pages.map(withRotatedHandle) as Page[]),
+      rects: tmpPages.map((r, i) => recomputeCoords(r, i, image.thumbnail_info.width, image.thumbnail_info.height, image.width, image.height))
     } : null
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const globalData = allScamData[image.thumbnail_path]
@@ -332,6 +365,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
             const H = response.data.height
             const w = response.data.thumbnail_info.width
             const h = response.data.thumbnail_info.height
+            response.data.pages = (response.data as ScamImageData).pages?.map(withRotatedHandle)
             response.data.rects = (response.data as ScamImageData).pages?.map((r, i) => recomputeCoords(r, i, w, h, W, H))
 
             let state = 'new'
@@ -434,6 +468,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         data.pages[p.n].minAreaRect[2] = W * p.width / w
         data.pages[p.n].minAreaRect[3] = H * p.height / h
         data.pages[p.n].minAreaRect[4] = p.rotation
+        data.pages = data.pages.map(withRotatedHandle) as Page[]
         data.rects = handleZindex(data.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
 
         debug(W, H, w, h, p) //,scamData.pages[p.n].minAreaRect)

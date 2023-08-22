@@ -8,6 +8,7 @@ type MinAreaRect = [number, number, number, number, number];
 export type Page = {
   minAreaRect: MinAreaRect;
   warnings: string[];
+  rotatedHandle?:boolean;
 };
 
 export type KonvaPage = {

@@ -11,9 +11,9 @@ import { useAtom } from 'jotai';
 // tmp data
 //import data from "./assets/scam.json"
 
-import { ScamImageContainer } from "./components/ScamImage"
+import { ScamImageContainer, recomputeCoords, withRotatedHandle } from "./components/ScamImage"
 import './App.css'
-import { ConfigData, LocalData, SavedScamData, ScamData, ScamImageData } from './types';
+import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData } from './types';
 import { BottomBar } from './components/BottomBar';
 import { TopBar } from './components/TopBar';
 import { ColorButton, theme } from "./components/theme"
@@ -41,6 +41,10 @@ function App() {
   const paramFolder = searchParams.get("folder") || "";
   const [ folder, setFolder ] = useState(paramFolder);
   
+  useEffect(() => {
+    document.title = "SCAM QC platform"
+  }, []);
+
   useEffect(() => {
     debug("loca?",paramFolder,location)
     if(paramFolder) {
@@ -167,7 +171,15 @@ function App() {
     if(folder) {
       const hasDraft = ((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) 
       if(hasDraft[folder]?.images) setModified(true)
-      setDrafts( hasDraft[folder]?.images || {} )
+      const theDraft = hasDraft[folder]?.images || {}
+      if(theDraft) { 
+        Object.values(theDraft).map(val => {
+          if(val.data?.pages) {
+            val.data.pages = val.data.pages.map(withRotatedHandle) as Page[]      
+          }
+        })
+      }
+      setDrafts( theDraft )
       setLoadDraft( hasDraft[folder]?.images ? undefined : false )
     }
   }, [folder])

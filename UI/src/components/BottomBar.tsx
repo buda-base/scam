@@ -14,12 +14,13 @@ import { useAtom } from "jotai";
 import debugFactory from "debug"
 import { encode } from "js-base64";
 
-import { ConfigData, LocalData, SavedScamData, ScamData, ScamOptionsMap } from "../types"
+import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamOptionsMap } from "../types"
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
 import { apiUrl, discardDraft } from "../App";
 import axios from "axios";
+import { withoutRotatedHandle } from "./ScamImage";
 
 const debug = debugFactory("scam:bbar")
 
@@ -76,7 +77,11 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       ...local.drafts[folder], 
       images: { ...Object.keys(allScamData).reduce( (acc,a) => {
         const val = allScamData[a]
-        if(["draft", "modified"].includes(val.state)) return ({ ...acc, [a]: val })
+        val.data = { ...val.data }
+        if(["draft", "modified"].includes(val.state)) { 
+          if(val.data.pages) val.data.pages = val.data.pages.map(withoutRotatedHandle) as Page[]
+          return ({ ...acc, [a]: val })
+        }
         return acc
       }, {}) },
       options: orient != "custom" ? { orientation: orient } : { ...scamOptions }
@@ -107,6 +112,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
           ...obj.checked ? { checked: true } : {}
         }
         if(data.rects) delete data.rects
+        if(data.pages) data.pages = data.pages.map(withoutRotatedHandle) as Page[]
         return data
       }),
       checked

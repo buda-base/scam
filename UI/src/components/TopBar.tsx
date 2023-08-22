@@ -160,7 +160,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
   return <nav className="top">
     {confirmDialog}
     {folderDialog}
-    <div></div>
+    <div><Link to={"/"} style={{ fontWeight:600, color:"#000" }}>SCAM QC</Link></div>
     <div className="nav">
     { folder && <>
         <div onClick={() => handleConfirm(false)}>
