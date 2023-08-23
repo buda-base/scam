@@ -232,7 +232,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   })
   const figureRef = useRef<HTMLElement>(null)
 
-  useLayoutEffect(() => {    
+  useEffect(() => {    
     if (figureRef.current?.parentElement) { 
       const w = (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding 
       if(w != dimensions.width) {
@@ -343,6 +343,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   }, [windowSize, updateRects, resized])
 
   useEffect(() => {
+    debug("dimensions:", image.thumbnail_path, dimensions)
     setResized("")
   }, [dimensions])
 
