@@ -107,12 +107,12 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
           >
             <Close />
           </IconButton> 
-          Save changes to '{folder}'?
+          Lose your changes to '{folder}'?
         </DialogContent>
       <DialogActions sx={{padding:"16px"}}>
         <ColorButton onClick={handleClose}>Cancel</ColorButton>
-        <ColorButton onClick={onConfirmed}>No</ColorButton>
-        <SaveButtons { ...{ folder, config, onConfirmed }}/>
+        <ColorButton onClick={onConfirmed}>Ok</ColorButton>
+        {/* <SaveButtons { ...{ folder, config, onConfirmed }}/> */}
       </DialogActions>
     </Dialog>
   ), [config, confirmAct, folder, handleClose, modified, onConfirmed, showDialog])
