@@ -215,6 +215,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   
 
   const [filter, setFilter] = useAtom(state.filter)
+  const [grid, setGrid] = useAtom(state.grid)
 
   return (<nav className="bot">
     <Box>
@@ -233,6 +234,19 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         onChange={(r) => setFilter(r.target.value)}
       >
         { ["all", "warning", "unchecked" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+      </TextField>
+      <TextField
+        SelectProps={{ 
+          MenuProps : { disableScrollLock: true }
+        }}
+        sx={{ minWidth: 100, marginLeft: "16px" }}
+        select
+        variant="standard"
+        value={grid}
+        label="Display grid"
+        onChange={(r) => setGrid(r.target.value)}
+      >
+        { ["1x1", "2x1", "3x2" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
       </TextField>
     </Box>
     <div>

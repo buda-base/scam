@@ -193,6 +193,27 @@ export const withoutRotatedHandle = (r: Page) => {
   return ({ warnings, minAreaRect: [ rect[0], rect[1], width, height, rotation ] })
 }
 
+
+// Hook
+function useWindowSize() {
+  const [windowSize, setWindowSize] = useState({
+    width: 0,
+    height: 0,
+  });
+  useEffect(() => {
+    function handleResize() {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    }
+    window.addEventListener("resize", handleResize);
+    handleResize();
+    return () => window.removeEventListener("resize", handleResize);
+  }, []); 
+  return windowSize;
+}
+
 const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
     loadDraft: boolean | undefined, checked: boolean,
     setImageData:(data:ScamImageData)=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void }) => {
@@ -200,11 +221,35 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
+  const windowSize = useWindowSize();
+
+  const [filter, setFilter] = useAtom(state.filter)
+  const [grid, setGrid] = useAtom(state.grid)  
+
+  const [dimensions, setDimensions] = useState({
+    width: 0,
+    height: image.thumbnail_info.height
+  })
+  const figureRef = useRef<HTMLElement>(null)
+
+  useLayoutEffect(() => {    
+    if (figureRef.current?.parentElement) { 
+      const w = (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding 
+      if(w != dimensions.width) {
+        setDimensions({
+          width: w,
+          height: w * image.height / image.width
+        })
+      }
+    }    
+  }, [grid, figureRef, dimensions, image, windowSize])
+
+
   let tmpPages ;
   const uploadedData = image?.pages ? { 
       ...image, 
       pages: (tmpPages = image.pages.map(withRotatedHandle) as Page[]),
-      rects: tmpPages.map((r, i) => recomputeCoords(r, i, image.thumbnail_info.width, image.thumbnail_info.height, image.width, image.height))
+      rects: tmpPages.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, image.width, image.height))
     } : null
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const globalData = allScamData[image.thumbnail_path]
@@ -220,7 +265,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     setPortrait([90,270].includes(image.rotation) ? true : false)
   }, [image.rotation])
 
-  const [showDebug, setShowDebug] = useState(true)
+  const [showDebug, setShowDebug] = useState(false)
   const [selectedId, selectShape] = useState<number | null>(null);
   const [addNew, setAddNew] = useState(false)
   const [newPage, setNewPage] = useState<KonvaPage[]>([]);
@@ -233,7 +278,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
   
-  const [filter, setFilter] = useAtom(state.filter)
+  const [keyDown, setKeyDown] = useAtom(state.keyDown)
+  const [focused, setFocused] = useAtom(state.focused)
 
   const scamOptions:ScamOptionsMap = useMemo(() => ({
     ...scam_options,
@@ -262,21 +308,45 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     return [...rects.filter(r => r.n != selectedId)].concat([...rects.filter(r => r.n === selectedId)])
   }, [selectedId])
 
-  let controller = new AbortController();   
-  const stageRef = useRef()
+  const updateRects = useCallback( () => {
+    if(typeof scamData === 'object' && scamData.pages && scamData.rects) {
 
-  const handleKeyDown = useCallback((e: { key: string; }) => {
-    debug("kd:", image.thumbnail_path, e, selectedId)
-    return
-    if (selectedId != null) { // && e.key === "Del") {
-        console.log('key pressed!', e);
+      //debug("resize!", dimensions, image.thumbnail_path)
+      
+      const newData = { ...scamData }
+
+      const W = scamData?.width
+      const H = scamData?.height
+      const w = dimensions.width
+      const h = dimensions.height
+        
+      newData.pages = [...scamData.pages]
+      newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))            
+
+      setScamData(newData)
+      dispatch({
+        type: 'UPDATE_DATA',
+        payload: {
+          id: image.thumbnail_path,
+          val: { data: newData }
+        }
+      })
     }
-  }, [ selectedId ]);
+  }, [dimensions, dispatch, handleZindex, image, scamData])
+    
+  const [resized, setResized] = useState("")
+  useEffect(() => {
+    if(windowSize.width + "-" + windowSize.height != resized) {
+      setResized(windowSize.width + "-" + windowSize.height) 
+      updateRects()
+    } 
+  }, [windowSize, updateRects, resized])
 
-  useEffect(()=> {
-    window.removeEventListener('keydown', handleKeyDown);
-    window.addEventListener('keydown', handleKeyDown);      
-  }, [ handleKeyDown ])
+  useEffect(() => {
+    setResized("")
+  }, [dimensions])
+
+  let controller = new AbortController();   
 
   useEffect(() => {
     //debug("mount:", image.thumbnail_path, controller.signal.aborted)
@@ -284,12 +354,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     if(controller.signal.aborted) {
       controller = new AbortController();   
     }
-    
+
     return () => {
       //debug("unmount:",image.thumbnail_path)
       unmount = true
       controller.abort()
-      window.removeEventListener('keydown', handleKeyDown);
     }
   }, [])
 
@@ -378,8 +447,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           if (response.data) {
             const W = response.data.width
             const H = response.data.height
-            const w = response.data.thumbnail_info.width
-            const h = response.data.thumbnail_info.height
+            const w = dimensions.width
+            const h = dimensions.height
             response.data.pages = (response.data as ScamImageData).pages?.map(withRotatedHandle)
             response.data.rects = (response.data as ScamImageData).pages?.map((r, i) => recomputeCoords(r, i, w, h, W, H))
 
@@ -400,7 +469,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [loadDraft, draft, globalData, visible, config.auth, scamData, lastRun, shouldRunAfter, image, folder, scamOptions, controller.signal, dispatch, setVisible, checked])
+  }, [visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, scamOptions, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height])
 
   
   useEffect(() => {
@@ -444,8 +513,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       const W = scamData?.width
       const H = scamData?.height
-      const w = scamData?.thumbnail_info.width
-      const h = scamData?.thumbnail_info.height
+      const w = dimensions.width
+      const h = dimensions.height
         
       newData.pages = [...scamData.pages.filter((_im,n) => n !== id)]
       newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
@@ -461,7 +530,21 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       setModified(true)
       selectShape(null)
     }
-  }, [checked, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
+  }, [checked, dimensions.height, dimensions.width, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
+
+  useEffect(() => {
+    if(focused != image.thumbnail_path) {
+      selectShape(null)
+    }
+  }, [focused, image.thumbnail_path])
+
+  useEffect(()=>{
+    if(selectedId != null && keyDown != '') {
+      removeId(selectedId)
+      setKeyDown('')
+    }
+  }, [selectedId, keyDown, removeId, setKeyDown])
+
 
   const onChange = useCallback((p: KonvaPage, add?: boolean) => {
     if (typeof scamData === 'object' && scamData.pages) {
@@ -474,8 +557,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       const W = scamData?.width
       const H = scamData?.height
-      const w = scamData?.thumbnail_info.width
-      const h = scamData?.thumbnail_info.height
+      const w = dimensions.width
+      const h = dimensions.height
 
       if (data.pages) {
         data.pages[p.n].minAreaRect[0] = W * (p.x + p.width / 2) / w
@@ -499,7 +582,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         setModified(true)
       }
     }
-  }, [checked, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
+  }, [checked, dimensions.height, dimensions.width, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
 
   useEffect(() => {
     if (typeof scamData === 'object' && scamData.rects && scamData.selected != selectedId && selectedId != undefined) {
@@ -507,9 +590,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       const rects = handleZindex(scamData.rects)
       setScamData({ ...scamData, selected: selectedId, rects })
     }
-  }, [scamData, selectedId])
+  }, [handleZindex, scamData, selectedId])
 
-  const handleMouseDown = (event:KonvaEventObject<MouseEvent>) => {
+  const handleMouseDown = useCallback((event:KonvaEventObject<MouseEvent>) => {
+
+    if(focused != image.thumbnail_path) setFocused(image.thumbnail_path)
+
     const container = event.target.getStage()?.container();
     if (addNew || container?.style.cursor == "copy") {
       if (typeof scamData !== 'object' || !scamData.pages) return
@@ -526,7 +612,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     } else {
       checkDeselect(event)
     }
-  };
+  }, [addNew, focused, image.thumbnail_path, newPage.length, scamData, setFocused]);
 
   const handleMouseUp = (event:KonvaEventObject<MouseEvent>) => {
     if (typeof scamData !== 'object' || !scamData.pages) return
@@ -614,16 +700,19 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     }
   }, [ scamData, scamOptions ])
 
-  const actualW = (portrait ? image.thumbnail_info.height : image.thumbnail_info.width)
-  const actualH = (portrait ? image.thumbnail_info.width : image.thumbnail_info.height)
+  const actualW = (portrait ? dimensions.height : dimensions.width)
+  const actualH = (portrait ? dimensions.width : dimensions.height)
+
+  //debug("dim:",image.thumbnail_path, dimensions, actualW, actualH)
 
   return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
-      + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" )}
-    style={{ height: visible ? actualH + 2 * padding : 80 }}
+      + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid)}
+    style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info.width + 2*padding }}
     onMouseDown={checkDeselectDiv}
   >
-    <figure className={"visible-"+visible} 
-        {... !visible ? { style: { width: image.thumbnail_info.width + padding * 2, height: 80 } }:{} }>
+    <figure className={"visible-"+visible} ref={figureRef} 
+        // {... !visible ? { style: { width: dimensions.width + padding * 2, height: 80 } }:{} }
+        >
       { !visible && typeof konvaImg == "object" && <img src={konvaImg?.src} className={"mini"+((image.rotation + 360) % 360 != 0 ? " rotated": "")} style={{transform: "rotate("+image.rotation+"deg)" }}/> }
       { visible  && <Stage
         width={actualW + padding * 2}
@@ -637,15 +726,15 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           {typeof konvaImg === 'object' && <>
             <KImage
               image={konvaImg}
-              width={image.thumbnail_info.width}
-              height={image.thumbnail_info.height}
+              width={dimensions.width}
+              height={dimensions.height}
               //x={padding + ([90,180].includes(image.rotation) ? actualW : 0)}
               //y={padding + ([180,270].includes(image.rotation) ? actualH : 0)}
               x={actualW / 2 + padding}
               y={actualH / 2 + padding}
               rotation={360 - image.rotation}
-              offsetX={image.thumbnail_info.width / 2}
-              offsetY={image.thumbnail_info.height / 2}
+              offsetX={dimensions.width / 2}
+              offsetY={dimensions.height / 2}
               onMouseEnter={(e) => {
                 const container = e.target.getStage()?.container();
                 if (container/* && addNew*/) container.style.cursor = "copy";

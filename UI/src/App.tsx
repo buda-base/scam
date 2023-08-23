@@ -41,8 +41,26 @@ function App() {
   const paramFolder = searchParams.get("folder") || "";
   const [ folder, setFolder ] = useState(paramFolder);
   
+  const [keyDown, setKeyDown] = useAtom(state.keyDown)
+
   useEffect(() => {
     document.title = "SCAM QC platform"
+    
+    const handleKeyDown = (e: { key: string; }) => {
+      setKeyDown(e.key)
+    }
+
+    const handleKeyUp = (e: { key: string; }) => {
+      setKeyDown('')
+    }
+
+    window.addEventListener('keydown', handleKeyDown);      
+    window.addEventListener('keyup', handleKeyUp);      
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyDown);
+    }
   }, []);
 
   useEffect(() => {
