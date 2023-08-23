@@ -50,7 +50,7 @@ function App() {
       setKeyDown(e.key)
     }
 
-    const handleKeyUp = (e: { key: string; }) => {
+    const handleKeyUp = () => {
       setKeyDown('')
     }
 
