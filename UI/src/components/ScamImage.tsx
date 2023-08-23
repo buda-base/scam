@@ -82,6 +82,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             x: e.target.x() - padding - handleX,
             y: e.target.y() - padding - handleY,
           });
+          onSelect()
         }}
         onTransformEnd={() => {
           const node = shRef.current;
@@ -172,18 +173,21 @@ export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: num
   return ({ n, x, y, width, height, rotation, warning })
 }
 
-export const withRotatedHandle = (r: Page) => {
-  const { minAreaRect: rect } = r
+export const withRotatedHandle = (r: Page, data: ScamImageData) => {    
+  const { minAreaRect: rect } = r  
   let width = rect[2] 
   let height = rect[3] 
   let rotation = rect[4]
   let rotatedHandle = r.rotatedHandle
-  if(width > height) {
+  if(width > height 
+      // TODO: inverting w & h to keep rotation handle on the small side doesn't work for portrait A4 with 90/270 rotation...
+      && ![90,270].includes(data.rotation) 
+    ) { 
     width = rect[3] 
     height = rect[2]
     if(!rotatedHandle) rotation = (rotation + 90) % 360 
     else rotation = (rotation - 90) % 360 
-    rotatedHandle = !rotatedHandle
+    rotatedHandle = !rotatedHandle        
   }
   return ({ ...r, minAreaRect: [ rect[0], rect[1], width, height, rotation ], rotatedHandle })
 }
@@ -256,7 +260,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   let tmpPages ;
   const uploadedData = image?.pages ? { 
       ...image, 
-      pages: (tmpPages = image.pages.map(withRotatedHandle) as Page[]),
+      pages: (tmpPages = image.pages.map((p) => withRotatedHandle(p, image)) as Page[]),
       rects: tmpPages.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, image.width, image.height))
     } : null
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
@@ -458,8 +462,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
             const H = response.data.height
             const w = dimensions.width
             const h = dimensions.height
-            response.data.pages = (response.data as ScamImageData).pages?.map(withRotatedHandle)
-            response.data.rects = (response.data as ScamImageData).pages?.map((r, i) => recomputeCoords(r, i, w, h, W, H))
+            const d = response.data as ScamImageData
+            response.data.pages = d.pages?.map(p => withRotatedHandle(p, d))
+            response.data.rects = d.pages?.map((r, i) => recomputeCoords(r, i, w, h, W, H))
 
             let state = 'new'
             if(typeof scamData === "object" && scamData.rotation != image.rotation) state = 'modified'
@@ -478,7 +483,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, scamOptions, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height])
+  }, [visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, scamOptions, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, portrait])
 
   
   useEffect(() => {
@@ -575,7 +580,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         data.pages[p.n].minAreaRect[2] = W * p.width / w
         data.pages[p.n].minAreaRect[3] = H * p.height / h
         data.pages[p.n].minAreaRect[4] = p.rotation
-        data.pages = data.pages.map(withRotatedHandle) as Page[]
+        data.pages = data.pages.map(p => withRotatedHandle(p, data)) as Page[]
         data.rects = handleZindex(data.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
 
         debug(W, H, w, h, p) //,scamData.pages[p.n].minAreaRect)
@@ -591,7 +596,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         setModified(true)
       }
     }
-  }, [checked, dimensions.height, dimensions.width, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
+  }, [checked, dimensions.height, dimensions.width, dispatch, handleZindex, image, portrait, scamData, setModified, shouldRunAfter, visible])
 
   useEffect(() => {
     if (typeof scamData === 'object' && scamData.rects && scamData.selected != selectedId && selectedId != undefined) {

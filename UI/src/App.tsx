@@ -193,7 +193,7 @@ function App() {
       if(theDraft) { 
         Object.values(theDraft).map(val => {
           if(val.data?.pages) {
-            val.data.pages = val.data.pages.map(withRotatedHandle) as Page[]      
+            val.data.pages = val.data.pages.map(p => withRotatedHandle(p, val.data)) as Page[]      
           }
         })
       }
