@@ -124,7 +124,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, setImageData: (data:ScamImageData) => void }) => {
   const { image } = props;
 
-  const { ref, inView } = useInView({
+  const { ref, inView, entry } = useInView({
     triggerOnce: false,
     rootMargin: '200% 0px'
   });
@@ -132,16 +132,24 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
   const [visible, setVisible] = useState(image.hidden ? false : true)
   const [checked, setChecked] = useState(image.checked ? true : false)
   
+  const figureRef = useRef<HTMLElement>(null)
+  
+  const [grid, setGrid] = useAtom(state.grid)  
+
   if (inView) {    
     //debug("scanImageContainer:", image.thumbnail_path, JSON.stringify(props, null, 3))
     return <ScamImage {...props} divRef={ref} {...{visible, checked, setVisible, setChecked}}/>
   }
   else {    
+
+    const w = (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding
+    const h = w * image.thumbnail_info.height / image.thumbnail_info.width
+
     return (
-      <div ref={ref} className="scam-image not-visible"
-        style={{ height: image.thumbnail_info.height + 2 * padding }}
+      <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid)}
+        style={{ height: h + 2 * padding, maxWidth: image.thumbnail_info.width + 2*padding }}
       >
-        <figure>
+        <figure ref={figureRef}>
           <figcaption>{image.img_path}</figcaption>
         </figure>
       </div>

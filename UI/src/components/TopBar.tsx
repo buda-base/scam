@@ -95,7 +95,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
 
   const confirmDialog = useMemo( () => (
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    <Dialog open={modified && confirmAct != undefined && !showDialog} disableScrollLock={true} >
+    <Dialog open={folder != "" && modified && confirmAct != undefined && !showDialog} disableScrollLock={true} >
       <DialogTitle>Folder modified</DialogTitle>
       <DialogContent>
           <IconButton
@@ -160,7 +160,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
   return <nav className="top">
     {confirmDialog}
     {folderDialog}
-    <div><Link to={"/"} style={{ fontWeight:600, color:"#000" }}>SCAM QC</Link></div>
+    <div style={{ fontWeight:600, color:"#000", cursor:"pointer" }} onClick={() => handleConfirm(true)}>SCAM QC</div>
     <div className="nav">
     { folder && <>
         <div onClick={() => handleConfirm(false)}>
