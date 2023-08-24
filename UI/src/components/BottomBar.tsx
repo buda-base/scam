@@ -46,9 +46,10 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const [ saving, setSaving ] = useState(false)
   const [ error, setError ] = useState("")
 
-  //debug("mod:", modified, drafted, published)
+  debug("mod:", modified, drafted, published)
 
   useEffect(() => {
+    debug("mod?", modified)
     if(modified) {
       setDrafted(false)
       setPublished(false)
@@ -78,7 +79,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       images: { ...Object.keys(allScamData).reduce( (acc,a) => {
         const val = allScamData[a]
         val.data = { ...val.data }
-        if(["draft", "modified"].includes(val.state)) { 
+        if(["draft", "modified", "uploaded"].includes(val.state)) { 
           if(val.data.pages) val.data.pages = val.data.pages.map(withoutRotatedHandle) as Page[]
           return ({ ...acc, [a]: val })
         }
@@ -130,7 +131,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       },
     })
     .then(response => {
-      debug("json",response.data);
+      debug("save:",response.data);
 
       setSaving(false)
       setPopChecked(false)
@@ -169,7 +170,10 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
     <>
       { (popChecked || error != "") && <div onClick={handleClosePop}>
         <div className="popper-bg"></div>
+        {/* 
         <div className="popper-bg-bar"></div>
+        <div className="popper-bg-bar-right"></div> 
+        */}
       </div>
       }
       <Popper open={popChecked || error != ""} anchorEl={spanRef.current} popperOptions={{ placement: "bottom-end" }}>

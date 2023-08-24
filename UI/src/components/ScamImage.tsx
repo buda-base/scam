@@ -231,7 +231,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     setImageData:(data:ScamImageData)=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void }) => {
   const { folder, config, image, divRef, draft, loadDraft, visible, checked, setImageData, setVisible, setChecked } = props;
 
-  const [shouldRunAfter] = useAtom(state.shouldRunAfterAtom)
+  const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
   const windowSize = useWindowSize();
 
@@ -267,6 +267,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const globalData = allScamData[image.thumbnail_path]
 
   const [modified, setModified] = useAtom(state.modified)
+  const [drafted, setDrafted] = useAtom(state.drafted)
 
   const [scamData, setScamData] = useState<ScamImageData | boolean>(uploadedData || (globalData?.time >= shouldRunAfter ? globalData.data : false))
   const [lastRun, setLastRun] = useState(globalData?.time <= shouldRunAfter ? globalData.time : 0)
@@ -289,32 +290,48 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+  const [configReady, setConfigReady] = useAtom(state.configReady)
   
   const [keyDown, setKeyDown] = useAtom(state.keyDown)
   const [focused, setFocused] = useAtom(state.focused)
 
-  const scamOptions:ScamOptionsMap = useMemo(() => ({
-    ...scam_options,
+  const [deselectAll, setDeselectAll] = useAtom(state.deselectAll)
+  
+  useEffect(() => {
+    //debug("des:", image.thumbnail_path, deselectAll)
+    if(deselectAll) selectShape(null)
+  }, [deselectAll])
 
-    /*
-    "squarishness_min": orient == 'horizontal' ? 0.85 : 1/0.85,
-    "area_ratio_min": orient == 'horizontal' ? 0.2 : 1/0.2,
-    "area_diff_max": orient == 'horizontal' ? 0.15 : 1/0.15,
-    */
-   
-    "wh_ratio_range": orient == "custom"
-      ? [minRatio, maxRatio]
-      : orient == "horizontal"
-        ? [2.0, 7.0]
-        : [0.6, 0.8], // TODO: check values for vertical mode    
-    "wh_ratio_range_warn": [1.5, 10], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
-    "nb_pages_expected": orient == "custom" ? nbPages : 2,
-    "direction": orient == "custom"
-      ? direc
-      : orient === 'horizontal'
-        ? 'vertical'
-        : 'horizontal'
-  }), [ orient, direc, minRatio, maxRatio, nbPages ])
+  useEffect(() => {
+    if(selectedId != null && deselectAll) setDeselectAll(false)
+  }, [selectedId, deselectAll])
+
+  const scamOptions:ScamOptionsMap = useMemo(() => { 
+    const opts = ({
+      ...scam_options,
+
+      /*
+      "squarishness_min": orient == 'horizontal' ? 0.85 : 1/0.85,
+      "area_ratio_min": orient == 'horizontal' ? 0.2 : 1/0.2,
+      "area_diff_max": orient == 'horizontal' ? 0.15 : 1/0.15,
+      */
+    
+      "wh_ratio_range": orient == "custom"
+        ? [minRatio, maxRatio]
+        : orient == "horizontal"
+          ? [2.0, 7.0]
+          : [0.6, 0.8], // TODO: check values for vertical mode    
+      "wh_ratio_range_warn": [1.5, 10], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
+      "nb_pages_expected": orient == "custom" ? nbPages : 2,
+      "direction": orient == "custom"
+        ? direc
+        : orient === 'horizontal'
+          ? 'vertical'
+          : 'horizontal'
+    })
+    //debug("opts!", image.thumbnail_path, opts)
+    return opts
+  }, [ orient, direc, minRatio, maxRatio, nbPages ])
 
   const handleZindex = useCallback((rects: KonvaPage[]) => {
     return [...rects.filter(r => r.n != selectedId)].concat([...rects.filter(r => r.n === selectedId)])
@@ -355,7 +372,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   }, [windowSize, updateRects, resized])
 
   useEffect(() => {
-    debug("dimensions:", image.thumbnail_path, dimensions)
+    //debug("dimensions:", image.thumbnail_path, dimensions)
     setResized("")
   }, [dimensions])
 
@@ -406,19 +423,25 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    //debug("gSR!", loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
+    //debug("gSR!", configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
 
-    if (visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
+    if (configReady != false && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
       if(loadDraft === undefined) return
       else if(loadDraft && draft && !scamData) {        
-        //debug("draft:", draft);
-        setScamData(draft.data)
+        
+        debug("draft:", draft);
+
+        const newData = {
+          ...draft.data,
+          rects: draft.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, draft.data.width, draft.data.height))
+        }
+        setScamData(newData)
         dispatch({
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data: draft.data, state: 'draft', time: shouldRunAfter, image: draft.image, visible: draft.visible, checked: draft.checked }
+            val: { data: newData, state: 'draft', time: shouldRunAfter, image: draft.image, visible: draft.visible, checked: draft.checked }
           }
         })
         if(visible != draft.visible) setVisible(draft.visible)
@@ -427,6 +450,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       }
 
       if(typeof scamData == "object" && image.pages && !globalData) {
+
+        //debug("previously uploaded data:", scamData)
+
         dispatch({
           type: 'ADD_DATA',
           payload: {
@@ -456,7 +482,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         signal: controller.signal
       })
         .then(response => {
-          debug("json", response.data);
+          debug("json:", response.data);
           if (response.data) {
             const W = response.data.width
             const H = response.data.height
@@ -483,7 +509,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, scamOptions, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, portrait])
+  }, [configReady, scamOptions, loadDraft, draft, globalData, scamData, visible, config.auth, lastRun, shouldRunAfter, image, checked, folder, controller.signal, 
+      dispatch, setVisible, setChecked, 
+      dimensions.width, dimensions.height])
 
   
   useEffect(() => {
@@ -492,7 +520,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   useEffect(() => {
     getScamResults()
-  }, [ shouldRunAfter, loadDraft, lastRun ])
+  }, [ shouldRunAfter, loadDraft, lastRun, configReady ])
 
   /*
     useEffect(() => {
@@ -501,13 +529,14 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   */
 
   const checkDeselect = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    debug("deselec:", e.target.nodeType, e.target.attrs.image)
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.attrs.image;
     if (clickedOnEmpty) {
       selectShape(null);
     }
   };
   const checkDeselectDiv: MouseEventHandler<HTMLDivElement> = (e) => {
-    //debug("deselec", (e.target as HTMLDivElement).nodeName)
+    debug("deselec div:", (e.target as HTMLDivElement).nodeName)
     const clickedOnEmpty = !["CANVAS", "SVG", "PATH", "BUTTON"].includes((e.target as HTMLDivElement).nodeName.toUpperCase())
     if (clickedOnEmpty) {
       selectShape(null);
@@ -542,7 +571,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         }
       })
       setModified(true)
-      selectShape(null)
+      selectShape(newData.pages.length ? newData.pages.length - 1 : null)
     }
   }, [checked, dimensions.height, dimensions.width, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
 
@@ -553,7 +582,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   }, [focused, image.thumbnail_path])
 
   useEffect(()=>{
-    if(selectedId != null && keyDown != '') {
+    if(selectedId != null && keyDown == 'Delete') {
       removeId(selectedId)
       setKeyDown('')
     }
@@ -594,9 +623,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           }
         })
         setModified(true)
+        if(drafted) setDrafted(false)
       }
     }
-  }, [checked, dimensions.height, dimensions.width, dispatch, handleZindex, image, portrait, scamData, setModified, shouldRunAfter, visible])
+  }, [checked, dimensions.height, dimensions.width, dispatch, drafted, handleZindex, image, scamData, setDrafted, setModified, shouldRunAfter, visible])
 
   useEffect(() => {
     if (typeof scamData === 'object' && scamData.rects && scamData.selected != selectedId && selectedId != undefined) {
@@ -641,10 +671,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       if(x !== sx && y !== sy) { 
         const annotationToAdd = {
           ...newPage[0],
-          x: sx - padding,
-          y: sy - padding,
-          width: x - sx,
-          height: y - sy
+          x: Math.min(sx, x) - padding,
+          y: Math.min(sy, y) - padding,
+          width: Math.abs(x - sx),
+          height: Math.abs(y - sy)
         };        
         onChange(annotationToAdd, true)
         setAddNew(false)

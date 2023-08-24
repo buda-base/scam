@@ -12,6 +12,7 @@ export const direcAtom = atom("horizontal")
 export const minRatioAtom = atom(0.145)
 export const maxRatioAtom = atom(0.5)
 export const nbPagesAtom = atom(2)
+export const configReady = atom<boolean|undefined>(undefined)
 
 export const shouldRunAfterAtom = atom(123)
 
@@ -37,8 +38,9 @@ export const modified = atom(false)
 export const drafted = atom(false)
 
 export const filter = atom('all')
-export const grid = atom('1x1')
+export const grid = atom('2x1') //'1x1')
 
 export const keyDown = atom('')
 export const focused = atom('')
 
+export const deselectAll = atom(false)

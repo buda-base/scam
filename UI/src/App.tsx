@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useState, useMemo, MouseEventHandler } from 'react'
 import axios from 'axios';
 import debugFactory from "debug"
 import { encode } from "js-base64"
@@ -90,6 +90,9 @@ function App() {
   const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+  const [configReady, setConfigReady] = useAtom(state.configReady)
+
+  const [deselectAll, setDeselectAll] = useAtom(state.deselectAll)
 
   const saveSession = useCallback(async () => {
     const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
@@ -130,7 +133,7 @@ function App() {
         },
       })
       .then(response => {
-        debug("json",response.data);
+        debug("get:",response.data);
 
         setJson(response.data)
         setSearchParams({ folder })
@@ -166,6 +169,7 @@ function App() {
   }, [json])
 
   const handleClose = useCallback(async (discard?: boolean) => {
+    setConfigReady(undefined)
     setModified(false)
     setLoadDraft(false)
     if(discard) {
@@ -197,6 +201,7 @@ function App() {
           }
         })
       }
+      setConfigReady(hasDraft[folder]?.images ? false : undefined)
       setDrafts( theDraft )
       setLoadDraft( hasDraft[folder]?.images ? undefined : false )
     }
@@ -204,17 +209,20 @@ function App() {
 
   useEffect(() => {
     const hasDraft = ((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) 
-    const options = hasDraft[folder]?.options
-    if(options && loadDraft) {
-      if(options.orientation) setOrient(options.orientation as string)
-      else {
-        setOrient("custom")
-        setDirec(options.direction as string)
-        setMinRatio((options["wh_ratio_range"] as number[])[0])
-        setMaxRatio((options["wh_ratio_range"] as number[])[1])
-        setNbPages(options["nb_pages_expected"] as number)
+    if(loadDraft) {
+      const options = hasDraft[folder]?.options
+      if(options) {
+        if(options.orientation) setOrient(options.orientation as string)
+        else {
+          setOrient("custom")
+          setDirec(options.direction as string)
+          setMinRatio((options["wh_ratio_range"] as number[])[0])
+          setMaxRatio((options["wh_ratio_range"] as number[])[1])
+          setNbPages(options["nb_pages_expected"] as number)
+        }
+        setConfigReady(true)
       }
-    }
+    } 
   }, [loadDraft])
   
   useEffect(() => {
@@ -227,6 +235,14 @@ function App() {
       Object.values(drafts).map(v => setImageData(v.image))
     }
   }, [loadDraft, drafts])
+
+  const checkDeselectMain: MouseEventHandler<HTMLElement> = (e) => {
+    const clickedOnEmpty = ["MAIN"].includes((e.target as HTMLDivElement).nodeName.toUpperCase())
+    if (clickedOnEmpty) {
+      //debug("deselec main:", (e.target as HTMLElement).nodeName)
+      setDeselectAll(true);
+    }
+  };
 
   const reloadDialog = useMemo(() => (
     <Dialog open={folder && loadDraft === undefined && Object.keys(drafts).length ? true : false} onClose={() => handleClose()} disableScrollLock={true} >
@@ -255,7 +271,7 @@ function App() {
     <ThemeProvider theme={theme}>
       {reloadDialog}
       <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, config, error, jsonPath, setFolder }}/></header>
-      <main>{images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData }}/>)}</main>
+      <main onClick={checkDeselectMain}>{images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData }}/>)}</main>
       { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json}:{}, setFolder }}/></footer>}
     </ThemeProvider>
   )
