@@ -116,7 +116,8 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
         if(data.pages) data.pages = data.pages.map(withoutRotatedHandle) as Page[]
         return data
       }),
-      checked
+      checked,
+      pages_order: false // as long as the UI doesn't allow user to reorder annotations
     }
     
     debug("publish", json, allScamData, toSave)
