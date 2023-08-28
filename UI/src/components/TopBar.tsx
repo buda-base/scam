@@ -5,9 +5,9 @@ import { useState, useMemo, MouseEventHandler, useCallback, ChangeEventHandler, 
 import { Link, useNavigate } from "react-router-dom";
 import { useAtom } from "jotai";
 import { useBeforeunload } from 'react-beforeunload';
+import { Close, Folder, FolderOpen } from "@mui/icons-material";
 
 import { ColorButton } from "./theme";
-import { Close, Folder, FolderOpen } from "@mui/icons-material";
 import * as state from "../state"
 import { SaveButtons } from "./BottomBar";
 import { ConfigData, LocalData } from "../types";
@@ -27,6 +27,8 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
     
   const theme = useTheme()
   
+  const navigate = useNavigate();
+
   const [sessions, setSessions] = useState<string[]>([])
 
   useEffect(() => {
@@ -34,14 +36,16 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
     setSessions(hasSessions)
   }, [])
 
-  const handleOpen = useCallback(() => {
+  const handleOpen = useCallback(() => {    
     if(!jsonPath.match(new RegExp("^"+path+"/?$")) || error) {
-      setFolder(path)
+      navigate("/?folder="+path)      
       if(showDialog) setShowDialog(false)
     }
     else if(showDialog) setShowDialog(false)
-    else setFolder(path)
-  },[error, jsonPath, path, setFolder, showDialog])
+    else {
+      navigate("/?folder="+path)      
+    }
+  },[error, jsonPath, path, setFolder, showDialog, navigate])
 
   const handlePath: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
     setPath(e.currentTarget.value)
@@ -60,7 +64,6 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
     setShowDialog(true)
   }, [])
 
-  const navigate = useNavigate();
   const handleNav = useCallback(() => {
     setFolder("")
     navigate("/")

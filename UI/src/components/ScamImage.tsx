@@ -365,16 +365,16 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     
   const [resized, setResized] = useState("")
   useEffect(() => {
-    if(windowSize.width + "-" + windowSize.height != resized) {
+    if(windowSize.width + "-" + windowSize.height != resized && typeof scamData === 'object' && scamData.pages && scamData.rects) {
       setResized(windowSize.width + "-" + windowSize.height) 
       updateRects()
     } 
-  }, [windowSize, updateRects, resized])
+  }, [windowSize, updateRects, resized, scamData])
 
   useEffect(() => {
     //debug("dimensions:", image.thumbnail_path, dimensions)
     setResized("")
-  }, [dimensions])
+  }, [dimensions, folder])
 
   let controller = new AbortController();   
 
@@ -677,8 +677,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           height: Math.abs(y - sy)
         };        
         onChange(annotationToAdd, true)
-        setAddNew(false)
       } 
+      setAddNew(false)
       setNewPage([]);
     }
   };
