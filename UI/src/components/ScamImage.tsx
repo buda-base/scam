@@ -138,13 +138,27 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             let stage:any = shRef.current
             while(stage?.parent) stage = stage.parent ;
             const b = shRef.current?.getClientRect()         
-            /*
-            if(b) {
-              if(b.x <= padding) {
-                return oldBox
-              }
+            const a = Math.abs(oldBox.rotation * 180 / Math.PI) 
+            debug("\n",b, oldBox, newBox, a)            
+            if(b) { 
+              if(a <= 1) {
+                if(newBox.x <= padding) {
+                  newBox.x = padding
+                  newBox.width = oldBox.width + (oldBox.x - padding)
+                }
+                if(newBox.y <= padding) {
+                  newBox.y = padding
+                  newBox.height = oldBox.height + (oldBox.y - padding)
+                }                
+                if(newBox.x + newBox.width >= stage.attrs.width - padding) {
+                  newBox.width = stage.attrs.width - padding - newBox.x - 1
+                }
+                if(newBox.y + newBox.height >= stage.attrs.height - padding) {
+                  newBox.height = stage.attrs.height - padding - newBox.y - 1
+                }
+                return newBox
+              } 
             }
-            */
             return newBox;
           }}
         />
@@ -699,7 +713,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       if(!stage) return
       const vect = stage.getPointerPosition() 
       if(!vect) return
-      const { x, y } = vect;
+      let { x, y } = vect;
+      if(x <= padding) x = padding
+      if(y <= padding) y = padding
+      if(x >= stage.attrs.width - padding - 1) x = stage.attrs.width - padding - 1
+      if(y >= stage.attrs.height - padding - 1) y = stage.attrs.height - padding - 1
       if(x !== sx && y !== sy) { 
         const annotationToAdd = {
           ...newPage[0],
@@ -724,7 +742,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       if(!stage) return
       const vect = stage.getPointerPosition() 
       if(!vect) return
-      const { x, y } = vect;
+      let { x, y } = vect;
+      if(x <= padding) x = padding
+      if(y <= padding) y = padding
+      if(x >= stage.attrs.width - padding - 1) x = stage.attrs.width - padding - 1
+      if(y >= stage.attrs.height - padding - 1) y = stage.attrs.height - padding - 1
       setNewPage([{
         ...newPage[0],
         x: sx,
@@ -786,7 +808,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info.width + 2*padding }}
     onMouseDown={checkDeselectDiv}
   >
-    <figure className={"visible-"+visible} ref={figureRef} 
+    <figure className={"visible-"+visible + " newPage-"+(newPage.length > 0)} ref={figureRef} 
         // {... !visible ? { style: { width: dimensions.width + padding * 2, height: 80 } }:{} }
         >
       { !visible && typeof konvaImg == "object" && <img src={konvaImg?.src} className={"mini"+((image.rotation + 360) % 360 != 0 ? " rotated": "")} style={{transform: "rotate("+image.rotation+"deg)" }}/> }
@@ -843,7 +865,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               width={newPage[0].width}
               height={newPage[0].height}
               fill="transparent"
-              stroke="black"              
+              globalCompositeOperation="exclusion"
+              stroke="white"              
             />
           )}
         </Layer>

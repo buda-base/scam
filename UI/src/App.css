@@ -200,6 +200,10 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   z-index:2;
 }
 
+.scam-image .newPage-true .image-menu {
+  z-index:0
+}
+
 .scam-image.filter-unchecked.checked-true .image-menu, 
 .scam-image .visible-false .image-menu { top:15px; bottom:auto;}
 
@@ -250,6 +254,7 @@ button.saving::after {
   bottom:0; width:100%; height:60px; 
   background:#e2e2e2; box-shadow: 0 -2px 4px rgba(187,187,187,0.5);
   text-align: left;
+  z-index:10;
 }
 
 #root > footer > nav {
@@ -276,7 +281,7 @@ button.saving::after {
   display: flex; position: fixed;
   top:0; width:100%; height:60px; 
   background:white; box-shadow: 0 2px 4px rgba(187,187,187,0.5);
-  text-align: left; z-index:1;
+  text-align: left; z-index:10;
 }
 
 
@@ -331,4 +336,8 @@ button.saving::after {
   font-size: 14px;
   color:red;
   padding:12px;
+}
+
+body > [role=tooltip] {
+  z-index:10;
 }
