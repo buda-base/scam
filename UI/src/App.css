@@ -112,7 +112,8 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 }
 
 
-.scam-image > figure > div {
+.scam-image > figure > div:first-child {
+  position: relative; z-index:1;
   /* box-shadow: 0 0 4px rgba(0,0,0,0.25); */
 }
 
@@ -174,6 +175,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   top:16px; left:50px; width:calc(100% - 100px); right:auto;
   text-align: center;
   box-sizing: border-box;
+  z-index:0;
 }
 
 .scam-image.filter-unchecked.checked-true figcaption { top:28px; }
@@ -195,6 +197,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   left:0; bottom:4px; width:100%;
   display: flex; justify-content: space-between;
   padding:0 60px; box-sizing: border-box;
+  z-index:2;
 }
 
 .scam-image.filter-unchecked.checked-true .image-menu, 
