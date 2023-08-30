@@ -12,8 +12,8 @@ from utils import upload_to_s3
 
 DEFAULT_POSTPROCESS_OPTIONS = {
     "rotation_in_derivation": True, # derive tiffs with the small rotation
-    "sources_source": "s3", # s3 or local
-    "derivate_dest": "local", # s3 or local
+    "src_storage": "s3", # s3 or local
+    "dst_storage": "s3", # s3 or local
     "skip_folder_local_output": False, # 
     "skip_folder_local_input": True, # 
     "local_src_folder": "./",
@@ -56,11 +56,11 @@ def order_pages(pages):
         return sorted(pages, key=(lambda x: x["minAreaRect"][1]))
 
 def derive_from_file(scam_json, file_info, postprocess_options):
-    if file_info["hidden"]:
+    if "hidden" in file_info and file_info["hidden"]:
         logging.info("do not derive hidden image %s" % file_info["img_path"])
         return
     pil_img = None
-    if scam_json["sources_source"] == "s3":
+    if postprocess_options["src_storage"] == "s3":
         pil_img = get_pil_img(scam_json["folder_path"], file_info["img_path"])
     else:
         local_path = postprocess_options["local_src_folder"]
@@ -76,16 +76,16 @@ def derive_from_file(scam_json, file_info, postprocess_options):
     if file_info["rotation"] != 0:
         pil_img = pil_img.rotate(file_info["rotation"], expand=True)
     if "pages" not in scam_json or len(scam_json["pages"]) == 0:
-        derive_from_page(pil_img, None, 1, postprocess_options)
+        derive_from_page(scam_json, file_info, pil_img, None, 1, postprocess_options)
         return
     pages = scam_json["pages"]
     # reorder pages if scam_json["pages_order"] is false
     if "pages_order" not in scam_json or not scam_json["pages_order"]:
         pages = order_pages(pages)
     for i, page in pages.items():
-        derive_from_page(pil_img, page, i+1, postprocess_options)
+        derive_from_page(scam_json, file_info, pil_img, page, i+1, postprocess_options)
 
-def derive_from_page(pil_img, page_info, page_position, postprocess_options):
+def derive_from_page(scam_json, file_info, pil_img, page_info, page_position, postprocess_options):
     # page_info is None means we take the whole image
     # page_position starts at 1
     suffix_letter = chr(96+page_position)
@@ -97,16 +97,18 @@ def derive_from_page(pil_img, page_info, page_position, postprocess_options):
             extract = pil_img.crop((bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]))
         else:
             extract = rotate_warp_affine(pil_img, page_info["minAreaRect"])
-    if postprocess_options["derivate_dest"] == "s3":
-        s3key = scam_json["folder_path"]
+    if postprocess_options["dst_storage"] == "s3":
+        s3key = "scam_cropped/"+scam_json["folder_path"]
         s3key += os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
-        upload_to_s3(s3key, encode_img_uncompressed(extract))
+        b, ext = encode_img_uncompressed(extract)
+        upload_to_s3(b, s3key)
     else:
         local_path = postprocess_options["local_dst_folder"]
         if not postprocess_options["skip_folder_local_output"]:
             local_path += scam_json["folder_path"]
         local_path += os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
-        pil_img = Image.save(local_path, icc_profile=extract.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        pil_img.save(local_path, icc_profile=extract.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
 
 def postprocess_folder(folder_path, postprocess_options=DEFAULT_POSTPROCESS_OPTIONS):
     """
@@ -116,6 +118,8 @@ def postprocess_folder(folder_path, postprocess_options=DEFAULT_POSTPROCESS_OPTI
     """
     logging.info("preprocess %s" % folder_path)
     scam_json = get_scam_json(folder_path)
+    if not scam_json["checked"]:
+        logging.warning("warning: processing unchecked json %s" % folder_path)
     for file_info in tqdm(scam_json["files"]):
         derive_from_file(scam_json, file_info, postprocess_options)
 
