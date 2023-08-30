@@ -58,6 +58,26 @@ def rotate_warp_affine(pil_img, rect):
         res = res.astype(bool)
     return Image.fromarray(res)
 
+def get_bounding_box(min_area_rect, width, height):
+    """
+    Returns the smallest bounding box containing the minAreaRect.
+    :param min_area_rect: Tuple with center, size, and angle (e.g., ((x,y),(w,h),angle))
+    :return: List of top-left and bottom-right corner points [(x1, y1), (x2, y2)]
+
+    Thank you ChatGPT
+    """
+    # Extract the corner points of the minAreaRect
+    box_points = cv2.boxPoints(min_area_rect)
+    
+    # Find the minimum and maximum x and y coordinates
+    x_min = max(0, int(np.min(box_points[:, 0])))
+    y_min = max(0, int(np.min(box_points[:, 1])))
+    x_max = min(width, int(np.max(box_points[:, 0])))
+    y_max = min(height, int(np.max(box_points[:, 1])))
+
+    # Return top-left and bottom-right corner points
+    return [x_min, y_min, x_max-x_min, y_max-y_min]
+
 def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
     """
     extract a subset of an image corresponding to the ann_info (type AnnotationInfo) argument
@@ -99,6 +119,11 @@ def encode_img(img, target_mode=None, mozjpeg_optimize=True):
         if mozjpeg_optimize:
             jpg_bytes = mozjpeg_lossless_optimization.optimize(jpg_bytes)
         return jpg_bytes, ".jpg"
+    out_bytes = None
+    with io.BytesIO() as output:
+        img.save(output, format="PNG")
+        out_bytes = output.getvalue()
+    return out_bytes, ".png"
 
 def get_best_mode(img):
     """
@@ -177,7 +202,7 @@ def get_debug_img_bytes(img_orig, image_anns, max_size_px=256, draw_rotated=True
     """
     # resize factor
     rf = max(max_size_px/float(img_orig.size[0]), max_size_px/float(img_orig.size[1]))
-    img_orig = img_orig.resize((img_orig.size[0]*rf, img_orig.size[1]*rf), Image.BICUBIC)
+    img_orig = img_orig.resize((int(img_orig.size[0]*rf), int(img_orig.size[1]*rf)), Image.BICUBIC)
     # produce an opencv image
     img_orig = img_orig.convert('RGB')
     new_img = cv2.cvtColor(np.array(img_orig), cv2.COLOR_RGB2BGR)
