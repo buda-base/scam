@@ -102,17 +102,49 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             });
           }
         }}
+        dragBoundFunc={(p) => {
+          // DONE: keep box inside image                    
+          let stage:any = shRef.current
+          while(stage?.parent) stage = stage.parent ;
+          const b = shRef.current?.getClientRect()                    
+          if(b) {
+            if(p.x <= padding + b.width / 2) {
+              p.x = padding + b.width / 2
+            }
+            if(p.y <= padding + b.height / 2) {            
+              p.y = padding + b.height / 2 
+            }
+            if(p.x >= stage.attrs.width - padding - b.width / 2) {
+              p.x = stage.attrs.width - padding - b.width / 2
+            }
+            if(p.y >= stage.attrs.height - padding - b.height / 2) {            
+              p.y = stage.attrs.height - padding - b.height / 2 
+            }
+          }
+          return p
+        }}
       />
 
       {isSelected && (
         <Transformer
           keepRatio={false}
           ref={trRef}
-          boundBoxFunc={(oldBox, newBox) => {
+          boundBoxFunc={(oldBox, newBox) => {                        
             // limit resize
             if (newBox.width < 5 || newBox.height < 5) {
               return oldBox;
             }
+            // WIP: keep box inside image
+            let stage:any = shRef.current
+            while(stage?.parent) stage = stage.parent ;
+            const b = shRef.current?.getClientRect()         
+            /*
+            if(b) {
+              if(b.x <= padding) {
+                return oldBox
+              }
+            }
+            */
             return newBox;
           }}
         />
