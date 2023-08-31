@@ -134,31 +134,52 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             if (newBox.width < 5 || newBox.height < 5) {
               return oldBox;
             }
+
             // WIP: keep box inside image
             let stage:any = shRef.current
             while(stage?.parent) stage = stage.parent ;
-            const b = shRef.current?.getClientRect()         
+            const b = shRef.current?.getClientRect()   
             const a = Math.abs(oldBox.rotation * 180 / Math.PI) 
-            debug("\n",b, oldBox, newBox, a)            
-            if(b) { 
+            //debug("\n",b, oldBox, newBox, a)                        
+            if(newBox.rotation == oldBox.rotation) {
+              // non-rotated portrait box
               if(a <= 1) {
                 if(newBox.x <= padding) {
-                  newBox.x = padding
-                  newBox.width = oldBox.width + (oldBox.x - padding)
+                  if(oldBox.x != newBox.x) newBox.width = oldBox.width + (oldBox.x - padding)
+                  newBox.x = padding                 
                 }
                 if(newBox.y <= padding) {
+                  if(oldBox.y != newBox.y) newBox.height = oldBox.height + (oldBox.y - padding)
                   newBox.y = padding
-                  newBox.height = oldBox.height + (oldBox.y - padding)
                 }                
                 if(newBox.x + newBox.width >= stage.attrs.width - padding) {
-                  newBox.width = stage.attrs.width - padding - newBox.x - 1
-                }
+                  newBox.width = stage.attrs.width - padding - newBox.x 
+                } 
                 if(newBox.y + newBox.height >= stage.attrs.height - padding) {
-                  newBox.height = stage.attrs.height - padding - newBox.y - 1
+                  newBox.height = stage.attrs.height - padding - newBox.y 
+                } 
+                return newBox
+              }
+              // non-rotated landscape box
+              else if(a >= 89 && a <= 91) {
+                if(newBox.x >= stage.attrs.width - padding) {
+                  if(oldBox.x != newBox.x) newBox.height = oldBox.height + ((stage.attrs.width - padding) - oldBox.x)
+                  newBox.x = stage.attrs.width - padding
                 }
+                if(newBox.y <= padding) {
+                  if(oldBox.y != newBox.y) newBox.width = oldBox.width + (oldBox.y - padding)
+                  newBox.y = padding
+                }   
+                if(newBox.x - newBox.height <= padding) {
+                  newBox.height = newBox.x - padding
+                }
+                if(newBox.y + newBox.width >= stage.attrs.height - padding) {
+                  newBox.width = stage.attrs.height - padding - newBox.y 
+                } 
                 return newBox
               } 
             }
+            // TODO: other cases?
             return newBox;
           }}
         />
@@ -528,7 +549,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         signal: controller.signal
       })
         .then(response => {
-          debug("json:", response.data);
+          //debug("json:", response.data);
           if (response.data) {
             const W = response.data.width
             const H = response.data.height

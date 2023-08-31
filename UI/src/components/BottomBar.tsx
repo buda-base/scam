@@ -211,13 +211,14 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const handleClose = () => { setShowSettings(false); };
 
   const handleRun = () => { setShouldRunAfter(Date.now()); setShowSettings(false);  };
-  
+
+  /*
   useEffect( () =>  {
 
     debug("data:",allScamData)
 
   }, [allScamData])
-  
+  */
 
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)
