@@ -29,6 +29,8 @@ export const discardDraft = async (folder: string) => {
   localStorage.setItem("scamUI", JSON.stringify(local))
 }
 
+let oldHandleSelectStart: { (this: Window, ev: Event): any; (ev: any): void; (this: Window, ev: Event): any; } | null = null
+
 function App() {
 
   const [config, setConfig] = useState<ConfigData>({} as ConfigData)
@@ -43,16 +45,77 @@ function App() {
   
   const [keyDown, setKeyDown] = useAtom(state.keyDown)
 
+  const [selectedItems, setSelectedItems] = useState<string[]>([])
+  const [lastSelectedItem, setLastSelectedItem] = useState("")
+
+  const handleSelectStart = useCallback((ev: { preventDefault: () => void; }) => {
+    if (keyDown == "Shift") {
+      ev.preventDefault();
+    }
+  }, [keyDown])
+
+  useEffect(() => {
+    if(oldHandleSelectStart) window.removeEventListener('selectstart', oldHandleSelectStart);   
+    window.addEventListener('selectstart', handleSelectStart);   
+    oldHandleSelectStart = handleSelectStart
+  }, [handleSelectStart])
+
+  // cf tutorial https://tj.ie/multi-select-checkboxes-with-react/
+  const handleSelectItem = useCallback((ev: React.SyntheticEvent, val: boolean, label: string) => {
+
+    const getNewSelectedItems = (value: string) => {      
+      const currentSelectedIndex = images.findIndex(image => image.thumbnail_path === value);
+      const lastSelectedIndex = images.findIndex(image => image.thumbnail_path === lastSelectedItem)    
+      return images
+        .slice(
+          Math.min(lastSelectedIndex, currentSelectedIndex),
+          Math.max(lastSelectedIndex, currentSelectedIndex) + 1
+        )
+        .map(image => image.thumbnail_path);
+    }
+
+    const getNextValue = (value: string) => {
+      const isShiftDown = keyDown == "Shift"
+      const hasBeenSelected = !selectedItems.includes(value);
+    
+      if (isShiftDown) {
+        const newSelectedItems = getNewSelectedItems(value);
+        // de-dupe the array using a Set
+        const selections = [...new Set([...selectedItems, ...newSelectedItems])];    
+        if (!hasBeenSelected) {
+          return selections.filter(item => !newSelectedItems.includes(item));
+        }    
+        return selections;
+      }
+    
+      // if it's already in there, remove it, otherwise append it
+      return selectedItems.includes(value)
+        ? selectedItems.filter(item => item !== value)
+        : [...selectedItems, value];
+    }
+
+    const nextValue = getNextValue(label);
+
+    debug(ev, val, label, nextValue)
+  
+    setSelectedItems(nextValue)
+    setLastSelectedItem(label)
+
+  }, [images, keyDown, lastSelectedItem, selectedItems])
+
   useEffect(() => {
     document.title = "SCAM QC platform"
     
     const handleKeyDown = (e: { key: string; }) => {
+      debug("down",e.key)
       setKeyDown(e.key)
     }
 
     const handleKeyUp = () => {
+      debug("up")
       setKeyDown('')
     }
+
 
     window.addEventListener('keydown', handleKeyDown);      
     window.addEventListener('keyup', handleKeyUp);      
@@ -60,8 +123,28 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyDown);
+      if(oldHandleSelectStart) window.removeEventListener('selectstart', oldHandleSelectStart);   
     }
   }, []);
+
+
+  const markChecked = useCallback((val:boolean) => {
+    const newImages = [...images]
+    for(const im of newImages) {
+      if(selectedItems.includes(im.thumbnail_path)) im.checked = val
+    }
+    setImages(newImages)
+    setModified(true)
+  }, [selectedItems, images])
+
+  const markHidden = useCallback((val:boolean) => {
+    const newImages = [...images]
+    for(const im of newImages) {
+      if(selectedItems.includes(im.thumbnail_path)) im.hidden = val
+    }
+    setImages(newImages)
+    setModified(true)
+  }, [selectedItems, images])
 
   useEffect(() => {
     debug("loca?",paramFolder,location)
@@ -271,8 +354,10 @@ function App() {
     <ThemeProvider theme={theme}>
       {reloadDialog}
       <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, config, error, jsonPath, setFolder }}/></header>
-      <main onClick={checkDeselectMain}>{images.map(image => <ScamImageContainer {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData }}/>)}</main>
-      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json}:{}, setFolder }}/></footer>}
+      <main onClick={checkDeselectMain}>{
+        images.map(image => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
+      }</main>
+      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden }}/></footer>}
     </ThemeProvider>
   )
 }

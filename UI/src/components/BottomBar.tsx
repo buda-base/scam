@@ -14,7 +14,7 @@ import { useAtom } from "jotai";
 import debugFactory from "debug"
 import { encode } from "js-base64";
 
-import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamOptionsMap } from "../types"
+import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData, ScamOptionsMap } from "../types"
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
@@ -200,8 +200,9 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   )
 }
 
-export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData,  }) => {
-  const { folder, config, json } = props;
+export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[],
+    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void  }) => {
+  const { folder, config, json, selectedItems, images, setSelectedItems, markChecked, markHidden } = props;
 
   const [showSettings, setShowSettings] = useState(false)
 
@@ -212,6 +213,11 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
 
   const handleRun = () => { setShouldRunAfter(Date.now()); setShowSettings(false);  };
 
+  const [selectedImages, setSelectedImages] = useState<ScamImageData[]>([])
+  useEffect(() => {
+    setSelectedImages(images.filter(im => selectedItems.includes(im.thumbnail_path)))
+  }, [images, selectedItems])
+ 
   /*
   useEffect( () =>  {
 
@@ -252,7 +258,27 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         label="Display grid"
         onChange={(r) => setGrid(r.target.value)}
       >
-        { ["1x1", "2x1", "3x2" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+        { ["1x1", "2x1", "3x2", "4x3" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+      </TextField>
+      <TextField
+        SelectProps={{ 
+          MenuProps : { disableScrollLock: true }
+        }}
+        sx={{ minWidth: 100, marginLeft: "16px" }}
+        select
+        variant="standard"
+        value={0}
+        label="Selected images"
+        disabled={selectedItems.length === 0}
+        //onChange={(r) => setGrid(r.target.value)}
+      >
+        <MenuItem value={0} disabled>{"..."}</MenuItem>
+        <MenuItem value={1} onClick={() => setSelectedItems([])}>{"Deselect"}</MenuItem>
+        { selectedImages.some(im => !im.checked) && <MenuItem value={2} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
+        { selectedImages.some(im => im.checked) && <MenuItem value={2} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}
+        { selectedImages.some(im => !im.hidden) && <MenuItem value={3} onClick={() => markHidden(true)}>{"Mark hidden"}</MenuItem>}
+        { selectedImages.some(im => im.hidden) && <MenuItem value={3} onClick={() => markHidden(false)}>{"Mark visible"}</MenuItem>}
+        <MenuItem value={4} disabled>{"Run SCAM"}</MenuItem>
       </TextField>
     </Box>
     <div>

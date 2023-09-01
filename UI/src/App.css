@@ -96,6 +96,10 @@ main .select-folder { background-color: white; align-self: center; justify-self:
    width:calc(100% / 3 - 4px); 
 }
 
+.scam-image.grid-4x3 {
+  width:calc(100% / 4 - 4px); 
+}
+
 .scam-image:hover { 
   background-color:#e9e9e9;
 }
@@ -144,9 +148,9 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 }
 
 
-.scam-image.filter-warning.warning-true.checked-true > figure figcaption,
-.scam-image.filter-warning.warning-false > figure figcaption,
-.scam-image.filter-unchecked.checked-true > figure figcaption {
+.scam-image.filter-warning.warning-true.checked-true > figure figcaption label > span:last-child,
+.scam-image.filter-warning.warning-false > figure figcaption label > span:last-child,
+.scam-image.filter-unchecked.checked-true > figure figcaption label > span:last-child {
   margin-top:0; font-style:italic; opacity:0.5; 
 }
 
@@ -176,6 +180,11 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   text-align: center;
   box-sizing: border-box;
   z-index:0;
+  cursor: pointer;
+}
+
+.scam-image .selected-false figcaption {
+  z-index:2; 
 }
 
 .scam-image.filter-unchecked.checked-true figcaption { top:28px; }
@@ -206,6 +215,16 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 
 .scam-image.filter-unchecked.checked-true .image-menu, 
 .scam-image .visible-false .image-menu { top:15px; bottom:auto;}
+
+.scam-image.filter-unchecked.checked-true .image-menu,
+.scam-image .visible-false .image-menu {
+  pointer-events: none;
+}
+
+.scam-image.filter-unchecked.checked-true .image-menu > span:first-child,
+.scam-image .visible-false .image-menu > span:first-child {
+  pointer-events: auto;
+}
 
 .scam-image.filter-unchecked.checked-true .image-menu > span:not(:first-child),
 .scam-image .visible-false .image-menu > span:not(:first-child) { visibility: hidden;}
