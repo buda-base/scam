@@ -130,8 +130,17 @@ function App() {
 
   const markChecked = useCallback((val:boolean) => {
     const newImages = [...images]
-    for(const im of newImages) {
-      if(selectedItems.includes(im.thumbnail_path)) im.checked = val
+    for(const image of newImages) {
+      if(selectedItems.includes(image.thumbnail_path)) {
+        image.checked = val
+        dispatch({
+          type: 'UPDATE_DATA',
+          payload: {
+            id: image.thumbnail_path,
+            val: { checked: val, state: "modified" }
+          }
+        })
+      }
     }
     setImages(newImages)
     setModified(true)
@@ -139,8 +148,17 @@ function App() {
 
   const markHidden = useCallback((val:boolean) => {
     const newImages = [...images]
-    for(const im of newImages) {
-      if(selectedItems.includes(im.thumbnail_path)) im.hidden = val
+    for(const image of newImages) {
+      if(selectedItems.includes(image.thumbnail_path)) {
+        image.hidden = val
+        dispatch({
+          type: 'UPDATE_DATA',
+          payload: {
+            id: image.thumbnail_path,
+            val: { checked: val, state: "modified" }
+          }
+        })
+      }
     }
     setImages(newImages)
     setModified(true)

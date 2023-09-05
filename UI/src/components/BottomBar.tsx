@@ -218,6 +218,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     setSelectedImages(images.filter(im => selectedItems.includes(im.thumbnail_path)))
   }, [images, selectedItems])
  
+
   /*
   useEffect( () =>  {
 
@@ -225,6 +226,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
 
   }, [allScamData])
   */
+  
 
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)
@@ -276,10 +278,10 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         <MenuItem value={1} onClick={() => setSelectedItems([])}>{"Deselect"}</MenuItem>
 
         {/* // WIP: pb with saving draft (+ how to discard draft??) */ }
-        { selectedImages.some(im => !im.checked) && <MenuItem disabled value={2} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
-        { selectedImages.some(im => im.checked) && <MenuItem disabled value={3} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}
-        { selectedImages.some(im => !im.hidden) && <MenuItem disabled value={4} onClick={() => markHidden(true)}>{"Mark hidden"}</MenuItem>}
-        { selectedImages.some(im => im.hidden) && <MenuItem disabled value={5} onClick={() => markHidden(false)}>{"Mark visible"}</MenuItem>}
+        { selectedImages.some(im => !im.checked) && <MenuItem value={2} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
+        { selectedImages.some(im => im.checked) && <MenuItem value={3} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}
+        { selectedImages.some(im => !im.hidden) && <MenuItem value={4} onClick={() => markHidden(true)}>{"Mark hidden"}</MenuItem>}
+        { selectedImages.some(im => im.hidden) && <MenuItem value={5} onClick={() => markHidden(false)}>{"Mark visible"}</MenuItem>}
 
         <MenuItem value={4} disabled>{"Run SCAM"}</MenuItem>
       </TextField>
