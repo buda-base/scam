@@ -360,3 +360,5 @@ button.saving::after {
 body > [role=tooltip] {
   z-index:10;
 }
+
+ul li + hr + hr { display:none; }

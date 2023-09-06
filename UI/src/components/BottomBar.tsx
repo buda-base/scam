@@ -270,12 +270,13 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         select
         variant="standard"
         value={0}
-        label="Selected images"
-        disabled={selectedItems.length === 0}
-        //onChange={(r) => setGrid(r.target.value)}
+        label="Image selection"
       >
         <MenuItem value={0} disabled>{"..."}</MenuItem>
-        <MenuItem value={1} onClick={() => setSelectedItems([])}>{"Deselect"}</MenuItem>
+        <hr/>
+        <MenuItem value={1} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
+        <MenuItem value={1} onClick={() => setSelectedItems([])}>{"Deselect all"}</MenuItem>
+        <hr/>
 
         {/* // WIP: pb with saving draft (+ how to discard draft??) */ }
         { selectedImages.some(im => !im.checked) && <MenuItem value={2} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
@@ -283,7 +284,8 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         { selectedImages.some(im => !im.hidden) && <MenuItem value={4} onClick={() => markHidden(true)}>{"Mark hidden"}</MenuItem>}
         { selectedImages.some(im => im.hidden) && <MenuItem value={5} onClick={() => markHidden(false)}>{"Mark visible"}</MenuItem>}
 
-        <MenuItem value={4} disabled>{"Run SCAM"}</MenuItem>
+        <hr/>
+        <MenuItem value={4} disabled>{"Run SCAM on selection"}</MenuItem>
       </TextField>
     </Box>
     <div>
