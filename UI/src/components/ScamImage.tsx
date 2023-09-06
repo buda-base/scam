@@ -807,6 +807,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     })
     setVisible(!visible)
     setModified(true)
+    setImageData({...image, hidden: visible })    
   }, [checked, dispatch, image, scamData, setModified, setVisible, shouldRunAfter, visible])
 
   const toggleCheck = useCallback(() => {
@@ -819,6 +820,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     })
     setChecked(!checked)
     setModified(true)
+    setImageData({...image, checked: !checked })    
   }, [checked, dispatch, image, scamData, setModified, shouldRunAfter, visible])  
   
   useEffect( () => {

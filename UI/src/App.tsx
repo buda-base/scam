@@ -155,7 +155,7 @@ function App() {
           type: 'UPDATE_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { checked: val, state: "modified" }
+            val: { visible: !val, state: "modified" }
           }
         })
       }

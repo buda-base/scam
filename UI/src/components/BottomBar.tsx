@@ -219,7 +219,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   }, [images, selectedItems])
  
 
-  /*
+  /*  
   useEffect( () =>  {
 
     debug("data:",allScamData)
