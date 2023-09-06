@@ -231,6 +231,11 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)
 
+  const hasChecked = selectedImages.some(im => allScamData[im.thumbnail_path]?.checked)
+  const hasUnchecked = selectedImages.some(im => !allScamData[im.thumbnail_path]?.checked)
+  const hasHidden = selectedImages.some(im => !allScamData[im.thumbnail_path]?.visible)
+  const hasVisible = selectedImages.some(im => allScamData[im.thumbnail_path]?.visible)
+
   return (<nav className="bot">
     <Box>
       <IconButton onClick={() => setShowSettings(true)}>
@@ -277,13 +282,10 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         <MenuItem value={1} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
         <MenuItem value={1} onClick={() => setSelectedItems([])}>{"Deselect all"}</MenuItem>
         <hr/>
-
-        {/* // WIP: pb with saving draft (+ how to discard draft??) */ }
-        { selectedImages.some(im => !im.checked) && <MenuItem value={2} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
-        { selectedImages.some(im => im.checked) && <MenuItem value={3} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}
-        { selectedImages.some(im => !im.hidden) && <MenuItem value={4} onClick={() => markHidden(true)}>{"Mark hidden"}</MenuItem>}
-        { selectedImages.some(im => im.hidden) && <MenuItem value={5} onClick={() => markHidden(false)}>{"Mark visible"}</MenuItem>}
-
+        { (hasUnchecked || !hasChecked) && <MenuItem value={2} disabled={!hasUnchecked} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
+        { hasChecked && <MenuItem value={3} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}
+        { (hasVisible || !hasHidden) && <MenuItem value={4} disabled={!hasVisible} onClick={() => markHidden(true)}>{"Mark hidden"}</MenuItem>}
+        { hasHidden && <MenuItem value={5} onClick={() => markHidden(false)}>{"Mark visible"}</MenuItem>}
         <hr/>
         <MenuItem value={4} disabled>{"Run SCAM on selection"}</MenuItem>
       </TextField>

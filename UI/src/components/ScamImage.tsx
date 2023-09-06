@@ -606,14 +606,14 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   */
 
   const checkDeselect = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-    debug("deselec:", e.target.nodeType, e.target.attrs.image)
+    //debug("deselec:", e.target.nodeType, e.target.attrs.image)
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.attrs.image;
     if (clickedOnEmpty) {
       selectShape(null);
     }
   };
   const checkDeselectDiv: MouseEventHandler<HTMLDivElement> = (e) => {
-    debug("deselec div:", (e.target as HTMLDivElement).nodeName)
+    //debug("deselec div:", (e.target as HTMLDivElement).nodeName)
     const clickedOnEmpty = !["CANVAS", "SVG", "PATH", "BUTTON"].includes((e.target as HTMLDivElement).nodeName.toUpperCase())
     if (clickedOnEmpty) {
       selectShape(null);
@@ -621,7 +621,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   };
 
   const onSelect = (i: number) => {
-    debug("select!", i);
+    //debug("select!", i);
     selectShape(i);
   }
   
