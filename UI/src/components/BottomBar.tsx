@@ -236,6 +236,11 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const hasHidden = selectedImages.some(im => !allScamData[im.thumbnail_path]?.visible)
   const hasVisible = selectedImages.some(im => allScamData[im.thumbnail_path]?.visible)
 
+  const [restrictRun, setRestrictRun] = useState(selectedItems.length > 0)
+  useEffect(() => {
+    if(restrictRun != selectedItems.length > 0) setRestrictRun(selectedItems.length > 0)
+  }, [selectedItems])
+
   return (<nav className="bot">
     <Box>
       <IconButton onClick={() => setShowSettings(true)}>
@@ -287,7 +292,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         { (hasVisible || !hasHidden) && <MenuItem value={4} disabled={!hasVisible} onClick={() => markHidden(true)}>{"Mark hidden"}</MenuItem>}
         { hasHidden && <MenuItem value={5} onClick={() => markHidden(false)}>{"Mark visible"}</MenuItem>}
         <hr/>
-        <MenuItem value={4} disabled>{"Run SCAM on selection"}</MenuItem>
+        <MenuItem value={4} disabled={!selectedItems.length} onClick={() => setShowSettings(true)}>{"Run SCAM on selection"}</MenuItem>
       </TextField>
     </Box>
     <div>
@@ -310,6 +315,16 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
           <Close />
         </IconButton>
         <SettingsMenu />
+        <br/>
+        <br/>
+        <div>
+          <FormControlLabel 
+            disabled={!selectedItems.length}
+            label={"only run on selected images"} 
+            onChange={() => setRestrictRun(!restrictRun)} 
+            control={<Checkbox checked={restrictRun} sx={{padding: "0 8px" }}/>}  
+          />
+        </div>
       </DialogContent>
       <DialogActions sx={{padding:"16px"}}>
         <ColorButton onClick={handleRun} sx={{ textAlign: "right" }}>re-run SCAM on<br/>unchecked images</ColorButton>
