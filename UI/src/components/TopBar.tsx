@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAtom } from "jotai";
 import { useBeforeunload } from 'react-beforeunload';
 import { Close, Folder, FolderOpen } from "@mui/icons-material";
+import { useClearCache } from "react-clear-cache"
 
 import { ColorButton } from "./theme";
 import * as state from "../state"
@@ -28,6 +29,8 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
   const theme = useTheme()
   
   const navigate = useNavigate();
+
+  const { latestVersion, isLatestVersion, emptyCacheStorage } = useClearCache()
 
   const [sessions, setSessions] = useState<string[]>([])
 
@@ -160,10 +163,21 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
     </Dialog>
     ), [confirmAct, modified, folder, error, showDialog, handleClose, jsonPath, path, handlePath, couldHandleOpen, sessions, handleOpen, theme.palette.primary.main])
   
+  const handleUpdate = (e: { preventDefault: () => void; }) => {
+    e.preventDefault();
+    emptyCacheStorage();
+  }
+
   return <nav className="top">
     {confirmDialog}
     {folderDialog}
-    <div style={{ fontWeight:600, color:"#000", cursor:"pointer" }} onClick={() => handleConfirm(true)}>SCAM QC</div>
+    <div style={{ fontWeight:600, color:"#000", cursor:"pointer" }} onClick={() => handleConfirm(true)}>SCAM QC</div> 
+    <div style={{ marginRight: "auto", marginLeft:20 }}>
+      { isLatestVersion 
+        ? <span title={latestVersion} style={{ fontSize: 12, verticalAlign: 2 }}>(up-to-date)</span>
+        : <ColorButton onClick={handleUpdate}>Update Scam QC</ColorButton>
+      }
+    </div>
     <div className="nav">
     { folder && <>
         <div onClick={() => handleConfirm(false)}>
