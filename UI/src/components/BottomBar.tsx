@@ -218,15 +218,13 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     setSelectedImages(images.filter(im => selectedItems.includes(im.thumbnail_path)))
   }, [images, selectedItems])
  
-
-  /*  
+  /*
   useEffect( () =>  {
 
     debug("data:",allScamData)
 
   }, [allScamData])
-  */
-  
+  */ 
 
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)
@@ -236,7 +234,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const hasHidden = selectedImages.some(im => !allScamData[im.thumbnail_path]?.visible)
   const hasVisible = selectedImages.some(im => allScamData[im.thumbnail_path]?.visible)
 
-  const [restrictRun, setRestrictRun] = useState(selectedItems.length > 0)
+  const [restrictRun, setRestrictRun] = useAtom(state.restrictRun)
   useEffect(() => {
     if(restrictRun != selectedItems.length > 0) setRestrictRun(selectedItems.length > 0)
   }, [selectedItems])

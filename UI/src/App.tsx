@@ -107,12 +107,12 @@ function App() {
     document.title = "SCAM QC platform"
     
     const handleKeyDown = (e: { key: string; }) => {
-      debug("down",e.key)
+      //debug("down",e.key)
       setKeyDown(e.key)
     }
 
     const handleKeyUp = () => {
-      debug("up")
+      //debug("up")
       setKeyDown('')
     }
 

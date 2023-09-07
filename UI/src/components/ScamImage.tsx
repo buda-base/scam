@@ -374,6 +374,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const [deselectAll, setDeselectAll] = useAtom(state.deselectAll)
   
+  const [restrictRun, setRestrictRun] = useAtom(state.restrictRun)
+
   useEffect(() => {
     //debug("des:", image.thumbnail_path, deselectAll)
     if(deselectAll) selectShape(null)
@@ -500,9 +502,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    //debug("gSR!", configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
+    //debug("gSR!", restrictRun, selected, configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
 
-    if (configReady != false && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
+    if ((!restrictRun || selected) && configReady != false && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
       if(loadDraft === undefined) return
       else if(loadDraft && draft && !scamData) {        
@@ -571,24 +573,28 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
             let state = 'new'
             if(typeof scamData === "object" && scamData.rotation != image.rotation) state = 'modified'
+            if(restrictRun) state = 'modified'
 
             setScamData(response.data)
             dispatch({
               type: 'ADD_DATA',
               payload: {
                 id: image.thumbnail_path,
-                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked }
+                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked, options: { ...scamOptions }}
               }
             })
+           
+            if(state === "modified") {
+              setModified(true)
+            }
+            
           }
         })
         .catch(error => {
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [configReady, scamOptions, loadDraft, draft, globalData, scamData, visible, config.auth, lastRun, shouldRunAfter, image, checked, folder, controller.signal, 
-      dispatch, setVisible, setChecked, 
-      dimensions.width, dimensions.height])
+  }, [restrictRun, selected, configReady, visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, scamOptions, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height])
 
   
   useEffect(() => {
