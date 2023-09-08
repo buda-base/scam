@@ -44,3 +44,5 @@ export const keyDown = atom('')
 export const focused = atom('')
 
 export const deselectAll = atom(false)
+
+export const restrictRun = atom(false)

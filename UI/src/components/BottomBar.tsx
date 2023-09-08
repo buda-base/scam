@@ -14,7 +14,7 @@ import { useAtom } from "jotai";
 import debugFactory from "debug"
 import { encode } from "js-base64";
 
-import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamOptionsMap } from "../types"
+import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData, ScamOptionsMap } from "../types"
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
@@ -200,8 +200,9 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   )
 }
 
-export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData,  }) => {
-  const { folder, config, json } = props;
+export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[],
+    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void  }) => {
+  const { folder, config, json, selectedItems, images, setSelectedItems, markChecked, markHidden } = props;
 
   const [showSettings, setShowSettings] = useState(false)
 
@@ -211,16 +212,32 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const handleClose = () => { setShowSettings(false); };
 
   const handleRun = () => { setShouldRunAfter(Date.now()); setShowSettings(false);  };
-  
+
+  const [selectedImages, setSelectedImages] = useState<ScamImageData[]>([])
+  useEffect(() => {
+    setSelectedImages(images.filter(im => selectedItems.includes(im.thumbnail_path)))
+  }, [images, selectedItems])
+ 
+  /*
   useEffect( () =>  {
 
     debug("data:",allScamData)
 
   }, [allScamData])
-  
+  */ 
 
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)
+
+  const hasChecked = selectedImages.some(im => allScamData[im.thumbnail_path]?.checked)
+  const hasUnchecked = selectedImages.some(im => !allScamData[im.thumbnail_path]?.checked)
+  const hasHidden = selectedImages.some(im => !allScamData[im.thumbnail_path]?.visible)
+  const hasVisible = selectedImages.some(im => allScamData[im.thumbnail_path]?.visible)
+
+  const [restrictRun, setRestrictRun] = useAtom(state.restrictRun)
+  useEffect(() => {
+    if(restrictRun != selectedItems.length > 0) setRestrictRun(selectedItems.length > 0)
+  }, [selectedItems])
 
   return (<nav className="bot">
     <Box>
@@ -251,7 +268,29 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         label="Display grid"
         onChange={(r) => setGrid(r.target.value)}
       >
-        { ["1x1", "2x1", "3x2" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+        { ["1x1", "2x1", "3x2", "4x3" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+      </TextField>
+      <TextField
+        SelectProps={{ 
+          MenuProps : { disableScrollLock: true }
+        }}
+        sx={{ minWidth: 100, marginLeft: "16px" }}
+        select
+        variant="standard"
+        value={0}
+        label="Image selection"
+      >
+        <MenuItem value={0} disabled>{"..."}</MenuItem>
+        <hr/>
+        <MenuItem value={1} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
+        <MenuItem value={1} onClick={() => setSelectedItems([])}>{"Deselect all"}</MenuItem>
+        <hr/>
+        { (hasUnchecked || !hasChecked) && <MenuItem value={2} disabled={!hasUnchecked} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
+        { hasChecked && <MenuItem value={3} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}
+        { (hasVisible || !hasHidden) && <MenuItem value={4} disabled={!hasVisible} onClick={() => markHidden(true)}>{"Mark hidden"}</MenuItem>}
+        { hasHidden && <MenuItem value={5} onClick={() => markHidden(false)}>{"Mark visible"}</MenuItem>}
+        <hr/>
+        <MenuItem value={4} disabled={!selectedItems.length} onClick={() => setShowSettings(true)}>{"Run SCAM on selection"}</MenuItem>
       </TextField>
     </Box>
     <div>
@@ -274,6 +313,16 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
           <Close />
         </IconButton>
         <SettingsMenu />
+        <br/>
+        <br/>
+        <div>
+          <FormControlLabel 
+            disabled={!selectedItems.length}
+            label={"only run on selected images"} 
+            onChange={() => setRestrictRun(!restrictRun)} 
+            control={<Checkbox checked={restrictRun} sx={{padding: "0 8px" }}/>}  
+          />
+        </div>
       </DialogContent>
       <DialogActions sx={{padding:"16px"}}>
         <ColorButton onClick={handleRun} sx={{ textAlign: "right" }}>re-run SCAM on<br/>unchecked images</ColorButton>

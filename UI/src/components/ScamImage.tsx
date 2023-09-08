@@ -9,6 +9,7 @@ import Konva from "konva";
 import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
 import { Warning, WarningAmber } from "@mui/icons-material";
+import { Checkbox, FormControlLabel } from "@mui/material";
 
 import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap } from "../types";
 import { apiUrl } from "../App";
@@ -134,17 +135,52 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             if (newBox.width < 5 || newBox.height < 5) {
               return oldBox;
             }
+
             // WIP: keep box inside image
             let stage:any = shRef.current
             while(stage?.parent) stage = stage.parent ;
-            const b = shRef.current?.getClientRect()         
-            /*
-            if(b) {
-              if(b.x <= padding) {
-                return oldBox
+            const b = shRef.current?.getClientRect()   
+            const a = Math.abs(oldBox.rotation * 180 / Math.PI) 
+            //debug("\n",b, oldBox, newBox, a)                        
+            if(newBox.rotation == oldBox.rotation) {
+              // non-rotated portrait box
+              if(a <= 5) {
+                if(newBox.x <= padding) {
+                  if(oldBox.x != newBox.x) newBox.width = oldBox.width + (oldBox.x - padding)
+                  newBox.x = padding                 
+                }
+                if(newBox.y <= padding) {
+                  if(oldBox.y != newBox.y) newBox.height = oldBox.height + (oldBox.y - padding)
+                  newBox.y = padding
+                }                
+                if(newBox.x + newBox.width >= stage.attrs.width - padding) {
+                  newBox.width = stage.attrs.width - padding - newBox.x 
+                } 
+                if(newBox.y + newBox.height >= stage.attrs.height - padding) {
+                  newBox.height = stage.attrs.height - padding - newBox.y 
+                } 
+                return newBox
               }
+              // non-rotated landscape box
+              else if(a >= 85 && a <= 95) {
+                if(newBox.x >= stage.attrs.width - padding) {
+                  if(oldBox.x != newBox.x) newBox.height = oldBox.height + ((stage.attrs.width - padding) - oldBox.x)
+                  newBox.x = stage.attrs.width - padding
+                }
+                if(newBox.y <= padding) {
+                  if(oldBox.y != newBox.y) newBox.width = oldBox.width + (oldBox.y - padding)
+                  newBox.y = padding
+                }   
+                if(newBox.x - newBox.height <= padding) {
+                  newBox.height = newBox.x - padding
+                }
+                if(newBox.y + newBox.width >= stage.attrs.height - padding) {
+                  newBox.width = stage.attrs.height - padding - newBox.y 
+                } 
+                return newBox
+              } 
             }
-            */
+            // TODO: other cases?
             return newBox;
           }}
         />
@@ -154,8 +190,9 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 }
 
 
-export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, setImageData: (data:ScamImageData) => void }) => {
-  const { image } = props;
+export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, selected:boolean,
+    setImageData: (data:ScamImageData) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
+  const { image, selected, handleSelectItem } = props;
 
   const { ref, inView, entry } = useInView({
     triggerOnce: false,
@@ -165,13 +202,21 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
   const [visible, setVisible] = useState(image.hidden ? false : true)
   const [checked, setChecked] = useState(image.checked ? true : false)
   
+  useEffect(()=>{
+    setVisible(image.hidden ? false : true)
+  }, [image.hidden])
+
+  useEffect(()=>{
+    setChecked(image.checked ?  true : false)
+  }, [image.checked])
+
   const figureRef = useRef<HTMLElement>(null)
   
   const [grid, setGrid] = useAtom(state.grid)  
 
   if (inView) {    
     //debug("scanImageContainer:", image.thumbnail_path, JSON.stringify(props, null, 3))
-    return <ScamImage {...props} divRef={ref} {...{visible, checked, setVisible, setChecked}}/>
+    return <ScamImage {...props} divRef={ref} {...{visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
   }
   else {    
 
@@ -259,9 +304,9 @@ function useWindowSize() {
 }
 
 const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
-    loadDraft: boolean | undefined, checked: boolean,
-    setImageData:(data:ScamImageData)=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void }) => {
-  const { folder, config, image, divRef, draft, loadDraft, visible, checked, setImageData, setVisible, setChecked } = props;
+    loadDraft: boolean | undefined, checked: boolean, selected:boolean,
+    setImageData:(data:ScamImageData)=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
+  const { folder, config, image, divRef, draft, loadDraft, visible, checked, selected, setImageData, setVisible, setChecked, handleSelectItem } = props;
 
   const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
@@ -329,6 +374,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const [deselectAll, setDeselectAll] = useAtom(state.deselectAll)
   
+  const [restrictRun, setRestrictRun] = useAtom(state.restrictRun)
+
   useEffect(() => {
     //debug("des:", image.thumbnail_path, deselectAll)
     if(deselectAll) selectShape(null)
@@ -455,9 +502,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    //debug("gSR!", configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
+    //debug("gSR!", restrictRun, selected, configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
 
-    if (configReady != false && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
+    if ((!restrictRun || selected) && configReady != false && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
       if(loadDraft === undefined) return
       else if(loadDraft && draft && !scamData) {        
@@ -514,7 +561,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         signal: controller.signal
       })
         .then(response => {
-          debug("json:", response.data);
+          //debug("json:", response.data);
           if (response.data) {
             const W = response.data.width
             const H = response.data.height
@@ -526,24 +573,28 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
             let state = 'new'
             if(typeof scamData === "object" && scamData.rotation != image.rotation) state = 'modified'
+            if(restrictRun) state = 'modified'
 
             setScamData(response.data)
             dispatch({
               type: 'ADD_DATA',
               payload: {
                 id: image.thumbnail_path,
-                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked }
+                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked, options: { ...scamOptions }}
               }
             })
+           
+            if(state === "modified") {
+              setModified(true)
+            }
+            
           }
         })
         .catch(error => {
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [configReady, scamOptions, loadDraft, draft, globalData, scamData, visible, config.auth, lastRun, shouldRunAfter, image, checked, folder, controller.signal, 
-      dispatch, setVisible, setChecked, 
-      dimensions.width, dimensions.height])
+  }, [restrictRun, selected, configReady, visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, scamOptions, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height])
 
   
   useEffect(() => {
@@ -561,14 +612,14 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   */
 
   const checkDeselect = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-    debug("deselec:", e.target.nodeType, e.target.attrs.image)
+    //debug("deselec:", e.target.nodeType, e.target.attrs.image)
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.attrs.image;
     if (clickedOnEmpty) {
       selectShape(null);
     }
   };
   const checkDeselectDiv: MouseEventHandler<HTMLDivElement> = (e) => {
-    debug("deselec div:", (e.target as HTMLDivElement).nodeName)
+    //debug("deselec div:", (e.target as HTMLDivElement).nodeName)
     const clickedOnEmpty = !["CANVAS", "SVG", "PATH", "BUTTON"].includes((e.target as HTMLDivElement).nodeName.toUpperCase())
     if (clickedOnEmpty) {
       selectShape(null);
@@ -576,7 +627,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   };
 
   const onSelect = (i: number) => {
-    debug("select!", i);
+    //debug("select!", i);
     selectShape(i);
   }
   
@@ -699,7 +750,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       if(!stage) return
       const vect = stage.getPointerPosition() 
       if(!vect) return
-      const { x, y } = vect;
+      let { x, y } = vect;
+      if(x <= padding) x = padding
+      if(y <= padding) y = padding
+      if(x >= stage.attrs.width - padding - 1) x = stage.attrs.width - padding - 1
+      if(y >= stage.attrs.height - padding - 1) y = stage.attrs.height - padding - 1
       if(x !== sx && y !== sy) { 
         const annotationToAdd = {
           ...newPage[0],
@@ -709,7 +764,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           height: Math.abs(y - sy)
         };        
         onChange(annotationToAdd, true)
-      } 
+      } else {
+        selectShape(null)
+      }
       setAddNew(false)
       setNewPage([]);
     }
@@ -724,7 +781,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       if(!stage) return
       const vect = stage.getPointerPosition() 
       if(!vect) return
-      const { x, y } = vect;
+      let { x, y } = vect;
+      if(x <= padding) x = padding
+      if(y <= padding) y = padding
+      if(x >= stage.attrs.width - padding - 1) x = stage.attrs.width - padding - 1
+      if(y >= stage.attrs.height - padding - 1) y = stage.attrs.height - padding - 1
       setNewPage([{
         ...newPage[0],
         x: sx,
@@ -752,6 +813,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     })
     setVisible(!visible)
     setModified(true)
+    setImageData({...image, hidden: visible })    
   }, [checked, dispatch, image, scamData, setModified, setVisible, shouldRunAfter, visible])
 
   const toggleCheck = useCallback(() => {
@@ -764,6 +826,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     })
     setChecked(!checked)
     setModified(true)
+    setImageData({...image, checked: !checked })    
   }, [checked, dispatch, image, scamData, setModified, shouldRunAfter, visible])  
   
   useEffect( () => {
@@ -786,7 +849,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info.width + 2*padding }}
     onMouseDown={checkDeselectDiv}
   >
-    <figure className={"visible-"+visible} ref={figureRef} 
+    <figure className={"visible-"+visible + " newPage-"+(newPage.length > 0) + " selected-"+(selectedId == null ? "false":"true")} ref={figureRef} 
         // {... !visible ? { style: { width: dimensions.width + padding * 2, height: 80 } }:{} }
         >
       { !visible && typeof konvaImg == "object" && <img src={konvaImg?.src} className={"mini"+((image.rotation + 360) % 360 != 0 ? " rotated": "")} style={{transform: "rotate("+image.rotation+"deg)" }}/> }
@@ -843,13 +906,14 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               width={newPage[0].width}
               height={newPage[0].height}
               fill="transparent"
-              stroke="black"              
+              globalCompositeOperation="exclusion"
+              stroke="white"              
             />
           )}
         </Layer>
       </Stage> }
-      <figcaption>{image.img_path}
-        { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px" }} /> }
+      <figcaption><FormControlLabel label={image.img_path} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} control={<Checkbox checked={selected} sx={{padding: "0 8px" }}/>}  />
+        { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "4px" }} /> }
         {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
       </figcaption>
       {showDebug && visible && typeof scamData === 'object' &&
