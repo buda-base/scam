@@ -31,6 +31,8 @@ def get_pickle_path(folder_path, img_path):
 def get_all_img_paths(folder_path):
     img_keys = []
     for img_full_key in sorted(list_img_keys(folder_path)):
+        if "_cropped_uncompressed/" in img_full_key:
+            continue
         img_keys.append(img_full_key[len(folder_path):])
     return img_keys
 
