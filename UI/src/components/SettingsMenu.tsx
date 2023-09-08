@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useAtom } from "jotai"
 
 import * as state from "../state"
+import { Orientation, Direction } from "../types"
 
 const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: ConfigData } */) => {
   //const { folder, config, image } = props;
@@ -26,7 +27,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
         variant="standard"
         value={orient}
         label="Pages orientation"
-        onChange={(r) => setOrient(r.target.value)}
+        onChange={(r) => setOrient(r.target.value as Orientation)}
       >
         <MenuItem value={"vertical"}>vertical (modern books)</MenuItem>
         <MenuItem value={"horizontal"}>horizontal (pechas)</MenuItem>
@@ -78,7 +79,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               variant="standard"
               value={direc}
               label="Direction"
-              onChange={(r) => setDirec(r.target.value)}
+              onChange={(r) => setDirec(r.target.value as Direction)}
             >
               <MenuItem value={"vertical"}>vertical</MenuItem>
               <MenuItem value={"horizontal"}>horizontal</MenuItem>

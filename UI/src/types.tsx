@@ -63,7 +63,9 @@ export type ScamData = {
   scam_runs: any[];
 };
 
-export type Direction = "vertical" | "horizontal" | "custom" ;
+export type Orientation = "vertical" | "horizontal" | "custom"
+
+export type Direction = "vertical" | "horizontal"  ;
 
 export type ScamDataState = 'new' | 'modified' | 'savedDraft' | 'savedOnline'
 
@@ -74,6 +76,7 @@ export type SavedScamData = {
   image: ScamImageData;
   visible: boolean;
   checked: boolean;
+  options?:ScamOptions;
 }
 
 export type SavedScamDataMap = {
@@ -88,12 +91,20 @@ export type LocalData = {
   drafts: {
     [str:string]: {
       images: SavedScamDataMap;
-      options: ScamOptionsMap 
+      options: ScamOptions 
     }
   }, 
   sessions: {
     [str:string]: number
   }
+}
+
+export type ScamOptions = {
+  orient: Orientation,
+  nbPages?: number,
+  direc?: Direction,
+  minRatio?: number,
+  maxRatio?: number
 }
 
 export type Filter = 'all' | 'warning' | 'unchecked'

@@ -13,7 +13,7 @@ import { useAtom } from 'jotai';
 
 import { ScamImageContainer, recomputeCoords, withRotatedHandle } from "./components/ScamImage"
 import './App.css'
-import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData } from './types';
+import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData, ScamOptions } from './types';
 import { BottomBar } from './components/BottomBar';
 import { TopBar } from './components/TopBar';
 import { ColorButton, theme } from "./components/theme"
@@ -48,6 +48,8 @@ function App() {
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [lastSelectedItem, setLastSelectedItem] = useState("")
 
+  const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
+
   const handleSelectStart = useCallback((ev: { preventDefault: () => void; }) => {
     if (keyDown == "Shift") {
       ev.preventDefault();
@@ -60,6 +62,11 @@ function App() {
     oldHandleSelectStart = handleSelectStart
   }, [handleSelectStart])
 
+  const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
+  
+  const [restrictRun, setRestrictRun] = useAtom(state.restrictRun)
+  const [checkedRestrict, setCheckedRestrict] = useAtom(state.checkedRestrict)
+  
   // cf tutorial https://tj.ie/multi-select-checkboxes-with-react/
   const handleSelectItem = useCallback((ev: React.SyntheticEvent, val: boolean, label: string) => {
 
@@ -101,7 +108,29 @@ function App() {
     setSelectedItems(nextValue)
     setLastSelectedItem(label)
 
-  }, [images, keyDown, lastSelectedItem, selectedItems])
+    if(val && nextValue.length >= 1) {
+      setCheckedRestrict(true)
+      if(nextValue.length == 1) {
+        debug("1 selected", allScamData[nextValue[0]])
+        if(allScamData[nextValue[0]].options) {
+          setOptions(allScamData[nextValue[0]].options)
+        } 
+      }
+    } else if (!nextValue.length) {      
+      setCheckedRestrict(false)
+      setRestrictRun(false)
+      debug("0 selected", scamOptions)
+      setOptions(scamOptions)
+        /*
+        { orient, setOrient] = useAtom(state.orientAtom)
+  const [direc, setDirec] = useAtom(state.direcAtom)
+  const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
+  const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
+  const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+  */
+    }
+
+  }, [allScamData, images, keyDown, lastSelectedItem, scamOptions, selectedItems])
 
   useEffect(() => {
     document.title = "SCAM QC platform"
@@ -180,8 +209,6 @@ function App() {
 
   const [ drafts, setDrafts ] = useState({} as  { [str:string] : SavedScamData })
   const [ loadDraft, setLoadDraft ] = useState<boolean|undefined>(false)
-
-  const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
@@ -308,19 +335,21 @@ function App() {
     }
   }, [folder])
 
+  const setOptions = (options:ScamOptions) => {
+    debug("options:", options)
+    setOrient(options.orient)
+    if(options.direc) setDirec(options.direc)
+    if(options.minRatio) setMinRatio(options.minRatio)
+    if(options.maxRatio) setMaxRatio(options.maxRatio)
+    if(options.nbPages) setNbPages(options.nbPages)    
+  }
+
   useEffect(() => {
     const hasDraft = ((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) 
     if(loadDraft) {
       const options = hasDraft[folder]?.options
       if(options) {
-        if(options.orientation) setOrient(options.orientation as string)
-        else {
-          setOrient("custom")
-          setDirec(options.direction as string)
-          setMinRatio((options["wh_ratio_range"] as number[])[0])
-          setMaxRatio((options["wh_ratio_range"] as number[])[1])
-          setNbPages(options["nb_pages_expected"] as number)
-        }
+        setOptions(options)
         setConfigReady(true)
       }
     } 
@@ -375,7 +404,7 @@ function App() {
       <main onClick={checkDeselectMain}>{
         images.map(image => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
       }</main>
-      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden }}/></footer>}
+      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, setOptions }}/></footer>}
     </ThemeProvider>
   )
 }

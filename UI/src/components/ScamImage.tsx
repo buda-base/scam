@@ -18,6 +18,8 @@ import * as state from "../state"
 
 const debug = debugFactory("scam:img")
 
+const padding = 56
+
 const scam_options: ScamOptionsMap = {
   "alter_checked": false,
   "direction": "vertical",
@@ -35,8 +37,6 @@ const scam_options: ScamOptionsMap = {
   "expand_to_fixed": false,
   "cut_at_fixed": false
 }
-
-const padding = 56
 
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
@@ -362,11 +362,6 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const [warning, setWarning] = useState(false)
   
-  const [orient, setOrient] = useAtom(state.orientAtom)
-  const [direc, setDirec] = useAtom(state.direcAtom)
-  const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
-  const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
-  const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
   const [configReady, setConfigReady] = useAtom(state.configReady)
   
   const [keyDown, setKeyDown] = useAtom(state.keyDown)
@@ -376,6 +371,15 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   
   const [restrictRun, setRestrictRun] = useAtom(state.restrictRun)
 
+  const [orient, setOrient] = useAtom(state.orientAtom) 
+  const [direc, setDirec] = useAtom(state.direcAtom) 
+  const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
+  const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
+  const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+  
+  const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
+  const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
+  
   useEffect(() => {
     //debug("des:", image.thumbnail_path, deselectAll)
     if(deselectAll) selectShape(null)
@@ -384,33 +388,6 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   useEffect(() => {
     if(selectedId != null && deselectAll) setDeselectAll(false)
   }, [selectedId, deselectAll])
-
-  const scamOptions:ScamOptionsMap = useMemo(() => { 
-    const opts = ({
-      ...scam_options,
-
-      /*
-      "squarishness_min": orient == 'horizontal' ? 0.85 : 1/0.85,
-      "area_ratio_min": orient == 'horizontal' ? 0.2 : 1/0.2,
-      "area_diff_max": orient == 'horizontal' ? 0.15 : 1/0.15,
-      */
-    
-      "wh_ratio_range": orient == "custom"
-        ? [minRatio, maxRatio]
-        : orient == "horizontal"
-          ? [2.0, 7.0]
-          : [0.6, 0.8], // TODO: check values for vertical mode    
-      "wh_ratio_range_warn": [1.5, 10], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
-      "nb_pages_expected": orient == "custom" ? nbPages : 2,
-      "direction": orient == "custom"
-        ? direc
-        : orient === 'horizontal'
-          ? 'vertical'
-          : 'horizontal'
-    })
-    //debug("opts!", image.thumbnail_path, opts)
-    return opts
-  }, [ orient, direc, minRatio, maxRatio, nbPages ])
 
   const handleZindex = useCallback((rects: KonvaPage[]) => {
     return [...rects.filter(r => r.n != selectedId)].concat([...rects.filter(r => r.n === selectedId)])
@@ -520,7 +497,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data: newData, state: 'draft', time: shouldRunAfter, image: draft.image, visible: draft.visible, checked: draft.checked }
+            val: { data: newData, state: 'draft', time: shouldRunAfter, image: draft.image, visible: draft.visible, checked: draft.checked, options: draft.options }
           }
         })
         if(visible != draft.visible) setVisible(draft.visible)
@@ -549,9 +526,27 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       //debug("getScamResults:",image.thumbnail_path)
 
+
+      const opts= {
+        ...scam_options,  
+        "wh_ratio_range": orient == "custom"
+          ? [minRatio, maxRatio]
+          : orient == "horizontal"
+            ? [2.0, 7.0]
+            : [0.6, 0.8], // TODO: check values for vertical mode    
+        "wh_ratio_range_warn": [1.5, 10], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
+        "nb_pages_expected": orient == "custom" ? nbPages : 2,
+        "direction": orient == "custom"
+          ? direc
+          : orient === 'horizontal'
+            ? 'vertical'
+            : 'horizontal'
+      }
+      
+
       axios.post(apiUrl + "run_scam_file", {
         folder_path: folder,
-        scam_options: scamOptions,
+        scam_options: opts,
         file_info: image
       }, {
         headers: {
@@ -580,7 +575,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               type: 'ADD_DATA',
               payload: {
                 id: image.thumbnail_path,
-                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked, options: { ...scamOptions }}
+                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked, ...selected ? {options: { ...scamOptionsSelected }}:{}}
               }
             })
            
@@ -594,7 +589,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [restrictRun, selected, configReady, visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, scamOptions, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height])
+  }, [restrictRun, selected, configReady, visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, scamOptionsSelected, setModified])
 
   
   useEffect(() => {
@@ -647,10 +642,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       setScamData(newData)
       dispatch({
-        type: 'ADD_DATA',
+        type: 'UPDATE_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data: newData, state: 'modified', time: shouldRunAfter, image, visible, checked }
+          val: { data: newData, state: 'modified', time: shouldRunAfter }
         }
       })
       setModified(true)
@@ -699,10 +694,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
         setScamData(data)
         dispatch({
-          type: 'ADD_DATA',
+          type: 'UPDATE_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data, state: 'modified', time: shouldRunAfter, image, visible, checked }
+            val: { data, state: 'modified', time: shouldRunAfter }
           }
         })
         setModified(true)
@@ -805,10 +800,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const toggleVisible = useCallback(() => {
     dispatch({
-      type: 'ADD_DATA',
+      type: 'UPDATE_DATA',
       payload: {
         id: image.thumbnail_path,
-        val: { data: scamData, state: 'modified', time: shouldRunAfter, image, visible: !visible, checked }
+        val: { state: 'modified', time: shouldRunAfter, visible: !visible }
       }
     })
     setVisible(!visible)
@@ -818,10 +813,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const toggleCheck = useCallback(() => {
     dispatch({
-      type: 'ADD_DATA',
+      type: 'UPDATE_DATA',
       payload: {
         id: image.thumbnail_path,
-        val: { data: scamData, state: 'modified', time: shouldRunAfter, image, visible, checked: !checked }
+        val: { state: 'modified', time: shouldRunAfter, checked: !checked }
       }
     })
     setChecked(!checked)
@@ -831,13 +826,13 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   
   useEffect( () => {
     if(typeof scamData === 'object') { 
-      if(scamData?.rects?.length != scamOptions["nb_pages_expected"] || scamData?.rects?.some(r => r.warning)) {
+      if(scamData?.rects?.length != nbPages || scamData?.rects?.some(r => r.warning)) {
         setWarning(true)
       } else {
         setWarning(false)
       }
     }
-  }, [ scamData, scamOptions ])
+  }, [ scamData, nbPages ])
 
   const actualW = (portrait ? dimensions.height : dimensions.width)
   const actualH = (portrait ? dimensions.width : dimensions.height)

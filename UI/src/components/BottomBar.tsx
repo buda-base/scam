@@ -14,7 +14,7 @@ import { useAtom } from "jotai";
 import debugFactory from "debug"
 import { encode } from "js-base64";
 
-import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData, ScamOptionsMap } from "../types"
+import { ConfigData, LocalData, Orientation, Page, SavedScamData, ScamData, ScamImageData, ScamOptions, ScamOptionsMap } from "../types"
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
@@ -24,8 +24,8 @@ import { withoutRotatedHandle } from "./ScamImage";
 
 const debug = debugFactory("scam:bbar")
 
-export const SaveButtons = (props: { folder: string, config: ConfigData, json?:ScamData, onConfirmed?:() => void }) => {
-  const { folder, json, config, onConfirmed } = props;
+export const SaveButtons = (props: { folder: string, config: ConfigData, json?:ScamData, selectedItems:string[], checkedRestrict: boolean }) => {
+  const { folder, json, config, selectedItems, checkedRestrict } = props;
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
 
@@ -56,20 +56,30 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
     }
   }, [modified])
 
-  const scamOptions:ScamOptionsMap = useMemo(() => ({
-    "wh_ratio_range": orient == "custom"
-      ? [minRatio, maxRatio]
-      : orient == "horizontal"
-        ? [2.0, 7.0]
-        : [0.6, 0.8], // TODO: check values for vertical mode    
-    "wh_ratio_range_warn": [1.5, 10], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
-    "nb_pages_expected": orient == "custom" ? nbPages : 2,
-    "direction": orient == "custom"
-      ? direc
-      : orient === 'horizontal'
-        ? 'vertical'
-        : 'horizontal'
-  }), [ orient, direc, minRatio, maxRatio, nbPages ])    
+  const [globalScamOptionsUpdate, setGlobalScamOptionsUpdate] = useAtom(state.globalScamOptionsUpdate)
+
+  const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
+  const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
+
+  const updateOptions = useCallback(() => {
+    const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages }:{} }        
+    debug("opts!", opts, selectedItems.length, globalScamOptionsUpdate, checkedRestrict)
+    if(selectedItems.length > 0 && !checkedRestrict || !selectedItems.length || globalScamOptionsUpdate) setScamOptions(opts)
+    else setScamOptionsSelected(opts)    
+    if(globalScamOptionsUpdate != false) setGlobalScamOptionsUpdate(false)
+  }, [ orient, direc, minRatio, maxRatio, nbPages, selectedItems, globalScamOptionsUpdate, checkedRestrict ])   
+    
+  useEffect(() => {
+    updateOptions()
+  },[ orient, direc, minRatio, maxRatio, nbPages, selectedItems, globalScamOptionsUpdate])
+
+  useEffect(() =>  {
+    debug("scamOpt:", scamOptions)
+  }, [scamOptions])
+
+  useEffect(() =>  {
+    debug("scamOptSel:", scamOptionsSelected)
+  }, [scamOptionsSelected])
 
   const saveDraft = useCallback(async () => {
     const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
@@ -85,13 +95,12 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
         }
         return acc
       }, {}) },
-      options: orient != "custom" ? { orientation: orient } : { ...scamOptions }
+      options: orient != "custom" ? { orient: orient as Orientation} : { ...selectedItems.length>0?scamOptionsSelected:scamOptions }
     }
     localStorage.setItem("scamUI", JSON.stringify(local))
     //setModified(false)
     setDrafted(true)
-    if(onConfirmed) onConfirmed()
-  }, [allScamData, folder, onConfirmed, orient, scamOptions])
+  }, [allScamData, folder, orient, scamOptions, scamOptionsSelected, selectedItems])
 
   const publish = useCallback(async () => {
     
@@ -201,30 +210,55 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
 }
 
 export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[],
-    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void  }) => {
-  const { folder, config, json, selectedItems, images, setSelectedItems, markChecked, markHidden } = props;
+    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void  }) => {
+  const { folder, config, json, selectedItems, images, setSelectedItems, markChecked, markHidden, setOptions } = props;
 
   const [showSettings, setShowSettings] = useState(false)
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
-  const handleClose = () => { setShowSettings(false); };
+  const [restrictRun, setRestrictRun] = useAtom(state.restrictRun)
+  const [checkedRestrict, setCheckedRestrict] = useAtom(state.checkedRestrict)
 
-  const handleRun = () => { setShouldRunAfter(Date.now()); setShowSettings(false);  };
+  const [globalScamOptionsUpdate, setGlobalScamOptionsUpdate] = useAtom(state.globalScamOptionsUpdate)
+
+  const handleClose = () => { 
+    setShowSettings(false);
+    setRestrictRun(false) 
+    setGlobalScamOptionsUpdate(true)
+    setOptions(scamOptions) 
+  };
+
+  const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
+
+  const handleRun = useCallback(() => { 
+    if(restrictRun != checkedRestrict) setRestrictRun(checkedRestrict)
+    setShouldRunAfter(Date.now()); 
+    setShowSettings(false);  
+    if(selectedItems.length > 0 && !checkedRestrict) setGlobalScamOptionsUpdate(true)    
+  }, [restrictRun, selectedItems, checkedRestrict, scamOptions, setRestrictRun, setShouldRunAfter])
+
+  const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
+
+  const handleSettings = useCallback(() => {
+    if(selectedItems.length > 0) {
+      setCheckedRestrict(true)
+      setOptions(scamOptionsSelected)  
+    }
+    setShowSettings(true)
+  }, [scamOptionsSelected, selectedItems])
 
   const [selectedImages, setSelectedImages] = useState<ScamImageData[]>([])
   useEffect(() => {
     setSelectedImages(images.filter(im => selectedItems.includes(im.thumbnail_path)))
   }, [images, selectedItems])
  
-  /*
+  
   useEffect( () =>  {
-
     debug("data:",allScamData)
-
   }, [allScamData])
-  */ 
+   
 
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)
@@ -234,14 +268,16 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const hasHidden = selectedImages.some(im => !allScamData[im.thumbnail_path]?.visible)
   const hasVisible = selectedImages.some(im => allScamData[im.thumbnail_path]?.visible)
 
-  const [restrictRun, setRestrictRun] = useAtom(state.restrictRun)
-  useEffect(() => {
-    if(restrictRun != selectedItems.length > 0) setRestrictRun(selectedItems.length > 0)
-  }, [selectedItems])
+  const handleDeselectAll = () => {
+    setCheckedRestrict(false)
+    setRestrictRun(false)
+    setOptions(scamOptions)
+    setSelectedItems([])
+  }
 
   return (<nav className="bot">
     <Box>
-      <IconButton onClick={() => setShowSettings(true)}>
+      <IconButton onClick={() => handleSettings()}>
         <Settings />
       </IconButton>
       <TextField
@@ -283,7 +319,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         <MenuItem value={0} disabled>{"..."}</MenuItem>
         <hr/>
         <MenuItem value={1} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
-        <MenuItem value={1} onClick={() => setSelectedItems([])}>{"Deselect all"}</MenuItem>
+        <MenuItem value={1} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
         <hr/>
         { (hasUnchecked || !hasChecked) && <MenuItem value={2} disabled={!hasUnchecked} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
         { hasChecked && <MenuItem value={3} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}
@@ -294,7 +330,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       </TextField>
     </Box>
     <div>
-      <SaveButtons {...{ folder, config, json }} />
+      <SaveButtons {...{ folder, config, json, selectedItems, checkedRestrict }} />
     </div>
     <Dialog open={showSettings} onClose={handleClose} disableScrollLock={true} >
       <DialogTitle>Run SCAM</DialogTitle>
@@ -319,8 +355,8 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
           <FormControlLabel 
             disabled={!selectedItems.length}
             label={"only run on selected images"} 
-            onChange={() => setRestrictRun(!restrictRun)} 
-            control={<Checkbox checked={restrictRun} sx={{padding: "0 8px" }}/>}  
+            onChange={() => setCheckedRestrict(!checkedRestrict)} 
+            control={<Checkbox checked={checkedRestrict} sx={{padding: "0 8px" }}/>}  
           />
         </div>
       </DialogContent>

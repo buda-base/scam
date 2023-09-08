@@ -2,13 +2,13 @@ import { atom } from "jotai"
 import { atomWithReducer } from "jotai/utils"
 import debugFactory from "debug"
 
-import { ScamImageData, SavedScamDataMap } from "./types"
+import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction, Orientation } from "./types"
 
 const debug = debugFactory("scam:state")
 
 // global settings
-export const orientAtom = atom("horizontal") 
-export const direcAtom = atom("horizontal") 
+export const orientAtom = atom<Orientation>("horizontal") 
+export const direcAtom = atom<Direction>("horizontal") 
 export const minRatioAtom = atom(0.145)
 export const maxRatioAtom = atom(0.5)
 export const nbPagesAtom = atom(2)
@@ -46,3 +46,8 @@ export const focused = atom('')
 export const deselectAll = atom(false)
 
 export const restrictRun = atom(false)
+export const checkedRestrict = atom(false)
+
+export const scamOptions = atom<ScamOptions>({ orient: "horizontal" })
+export const scamOptionsSelected = atom<ScamOptions>({ orient: "horizontal" })
+export const globalScamOptionsUpdate = atom<boolean>(false)
