@@ -251,8 +251,8 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       setCheckedRestrict(true)      
       let found = false
       for(const it of selectedItems) { 
-        if(allScamData[it].options !== undefined) {
-          setOptions(allScamData[it].options)
+        if(allScamData[it].options) {
+          setOptions(allScamData[it].options as ScamOptions)
           found = true
           break ;
         }
