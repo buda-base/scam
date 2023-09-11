@@ -110,24 +110,10 @@ function App() {
 
     if(val && nextValue.length >= 1) {
       setCheckedRestrict(true)
-      if(nextValue.length == 1) {
-        debug("1 selected", allScamData[nextValue[0]])
-        if(allScamData[nextValue[0]].options) {
-          setOptions(allScamData[nextValue[0]].options)
-        } 
-      }
     } else if (!nextValue.length) {      
       setCheckedRestrict(false)
       setRestrictRun(false)
-      debug("0 selected", scamOptions)
       setOptions(scamOptions)
-        /*
-        { orient, setOrient] = useAtom(state.orientAtom)
-  const [direc, setDirec] = useAtom(state.direcAtom)
-  const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
-  const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
-  const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
-  */
     }
 
   }, [allScamData, images, keyDown, lastSelectedItem, scamOptions, selectedItems])

@@ -224,30 +224,43 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const [globalScamOptionsUpdate, setGlobalScamOptionsUpdate] = useAtom(state.globalScamOptionsUpdate)
 
   const handleClose = () => { 
-    setShowSettings(false);
-    setRestrictRun(false) 
-    setGlobalScamOptionsUpdate(true)
-    setOptions(scamOptions) 
+    setShowSettings(false); 
   };
 
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
 
   const handleRun = useCallback(() => { 
-    if(restrictRun != checkedRestrict) setRestrictRun(checkedRestrict)
     setShouldRunAfter(Date.now()); 
     setShowSettings(false);  
     if(selectedItems.length > 0 && !checkedRestrict) setGlobalScamOptionsUpdate(true)    
+    if(restrictRun != checkedRestrict) { 
+      setRestrictRun(checkedRestrict)
+      if(checkedRestrict) setTimeout(() => {
+        setRestrictRun(false)
+        setTimeout(() => {
+          setOptions(scamOptionsSelected)          
+        }, 150)
+      }, 150)
+    }
   }, [restrictRun, selectedItems, checkedRestrict, scamOptions, setRestrictRun, setShouldRunAfter])
 
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
 
   const handleSettings = useCallback(() => {
     if(selectedItems.length > 0) {
-      setCheckedRestrict(true)
-      setOptions(scamOptionsSelected)  
+      setCheckedRestrict(true)      
+      let found = false
+      for(const it of selectedItems) { 
+        if(allScamData[it].options !== undefined) {
+          setOptions(allScamData[it].options)
+          found = true
+          break ;
+        }
+        if(!found) setOptions(scamOptions)
+      } 
     }
     setShowSettings(true)
-  }, [scamOptionsSelected, selectedItems])
+  }, [scamOptionsSelected, selectedItems, allScamData, scamOptions])
 
   const [selectedImages, setSelectedImages] = useState<ScamImageData[]>([])
   useEffect(() => {
