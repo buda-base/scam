@@ -63,7 +63,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
 
   const updateOptions = useCallback(() => {
     const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages }:{} }        
-    debug("opts!", opts, selectedItems.length, globalScamOptionsUpdate, checkedRestrict)
+    //debug("opts!", opts, selectedItems.length, globalScamOptionsUpdate, checkedRestrict)
     if(selectedItems.length > 0 && !checkedRestrict || !selectedItems.length || globalScamOptionsUpdate) setScamOptions(opts)
     else setScamOptionsSelected(opts)    
     if(globalScamOptionsUpdate != false) setGlobalScamOptionsUpdate(false)
@@ -73,6 +73,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
     updateOptions()
   },[ orient, direc, minRatio, maxRatio, nbPages, selectedItems, globalScamOptionsUpdate])
 
+  /*
   useEffect(() =>  {
     debug("scamOpt:", scamOptions)
   }, [scamOptions])
@@ -80,7 +81,8 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   useEffect(() =>  {
     debug("scamOptSel:", scamOptionsSelected)
   }, [scamOptionsSelected])
-
+  */
+ 
   const saveDraft = useCallback(async () => {
     const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
     if(!local.drafts) local.drafts = {}
@@ -267,11 +269,11 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     setSelectedImages(images.filter(im => selectedItems.includes(im.thumbnail_path)))
   }, [images, selectedItems])
  
-  
+  /*
   useEffect( () =>  {
     debug("data:",allScamData)
   }, [allScamData])
-   
+  */
 
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)

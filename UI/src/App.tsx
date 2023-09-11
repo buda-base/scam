@@ -322,7 +322,7 @@ function App() {
   }, [folder])
 
   const setOptions = (options:ScamOptions) => {
-    debug("options:", options)
+    //debug("options:", options)
     setOrient(options.orient)
     if(options.direc) setDirec(options.direc)
     if(options.minRatio) setMinRatio(options.minRatio)

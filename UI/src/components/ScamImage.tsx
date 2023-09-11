@@ -100,6 +100,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
               // set minimal value
               width: Math.max(5, node.width() * scaleX),
               height: Math.max(5, node.height() * scaleY),
+              ...warning?{warning:false}:{}
             });
           }
         }}
@@ -682,6 +683,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       const h = dimensions.height
 
       if (data.pages) {
+                
+        if(p.warning === false && data.pages[p.n].warnings.length) {
+          data.pages[p.n].warnings = []
+        }
+
         data.pages[p.n].minAreaRect[0] = W * (p.x + p.width / 2) / w
         data.pages[p.n].minAreaRect[1] = H * (p.y + p.height / 2) / h
         data.pages[p.n].minAreaRect[2] = W * p.width / w
@@ -887,7 +893,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
             scamData?.rects?.map((rect, i) => (
               <TransformableRect
                 key={i}
-                shapeProps={rect}
+                shapeProps={!checked || !rect.warning ? rect : { ...rect, warning: false }}
                 isSelected={rect.n === selectedId}
                 onSelect={() => onSelect(rect.n)}
                 {...{ onChange, addNew, portrait }}
