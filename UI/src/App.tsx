@@ -206,6 +206,8 @@ function App() {
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
   const [configReady, setConfigReady] = useAtom(state.configReady)
 
+  const [configs, setConfigs] = useAtom(state.configs)
+
   const [deselectAll, setDeselectAll] = useAtom(state.deselectAll)
 
   const saveSession = useCallback(async () => {
@@ -252,6 +254,11 @@ function App() {
         setJson(response.data)
         setSearchParams({ folder })
         setError("")
+
+        if(response.data.options_list?.length >= 1) { 
+          setConfigs(response.data.options_list)
+          setOptions(response.data.options_list[0])
+        }
 
         saveSession()
       })

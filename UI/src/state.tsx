@@ -51,3 +51,5 @@ export const checkedRestrict = atom(false)
 export const scamOptions = atom<ScamOptions>({ orient: "horizontal" })
 export const scamOptionsSelected = atom<ScamOptions>({ orient: "horizontal" })
 export const globalScamOptionsUpdate = atom<boolean>(false)
+
+export const configs = atom<ScamOptions[]>([])

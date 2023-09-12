@@ -38,6 +38,7 @@ export type ScamImageData = {
   width: number;
   pages?:Page[];
   rects?:KonvaPage[];
+  options_index?:number;
 };
 
 type PreprocessOptions = {
@@ -61,6 +62,7 @@ export type ScamData = {
   folder_path: string;
   preprocess_run: PreprocessRun;
   scam_runs: any[];
+  options_list?:ScamOptions[];
 };
 
 export type Orientation = "vertical" | "horizontal" | "custom"

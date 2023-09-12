@@ -13,6 +13,7 @@ import {
 import { useAtom } from "jotai";
 import debugFactory from "debug"
 import { encode } from "js-base64";
+import _ from "lodash"
 
 import { ConfigData, LocalData, Orientation, Page, SavedScamData, ScamData, ScamImageData, ScamOptions, ScamOptionsMap } from "../types"
 import SettingsMenu from "./SettingsMenu";
@@ -107,14 +108,21 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const publish = useCallback(async () => {
     
     setSaving(true)
-
+    
+    const configs:ScamOptions[] = [{ ...scamOptions }]
     const toSave = { 
       ...json, 
       files: json?.files.map(j => {
         const obj = allScamData[j.thumbnail_path] || {}
+        let currentConfig = !obj.options ? 0 : configs.findIndex(c => _.isEqual(c, obj.options))
+        if(obj.options && currentConfig == -1) {
+          configs.push(obj.options)
+          currentConfig = configs.length - 1
+        }        
         let data = { 
           ...j,
-          ...obj.data || {}
+          ...obj.data || {},
+          ...currentConfig > 0 ? {options_index: currentConfig} : {}
         }
         if(data.hidden) delete data.hidden
         if(data.checked) delete data.checked
@@ -128,10 +136,11 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
         return data
       }),
       checked,
-      pages_order: false // as long as the UI doesn't allow user to reorder annotations
+      pages_order: false, // as long as the UI doesn't allow user to reorder annotations
+      options_list: configs
     }
     
-    debug("publish", json, allScamData, toSave)
+    debug("publish", json, allScamData, toSave, configs)
 
     axios.post(apiUrl + "save_scam_json", {
       folder_path: folder,

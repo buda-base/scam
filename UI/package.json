@@ -23,6 +23,7 @@
     "jotai": "^2.2.2",
     "js-base64": "^3.7.5",
     "konva": "^9.2.0",
+    "lodash": "^4.17.21",
     "prop-types": "^15.8.1",
     "react": "^18.2.0",
     "react-beforeunload": "^2.6.0",
@@ -33,6 +34,7 @@
     "react-router-dom": "^6.14.2"
   },
   "devDependencies": {
+    "@types/lodash": "^4.14.198",
     "@types/react": "^18.0.37",
     "@types/react-beforeunload": "^2.1.1",
     "@types/react-dom": "^18.0.11",

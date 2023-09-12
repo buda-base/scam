@@ -382,6 +382,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
   
+  const [configs, setConfigs] = useAtom(state.configs)
+
   useEffect(() => {
     //debug("des:", image.thumbnail_path, deselectAll)
     if(deselectAll) selectShape(null)
@@ -510,12 +512,17 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
         //debug("previously uploaded data:", uploadedData)
 
+        let options
+        if(uploadedData.options_index != undefined) {
+          options = configs[uploadedData.options_index]
+        }
+
         setScamData(uploadedData)
         dispatch({
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data: { ...uploadedData }, state: 'uploaded', time: shouldRunAfter, image: image, visible, checked }
+            val: { data: { ...uploadedData }, state: 'uploaded', time: shouldRunAfter, image: image, visible, checked, options }
           }
         })
         return
@@ -591,7 +598,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           if(error.message != "canceled") console.error(error);
         });
     }
-  }, [restrictRun, selected, configReady, visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, scamOptionsSelected, setModified])
+  }, [configs, restrictRun, selected, configReady, visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, scamOptionsSelected, setModified])
 
   
   useEffect(() => {
