@@ -341,14 +341,15 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       pages: (tmpPages = image.pages.map((p) => withRotatedHandle(p, image)) as Page[]),
       rects: tmpPages.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, image.width, image.height))
     } : null
+
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const globalData = allScamData[image.thumbnail_path]
 
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
-  const [scamData, setScamData] = useState<ScamImageData | boolean>(uploadedData || (globalData?.time >= shouldRunAfter ? globalData.data : false))
-  const [lastRun, setLastRun] = useState(globalData?.time <= shouldRunAfter ? globalData.time : 0)
+  const [scamData, setScamData] = useState<ScamImageData | boolean>((!draft || loadDraft == false) && uploadedData || (globalData?.time >= shouldRunAfter ? globalData.data : false))
+  const [lastRun, setLastRun] = useState(globalData?.time <= shouldRunAfter ? globalData.time : 0)  
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
   const [portrait, setPortrait] = useState(false)
@@ -480,14 +481,14 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    //debug("gSR!", restrictRun, selected, configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
+    //debug("gSR!", image?.thumbnail_path, restrictRun, selected, configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
 
     if ((!restrictRun || selected) && configReady != false && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
       if(loadDraft === undefined) return
       else if(loadDraft && draft && !scamData) {        
         
-        debug("draft:", draft);
+        //debug("draft:", draft);
 
         const newData = {
           ...draft.data,
@@ -504,17 +505,17 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         if(visible != draft.visible) setVisible(draft.visible)
         if(checked != draft.checked) setChecked(draft.checked)
         return
-      }
 
-      if(typeof scamData == "object" && image.pages && !globalData) {
+      } else if(uploadedData && !globalData) {
 
-        //debug("previously uploaded data:", scamData)
+        //debug("previously uploaded data:", uploadedData)
 
+        setScamData(uploadedData)
         dispatch({
           type: 'ADD_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { data: { ...scamData }, state: 'uploaded', time: shouldRunAfter, image: image, visible, checked }
+            val: { data: { ...uploadedData }, state: 'uploaded', time: shouldRunAfter, image: image, visible, checked }
           }
         })
         return

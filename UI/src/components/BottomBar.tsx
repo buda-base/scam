@@ -268,13 +268,13 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   useEffect(() => {
     setSelectedImages(images.filter(im => selectedItems.includes(im.thumbnail_path)))
   }, [images, selectedItems])
- 
+  
   /*
   useEffect( () =>  {
     debug("data:",allScamData)
   }, [allScamData])
   */
-
+ 
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)
 
