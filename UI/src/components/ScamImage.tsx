@@ -28,7 +28,7 @@ const scam_options: ScamOptionsMap = {
   "nb_pages_expected": 2,
   "wh_ratio_range": [2.0, 7.0],
   "wh_ratio_range_warn": [1.5, 10],
-  "area_ratio_min": 0.2,
+  "area_ratio_range": [0.2, 0.5],
   "area_diff_max": 0.15,
   "area_diff_max_warn": 0.7,
   "use_rotation": true,

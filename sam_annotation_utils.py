@@ -321,8 +321,9 @@ def add_scam_results(file_info, sam_ann_list, scam_options):
     for i, ann in enumerate(anns_by_area):
         ann_ratio = ann.bbox[2] / float(ann.bbox[3])
         print_debug("ann %d, bbox %s, aspect ratio %f" % (i, str(ann.bbox), ann_ratio))
-        if ann.contour_area / total_area < scam_options["area_ratio_min"]:
-            print_debug("reject annotation with ratio = %f < %f" % (ann.contour_area / total_area, scam_options["area_ratio_min"]))
+        area_ratio = ann.contour_area / total_area
+        if area_ratio < scam_options["area_ratio_range"][0] or area_ratio > scam_options["area_ratio_range"][1]:
+            print_debug("reject annotation with ratio = %f not in [%f, %f]" % (area_ratio, scam_options["area_ratio_range"][0], scam_options["area_ratio_range"][1]))
             break
         if scam_options["direction"] == "vertical" and ann.touches_top_bottom():
             print_debug("ann %d touches top and bottom edges, exclude" % i)
