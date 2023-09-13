@@ -108,6 +108,9 @@ export type ScamOptions = {
   direc?: Direction,
   minRatio?: number,
   maxRatio?: number
+  minAreaRatio?: number,
+  maxAreaRatio?: number,
+  minSquarish?: number
 }
 
 export type Filter = 'all' | 'warning' | 'unchecked'

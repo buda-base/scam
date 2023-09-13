@@ -39,6 +39,9 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+  const [minAreaRatio, setMinAreaRatio] = useAtom(state.minAreaRatioAtom)
+  const [maxAreaRatio, setMaxAreaRatio] = useAtom(state.maxAreaRatioAtom)
+  const [minSquarish, setMinSquarish] = useAtom(state.minSquarishAtom)
 
   const [popChecked, setPopChecked] = useState(false)
   const [checked, setChecked] = useState(false)
@@ -63,16 +66,17 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
 
   const updateOptions = useCallback(() => {
-    const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages }:{} }        
+    const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish }:{} }        
     //debug("opts!", opts, selectedItems.length, globalScamOptionsUpdate, checkedRestrict)
     if(selectedItems.length > 0 && !checkedRestrict || !selectedItems.length || globalScamOptionsUpdate) setScamOptions(opts)
     else setScamOptionsSelected(opts)    
     if(globalScamOptionsUpdate != false) setGlobalScamOptionsUpdate(false)
-  }, [ orient, direc, minRatio, maxRatio, nbPages, selectedItems, globalScamOptionsUpdate, checkedRestrict ])   
+  }, [orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, selectedItems.length, checkedRestrict, globalScamOptionsUpdate, 
+      setScamOptions, setScamOptionsSelected, setGlobalScamOptionsUpdate])   
     
   useEffect(() => {
     updateOptions()
-  },[ orient, direc, minRatio, maxRatio, nbPages, selectedItems, globalScamOptionsUpdate])
+  },[ orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, selectedItems, globalScamOptionsUpdate])
 
   /*
   useEffect(() =>  {

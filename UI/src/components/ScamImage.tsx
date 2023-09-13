@@ -57,11 +57,24 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
   const handleX = portrait ? height/2 : width/2
   const handleY = portrait ? width/2 : height/2
 
-  const ratio = Math.round(1000*(rotatedHandle?height/width:width/height)) / 1000
+  const ratio = useMemo(() => 
+    Math.round(1000*(rotatedHandle?height/width:width/height)) / 1000, 
+    [rotatedHandle, width, height]
+  )
 
   const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
+  const [selectedAreaRatio, setSelectedAreaRatio ] = useAtom(state.selectedAreaRatio) 
   useEffect(() => {
-    if(isSelected) setSelectedRatio(ratio)
+    if(isSelected && shRef.current) {
+      const stage = shRef.current.getStage()
+      if(stage) {
+        const W = stage.attrs.width - 2 * padding, H = stage.attrs.height - 2 * padding, 
+          w = shRef.current.attrs.width, h = shRef.current.attrs.height, 
+          areaRatio = Math.round(1000 * (w * h) / (W * H)) / 1000
+        setSelectedRatio(ratio)
+        setSelectedAreaRatio(areaRatio)
+      }
+    }
   }, [isSelected, ratio])
 
   
@@ -70,8 +83,12 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
     <>
       { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
           text={"[ratio="+ratio+"]"} verticalAlign='middle' align='center' width={150} height={30} fontSize={15}
-          {...{ x: x + padding + handleX - 75, y: y + padding + handleY - 15 }} 
+          {...{ x: x + padding + handleX - 75, y: y + padding + handleY - 10 }} 
         /> }
+      { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
+        text={"[area ratio="+selectedAreaRatio+"]"} verticalAlign='middle' align='center' width={200} height={30} fontSize={15}
+        {...{ x: x + padding + handleX - 100, y: y + padding + handleY + 10 }} 
+      /> }
       <Rect
         ref={shRef}
         {...{ x: x + padding + handleX, y: y + padding + handleY, width, height, rotation, offsetX: handleX, offsetY: handleY }}
@@ -391,6 +408,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+  const [minAreaRatio, setMinAreaRatio] = useAtom(state.minAreaRatioAtom)
+  const [maxAreaRatio, setMaxAreaRatio] = useAtom(state.maxAreaRatioAtom)
+  const [minSquarish, setMinSquarish] = useAtom(state.minSquarishAtom)
   
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
@@ -398,6 +418,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [configs, setConfigs] = useAtom(state.configs)
   
   const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
+  const [selectedAreaRatio, setSelectedAreaRatio ] = useAtom(state.selectedAreaRatio) 
 
   useEffect(() => {
     //debug("des:", image.thumbnail_path, deselectAll)
@@ -564,7 +585,13 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           ? direc
           : orient === 'horizontal'
             ? 'vertical'
-            : 'horizontal'
+            : 'horizontal',
+        "area_ratio_range": orient == "custom"
+          ? [minAreaRatio, maxAreaRatio]
+          : [0.2, 0.5],
+        "squarishness_min": orient == "custom" 
+          ? minSquarish
+          : 0.85
       }
       
 
@@ -636,6 +663,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     if (clickedOnEmpty) {
       selectShape(null);
       setSelectedRatio(0);
+      setSelectedAreaRatio(0);
     }
   };
   const checkDeselectDiv: MouseEventHandler<HTMLDivElement> = (e) => {
@@ -644,6 +672,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     if (clickedOnEmpty) {
       selectShape(null);
       setSelectedRatio(0);
+      setSelectedAreaRatio(0);
     }
   };
 

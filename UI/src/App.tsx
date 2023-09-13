@@ -204,6 +204,9 @@ function App() {
   const [minRatio, setMinRatio] = useAtom(state.minRatioAtom)
   const [maxRatio, setMaxRatio] = useAtom(state.maxRatioAtom)
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+  const [minAreaRatio, setMinAreaRatio] = useAtom(state.minAreaRatioAtom)
+  const [maxAreaRatio, setMaxAreaRatio] = useAtom(state.maxAreaRatioAtom)
+  const [minSquarish, setMinSquarish] = useAtom(state.minSquarishAtom)
   const [configReady, setConfigReady] = useAtom(state.configReady)
 
   const [configs, setConfigs] = useAtom(state.configs)
@@ -335,6 +338,9 @@ function App() {
     if(options.minRatio) setMinRatio(options.minRatio)
     if(options.maxRatio) setMaxRatio(options.maxRatio)
     if(options.nbPages) setNbPages(options.nbPages)    
+    if(options.minAreaRatio) setMinAreaRatio(options.minAreaRatio)
+    if(options.maxAreaRatio) setMaxAreaRatio(options.maxAreaRatio)
+    if(options.minSquarish) setMinSquarish(options.minSquarish)
   }
 
   useEffect(() => {
