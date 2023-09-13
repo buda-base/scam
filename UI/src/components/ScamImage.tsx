@@ -1,7 +1,7 @@
 import React, { FC, MouseEventHandler, useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from "react";
 import debugFactory from "debug"
 import { encode } from "js-base64"
-import { Layer, Stage, Image as KImage, Rect, Transformer } from "react-konva";
+import { Layer, Stage, Image as KImage, Rect, Transformer, Text } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
 import { useInView } from "react-intersection-observer";
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
@@ -40,7 +40,7 @@ const scam_options: ScamOptionsMap = {
 
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
-  const { x, y, width, height, rotation, warning } = props.shapeProps;
+  const { x, y, width, height, rotation, warning, rotatedHandle } = props.shapeProps;
   const { isSelected, addNew, portrait, onSelect, onChange } = props
 
   const shRef = useRef<Konva.Rect>(null)
@@ -57,8 +57,21 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
   const handleX = portrait ? height/2 : width/2
   const handleY = portrait ? width/2 : height/2
 
+  const ratio = Math.round(1000*(rotatedHandle?height/width:width/height)) / 1000
+
+  const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
+  useEffect(() => {
+    if(isSelected) setSelectedRatio(ratio)
+  }, [isSelected, ratio])
+
+  
+
   return (
     <>
+      { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
+          text={"[ratio="+ratio+"]"} verticalAlign='middle' align='center' width={150} height={30} fontSize={15}
+          {...{ x: x + padding + handleX - 75, y: y + padding + handleY - 15 }} 
+        /> }
       <Rect
         ref={shRef}
         {...{ x: x + padding + handleX, y: y + padding + handleY, width, height, rotation, offsetX: handleX, offsetY: handleY }}
@@ -125,7 +138,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
           }
           return p
         }}
-      />
+      />      
 
       {isSelected && (
         <Transformer
@@ -240,7 +253,7 @@ let unmount = false
 
 
 export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: number, H: number) => {
-  const { minAreaRect: rect } = r
+  const { minAreaRect: rect, rotatedHandle } = r
   const n = i
   const width = rect[2] * w / W
   const height = rect[3] * h / H
@@ -248,7 +261,7 @@ export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: num
   const y = rect[1] * h / H - height / 2
   const rotation = rect[4]
   const warning = r.warnings.length > 0
-  return ({ n, x, y, width, height, rotation, warning })
+  return ({ n, x, y, width, height, rotation, warning, rotatedHandle })
 }
 
 export const withRotatedHandle = (r: Page, data: ScamImageData) => {    
@@ -383,6 +396,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
   
   const [configs, setConfigs] = useAtom(state.configs)
+  
+  const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
 
   useEffect(() => {
     //debug("des:", image.thumbnail_path, deselectAll)
@@ -620,6 +635,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.attrs.image;
     if (clickedOnEmpty) {
       selectShape(null);
+      setSelectedRatio(0);
     }
   };
   const checkDeselectDiv: MouseEventHandler<HTMLDivElement> = (e) => {
@@ -627,6 +643,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     const clickedOnEmpty = !["CANVAS", "SVG", "PATH", "BUTTON"].includes((e.target as HTMLDivElement).nodeName.toUpperCase())
     if (clickedOnEmpty) {
       selectShape(null);
+      setSelectedRatio(0);
     }
   };
 
@@ -904,7 +921,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
                 shapeProps={!checked || !rect.warning ? rect : { ...rect, warning: false }}
                 isSelected={rect.n === selectedId}
                 onSelect={() => onSelect(rect.n)}
-                {...{ onChange, addNew, portrait }}
+                {...{ onChange, addNew, portrait  }}
               />)
             )
           }

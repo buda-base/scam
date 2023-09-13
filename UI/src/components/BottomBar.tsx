@@ -8,7 +8,7 @@ import {
   DialogActions,
   DialogContent,
   DialogContentText,
-  DialogTitle,
+  DialogTitle
 } from '@mui/material';
 import { useAtom } from "jotai";
 import debugFactory from "debug"
@@ -298,6 +298,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     setOptions(scamOptions)
     setSelectedItems([])
   }
+
 
   return (<nav className="bot">
     <Box>

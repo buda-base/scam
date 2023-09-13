@@ -53,3 +53,5 @@ export const scamOptionsSelected = atom<ScamOptions>({ orient: "horizontal" })
 export const globalScamOptionsUpdate = atom<boolean>(false)
 
 export const configs = atom<ScamOptions[]>([])
+
+export const selectedRatio = atom(0)

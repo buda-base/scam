@@ -1,9 +1,13 @@
-import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme } from "@mui/material"
-import { useState } from "react"
+import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, IconButton } from "@mui/material"
+import { useEffect, useState } from "react"
 import { useAtom } from "jotai"
+import { SystemUpdateAlt } from "@mui/icons-material"
+import debugFactory from "debug"
 
 import * as state from "../state"
 import { Orientation, Direction } from "../types"
+
+const debug = debugFactory("scam:menu")
 
 const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: ConfigData } */) => {
   //const { folder, config, image } = props;
@@ -17,6 +21,18 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
   //const [modified, setModified] = useAtom(state.modified)
 
   const [editRatio, setEditRatio] = useState(false)
+  const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
+
+  useEffect(() => {
+    if(maxRatio < minRatio) {
+      const minR = minRatio
+      const maxR = maxRatio
+      setMinRatio(maxR)
+      setMaxRatio(minR)
+    }
+  }, [ minRatio, maxRatio])
+
+  //debug("sR:", selectedRatio)
 
   const theme = useTheme()
 
@@ -39,27 +55,39 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
             <InputLabel shrink={false} id="custom-label" style={{ fontSize:12, lineHeight: "14px", height:16, color: editRatio ? theme.palette.primary.main : theme.palette.text.secondary }}>
               Page aspect ratio range
             </InputLabel>
-            <TextField
-              type="number"
-              sx={{ width:"90px", marginRight:"8px" }}
-              inputProps={{ style:{ textAlign: "left" }, step: 0.001, min:0.001, max:15.0 }}
-              variant="standard"
-              value={minRatio}
-              onChange={(e) => setMinRatio(Number(e.target.value))}
-              onFocus={() => setEditRatio(true)}
-              onBlur={() => setEditRatio(false)}
-            />
+            <span>
+              <IconButton disabled={selectedRatio === 0} onClick={() => setMinRatio(selectedRatio)}
+                  sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
+                <SystemUpdateAlt sx={{height:16}} />
+              </IconButton>
+              <TextField
+                type="number"
+                sx={{ width:"110px", marginRight:"8px" }}
+                inputProps={{ style:{ textAlign: "left", paddingLeft:"28px" }, step: 0.001, min:0.001, max:15.0 }}
+                variant="standard"
+                value={minRatio}
+                onChange={(e) => setMinRatio(Number(e.target.value))}
+                onFocus={() => setEditRatio(true)}
+                onBlur={() => setEditRatio(false)}
+              />
+            </span>
             <span style={{ fontSize: "16px", lineHeight: "30px" }}>...</span>
-            <TextField
-              type="number"
-              sx={{ width:"90px", marginLeft:"8px" }}
-              inputProps={{ step: 0.001, min:0.001, max:15.0 }}
-              variant="standard"
-              value={maxRatio}
-              onChange={(e) => setMaxRatio(Number(e.target.value))}
-              onFocus={() => setEditRatio(true)}
-              onBlur={() => setEditRatio(false)}
-            />
+            <span>
+              <IconButton disabled={selectedRatio === 0}  onClick={() => setMaxRatio(selectedRatio)}
+                  sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
+                <SystemUpdateAlt sx={{height:16}} />
+              </IconButton>
+              <TextField
+                type="number"
+                sx={{ width:"110px", marginLeft:"8px" }}
+                inputProps={{ step: 0.001, min:0.001, max:15.0, style: { paddingLeft:"28px" } }}
+                variant="standard"
+                value={maxRatio}
+                onChange={(e) => setMaxRatio(Number(e.target.value))}
+                onFocus={() => setEditRatio(true)}
+                onBlur={() => setEditRatio(false)}
+                />
+            </span>
           </Box>
           <Box sx={{ marginTop:"16px" }}>
             <TextField

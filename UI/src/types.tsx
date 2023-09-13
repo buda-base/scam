@@ -19,6 +19,7 @@ export type KonvaPage = {
   height:number;
   rotation:number;
   warning:boolean;
+  rotatedHandle?:boolean;
 };
 
 export type ScamImageData = {
