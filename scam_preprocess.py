@@ -111,7 +111,10 @@ def preprocess_csv():
     with open(sys.argv[1], newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
-            preprocess_folder(row[0])
+            folder = row[0]
+            if not folder.endswith('/'):
+                folder += "/"
+            preprocess_folder(folder)
 
 if __name__ == '__main__':
     preprocess_csv()
