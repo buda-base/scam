@@ -130,7 +130,10 @@ def postprocess_csv():
     with open(sys.argv[1], newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
-            postprocess_folder(row[0])
+            folder = row[0]
+            if not folder.endswith('/'):
+                folder += "/"
+            postprocess_folder(folder)
 
 if __name__ == '__main__':
     postprocess_csv()
