@@ -149,8 +149,6 @@ function App() {
 
 
   useEffect(() => {
-    document.title = "SCAM QC platform"
-  
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyDown);

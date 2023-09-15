@@ -293,7 +293,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
 
   const hasChecked = selectedImages.some(im => allScamData[im.thumbnail_path]?.checked)
   const hasUnchecked = selectedImages.some(im => !allScamData[im.thumbnail_path]?.checked)
-  const hasHidden = selectedImages.some(im => !allScamData[im.thumbnail_path]?.visible)
+  const hasHidden = selectedImages.some(im => allScamData[im.thumbnail_path]?.visible === false)
   const hasVisible = selectedImages.some(im => allScamData[im.thumbnail_path]?.visible)
 
   const handleDeselectAll = () => {
@@ -302,7 +302,6 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     setOptions(scamOptions)
     setSelectedItems([])
   }
-
 
   return (<nav className="bot">
     <Box>

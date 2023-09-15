@@ -27,8 +27,13 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
     if(!addNew) selectShape(null)
     setAddNew(!addNew)
   }
+  
+  const [deselectAll, setDeselectAll] = useAtom(state.deselectAll)
+  const handleClick = useCallback(() => { 
+    if(selectedId == null) setDeselectAll(true)
+  },[selectedId])
 
-  return (<div className="image-menu">
+  return (<div className="image-menu" onClick={handleClick}>
     <span>
       <IconButton onClick={toggleCheck}>
         { checked 

@@ -93,7 +93,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 }
 
 .scam-image.grid-3x2 {
-   width:calc(100% / 3 - 4px); 
+  width:calc(100% / 3 - 4px); 
 }
 
 .scam-image.grid-4x3 {

@@ -139,7 +139,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
           let stage:any = shRef.current
           while(stage?.parent) stage = stage.parent ;
           const b = shRef.current?.getClientRect()                    
-          if(b) {
+          if(b && !portrait) {
             if(p.x <= padding + b.width / 2) {
               p.x = padding + b.width / 2
             }
@@ -151,7 +151,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             }
             if(p.y >= stage.attrs.height - padding - b.height / 2) {            
               p.y = stage.attrs.height - padding - b.height / 2 
-            }
+            }          
           }
           return p
         }}
@@ -352,17 +352,27 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   })
   const figureRef = useRef<HTMLElement>(null)
 
+  const [portrait, setPortrait] = useState(false)
+  useEffect(() => {
+    setPortrait([90,270].includes(image.rotation) ? true : false)
+  }, [image.rotation])
+
   useEffect(() => {    
     if (figureRef.current?.parentElement) { 
-      const w = (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding 
+      let w = (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding 
       if(w != dimensions.width) {
+        let h = w * image.height / image.width
+        if(portrait && w > h) {
+          h = w
+          w = 50 //h * image.width / image.height
+        } 
         setDimensions({
           width: w,
-          height: w * image.height / image.width
+          height: h
         })
       }
     }    
-  }, [grid, figureRef, dimensions, image, windowSize])
+  }, [grid, figureRef, dimensions, image, windowSize, portrait])
 
 
   let tmpPages ;
@@ -382,10 +392,6 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [lastRun, setLastRun] = useState(globalData?.time <= shouldRunAfter ? globalData.time : 0)  
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
-  const [portrait, setPortrait] = useState(false)
-  useEffect(() => {
-    setPortrait([90,270].includes(image.rotation) ? true : false)
-  }, [image.rotation])
 
   const [showDebug, setShowDebug] = useState(false)
   const [selectedId, selectShape] = useState<number | null>(null);
@@ -897,11 +903,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const actualW = (portrait ? dimensions.height : dimensions.width)
   const actualH = (portrait ? dimensions.width : dimensions.height)
 
-  //debug("dim:",image.thumbnail_path, dimensions, actualW, actualH)
+  debug("dim:",image.thumbnail_path, dimensions, actualW, actualH)
 
   return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid)}
-    style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info.width + 2*padding }}
+    style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info[portrait ? "height":"width"] + 2*padding }}
     onMouseDown={checkDeselectDiv}
   >
     <figure className={"visible-"+visible + " newPage-"+(newPage.length > 0) + " selected-"+(selectedId == null ? "false":"true")} ref={figureRef} 
