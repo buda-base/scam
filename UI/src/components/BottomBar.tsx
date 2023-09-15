@@ -66,7 +66,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
 
   const updateOptions = useCallback(() => {
-    const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish }:{} }        
+    const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish }:{} }
     //debug("opts!", opts, selectedItems.length, globalScamOptionsUpdate, checkedRestrict)
     if(selectedItems.length > 0 && !checkedRestrict || !selectedItems.length || globalScamOptionsUpdate) setScamOptions(opts)
     else setScamOptionsSelected(opts)    
@@ -78,7 +78,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
     updateOptions()
   },[ orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, selectedItems, globalScamOptionsUpdate])
 
-  /*
+  /*  
   useEffect(() =>  {
     debug("scamOpt:", scamOptions)
   }, [scamOptions])
@@ -271,7 +271,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
           found = true
           break ;
         }
-        if(!found) setOptions(scamOptions)
+        if(!found) setOptions(scamOptionsSelected)
       } 
     }
     setShowSettings(true)
