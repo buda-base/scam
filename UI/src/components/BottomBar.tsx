@@ -228,7 +228,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void  }) => {
   const { folder, config, json, selectedItems, images, setSelectedItems, markChecked, markHidden, setOptions } = props;
 
-  const [showSettings, setShowSettings] = useState(false)
+  const [showSettings, setShowSettings] = useAtom(state.showSettings)
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)

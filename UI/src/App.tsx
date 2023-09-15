@@ -31,6 +31,9 @@ export const discardDraft = async (folder: string) => {
 
 let oldHandleSelectStart: { (this: Window, ev: Event): any; (ev: any): void; (this: Window, ev: Event): any; } | null = null
 
+let oldHandleKeyUp: { (this: Window, ev: KeyboardEvent): void; (): void; }, 
+  oldHandleKeyDown: { (this: Window, ev: KeyboardEvent): any; (this: Window, ev: KeyboardEvent): any; }
+
 function App() {
 
   const [config, setConfig] = useState<ConfigData>({} as ConfigData)
@@ -49,6 +52,8 @@ function App() {
   const [lastSelectedItem, setLastSelectedItem] = useState("")
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
+
+  const [showSettings, setShowSettings] = useAtom(state.showSettings)
 
   const handleSelectStart = useCallback((ev: { preventDefault: () => void; }) => {
     if (keyDown == "Shift") {
@@ -118,23 +123,34 @@ function App() {
 
   }, [allScamData, images, keyDown, lastSelectedItem, scamOptions, selectedItems])
 
+  const handleKeyDown = useCallback((e: { key: string; }) => {
+    //debug("down", e.key, showSettings)
+    if(!showSettings) setKeyDown(e.key)
+  }, [showSettings])
+
+  const handleKeyUp = useCallback(() => {
+    //debug("up", showSettings)
+    if(!showSettings) setKeyDown('')
+  }, [showSettings])
+
+
   useEffect(() => {
-    document.title = "SCAM QC platform"
+  
+    window.removeEventListener('keydown', oldHandleKeyDown);
+    window.removeEventListener('keyup', oldHandleKeyUp);
     
-    const handleKeyDown = (e: { key: string; }) => {
-      //debug("down",e.key)
-      setKeyDown(e.key)
-    }
-
-    const handleKeyUp = () => {
-      //debug("up")
-      setKeyDown('')
-    }
-
-
     window.addEventListener('keydown', handleKeyDown);      
     window.addEventListener('keyup', handleKeyUp);      
 
+    oldHandleKeyDown = handleKeyDown
+    oldHandleKeyUp = handleKeyUp
+
+  }, [handleKeyDown, handleKeyUp])
+
+
+  useEffect(() => {
+    document.title = "SCAM QC platform"
+  
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyDown);

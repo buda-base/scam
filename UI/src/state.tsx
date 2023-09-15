@@ -59,3 +59,5 @@ export const configs = atom<ScamOptions[]>([])
 
 export const selectedRatio = atom(0)
 export const selectedAreaRatio = atom(0)
+
+export const showSettings = atom(false);
