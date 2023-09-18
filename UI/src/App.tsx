@@ -139,8 +139,8 @@ function App() {
     window.removeEventListener('keydown', oldHandleKeyDown);
     window.removeEventListener('keyup', oldHandleKeyUp);
     
-    window.addEventListener('keydown', handleKeyDown);      
-    window.addEventListener('keyup', handleKeyUp);      
+    //window.addEventListener('keydown', handleKeyDown);      
+    //window.addEventListener('keyup', handleKeyUp);      
 
     oldHandleKeyDown = handleKeyDown
     oldHandleKeyUp = handleKeyUp
@@ -150,8 +150,9 @@ function App() {
 
   useEffect(() => {
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyDown);
+      //window.removeEventListener('keydown', handleKeyDown);
+      //window.removeEventListener('keyup', handleKeyDown);
+      
       if(oldHandleSelectStart) window.removeEventListener('selectstart', oldHandleSelectStart);   
     }
   }, []);

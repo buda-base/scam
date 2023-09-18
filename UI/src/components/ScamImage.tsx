@@ -359,13 +359,17 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   useEffect(() => {    
     if (figureRef.current?.parentElement) { 
-      let w = (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding 
-      if(w != dimensions.width) {
-        let h = w * image.height / image.width
-        if(portrait && w > h) {
+      let w = Math.max(300, (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding)
+      let h = w * image.height / image.width 
+      if(portrait) {
+        if(w > h) {
+          h = Math.max(300, h)
+        } else if(h > w) { 
           h = w
-          w = 50 //h * image.width / image.height
-        } 
+        }
+        w = h * image.width / image.height
+      }
+      if(w != dimensions.width || h != dimensions.height) {
         setDimensions({
           width: w,
           height: h
@@ -594,7 +598,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
             : 'horizontal',
         "area_ratio_range": orient == "custom"
           ? [minAreaRatio, maxAreaRatio]
-          : [0.2, 0.5],
+          : [0.2, 0.9],
         "squarishness_min": orient == "custom" 
           ? minSquarish
           : 0.85
@@ -902,8 +906,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const actualW = (portrait ? dimensions.height : dimensions.width)
   const actualH = (portrait ? dimensions.width : dimensions.height)
-
-  debug("dim:",image.thumbnail_path, dimensions, actualW, actualH)
+ 
+  //debug("dim:",image.thumbnail_path, dimensions, actualW, actualH, portrait)
 
   return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid)}

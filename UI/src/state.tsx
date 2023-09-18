@@ -13,7 +13,7 @@ export const minRatioAtom = atom(0.145)
 export const maxRatioAtom = atom(0.5)
 export const nbPagesAtom = atom(2)
 export const minAreaRatioAtom = atom(0.2)
-export const maxAreaRatioAtom = atom(0.5)
+export const maxAreaRatioAtom = atom(0.9)
 export const minSquarishAtom = atom(0.85)
 export const configReady = atom<boolean|undefined>(undefined)
 
