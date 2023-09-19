@@ -83,11 +83,11 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
     <>
       { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
           text={"[ratio="+ratio+"]"} verticalAlign='middle' align='center' width={150} height={30} fontSize={15}
-          {...{ x: x + padding + handleX - 75, y: y + padding + handleY - 10 }} 
+          {...{ x: x + (portrait ? handleY : handleX) - 75 + padding, y: y + (portrait ? handleX : handleY) - 10 - 15 + padding }} 
         /> }
       { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
         text={"[area ratio="+selectedAreaRatio+"]"} verticalAlign='middle' align='center' width={200} height={30} fontSize={15}
-        {...{ x: x + padding + handleX - 100, y: y + padding + handleY + 10 }} 
+        {...{ x: x + (portrait ? handleY : handleX) - 100 + padding, y: y + (portrait ? handleX : handleY) + 10 - 15 + padding}} 
       /> }
       <Rect
         ref={shRef}
@@ -554,9 +554,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         if(checked != draft.checked) setChecked(draft.checked)
         return
 
-      } else if(uploadedData && !globalData) {
+      } else if(uploadedData && (!globalData || globalData.state === "uploaded")) {
 
-        //debug("previously uploaded data:", uploadedData)
+        //debug("previously uploaded data:", image.thumbnail_path, uploadedData)
 
         let options
         if(uploadedData.options_index != undefined) {
@@ -863,7 +863,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const rotate = useCallback((angle: number) => {
     const rotation = (image.rotation + angle + 360) % 360    
-    setImageData({...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation })    
+    const newImage = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
+    if(newImage.pages) delete newImage.pages
+    setImageData(newImage)    
     setModified(true)
     setLastRun(1)
   }, [ image, shouldRunAfter ])

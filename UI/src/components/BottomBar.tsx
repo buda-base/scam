@@ -287,9 +287,17 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     debug("data:",allScamData)
   }, [allScamData])
   */
- 
+   
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)
+  useEffect(() => {
+    const restoreGrid = async () => {
+      const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+      if(local.grid) setGrid(local.grid)
+    }
+    restoreGrid()
+  }, [])
+
 
   const hasChecked = selectedImages.some(im => allScamData[im.thumbnail_path]?.checked)
   const hasUnchecked = selectedImages.some(im => !allScamData[im.thumbnail_path]?.checked)
@@ -303,6 +311,16 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     setSelectedItems([])
   }
 
+  const saveGrid = useCallback(async () => {
+    const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+    local.grid = grid
+    localStorage.setItem("scamUI", JSON.stringify(local))
+  }, [ grid])
+
+  useEffect(() => { 
+    saveGrid() 
+  }, [grid])
+  
   return (<nav className="bot">
     <Box>
       <IconButton onClick={() => handleSettings()}>

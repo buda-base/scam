@@ -41,7 +41,7 @@ export const modified = atom(false)
 export const drafted = atom(false)
 
 export const filter = atom('all')
-export const grid = atom('3x2') //'2x1')
+export const grid = atom('3x2') 
 
 export const keyDown = atom('')
 export const focused = atom('')

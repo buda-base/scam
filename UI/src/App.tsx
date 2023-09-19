@@ -152,7 +152,6 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyDown);
-      
       if(oldHandleSelectStart) window.removeEventListener('selectstart', oldHandleSelectStart);   
     }
   }, []);
