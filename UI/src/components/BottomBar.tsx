@@ -375,7 +375,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       >
         <MenuItem value={0} disabled>{"..."}</MenuItem>
         <hr/>
-        <MenuItem value={1} onClick={selectWithWarnings}>{"Select images with warnings"}</MenuItem>
+        <MenuItem value={1} onClick={selectWithWarnings}>{"Select images with warning"}</MenuItem>
         <MenuItem value={1} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
         <MenuItem value={1} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
         <hr/>
