@@ -83,11 +83,11 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
     <>
       { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
           text={"[ratio="+ratio+"]"} verticalAlign='middle' align='center' width={150} height={30} fontSize={15}
-          {...{ x: x + padding + handleX - 75, y: y + padding + handleY - 10 }} 
+          {...{ x: x + (portrait ? handleY : handleX) - 75 + padding, y: y + (portrait ? handleX : handleY) - 10 - 15 + padding }} 
         /> }
       { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
         text={"[area ratio="+selectedAreaRatio+"]"} verticalAlign='middle' align='center' width={200} height={30} fontSize={15}
-        {...{ x: x + padding + handleX - 100, y: y + padding + handleY + 10 }} 
+        {...{ x: x + (portrait ? handleY : handleX) - 100 + padding, y: y + (portrait ? handleX : handleY) + 10 - 15 + padding}} 
       /> }
       <Rect
         ref={shRef}
@@ -139,7 +139,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
           let stage:any = shRef.current
           while(stage?.parent) stage = stage.parent ;
           const b = shRef.current?.getClientRect()                    
-          if(b) {
+          if(b && !portrait) {
             if(p.x <= padding + b.width / 2) {
               p.x = padding + b.width / 2
             }
@@ -151,7 +151,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
             }
             if(p.y >= stage.attrs.height - padding - b.height / 2) {            
               p.y = stage.attrs.height - padding - b.height / 2 
-            }
+            }          
           }
           return p
         }}
@@ -352,17 +352,31 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   })
   const figureRef = useRef<HTMLElement>(null)
 
+  const [portrait, setPortrait] = useState(false)
+  useEffect(() => {
+    setPortrait([90,270].includes(image.rotation) ? true : false)
+  }, [image.rotation])
+
   useEffect(() => {    
     if (figureRef.current?.parentElement) { 
-      const w = (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding 
-      if(w != dimensions.width) {
+      let w = Math.max(300, (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding)
+      let h = w * image.height / image.width 
+      if(portrait) {
+        if(w > h) {
+          h = Math.max(300, h)
+        } else if(h > w) { 
+          h = w
+        }
+        w = h * image.width / image.height
+      }
+      if(w != dimensions.width || h != dimensions.height) {
         setDimensions({
           width: w,
-          height: w * image.height / image.width
+          height: h
         })
       }
     }    
-  }, [grid, figureRef, dimensions, image, windowSize])
+  }, [grid, figureRef, dimensions, image, windowSize, portrait])
 
 
   let tmpPages ;
@@ -382,10 +396,6 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [lastRun, setLastRun] = useState(globalData?.time <= shouldRunAfter ? globalData.time : 0)  
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
-  const [portrait, setPortrait] = useState(false)
-  useEffect(() => {
-    setPortrait([90,270].includes(image.rotation) ? true : false)
-  }, [image.rotation])
 
   const [showDebug, setShowDebug] = useState(false)
   const [selectedId, selectShape] = useState<number | null>(null);
@@ -544,9 +554,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         if(checked != draft.checked) setChecked(draft.checked)
         return
 
-      } else if(uploadedData && !globalData) {
+      } else if(uploadedData && (!globalData || globalData.state === "uploaded")) {
 
-        //debug("previously uploaded data:", uploadedData)
+        //debug("previously uploaded data:", image.thumbnail_path, uploadedData)
 
         let options
         if(uploadedData.options_index != undefined) {
@@ -588,7 +598,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
             : 'horizontal',
         "area_ratio_range": orient == "custom"
           ? [minAreaRatio, maxAreaRatio]
-          : [0.2, 0.5],
+          : [0.2, 0.9],
         "squarishness_min": orient == "custom" 
           ? minSquarish
           : 0.85
@@ -853,7 +863,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const rotate = useCallback((angle: number) => {
     const rotation = (image.rotation + angle + 360) % 360    
-    setImageData({...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation })    
+    const newImage = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
+    if(newImage.pages) delete newImage.pages
+    setImageData(newImage)    
     setModified(true)
     setLastRun(1)
   }, [ image, shouldRunAfter ])
@@ -896,12 +908,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const actualW = (portrait ? dimensions.height : dimensions.width)
   const actualH = (portrait ? dimensions.width : dimensions.height)
-
-  //debug("dim:",image.thumbnail_path, dimensions, actualW, actualH)
+ 
+  //debug("dim:",image.thumbnail_path, dimensions, actualW, actualH, portrait)
 
   return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid)}
-    style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info.width + 2*padding }}
+    style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info[portrait ? "height":"width"] + 2*padding }}
     onMouseDown={checkDeselectDiv}
   >
     <figure className={"visible-"+visible + " newPage-"+(newPage.length > 0) + " selected-"+(selectedId == null ? "false":"true")} ref={figureRef} 

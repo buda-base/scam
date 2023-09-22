@@ -13,7 +13,7 @@ export const minRatioAtom = atom(0.145)
 export const maxRatioAtom = atom(0.5)
 export const nbPagesAtom = atom(2)
 export const minAreaRatioAtom = atom(0.2)
-export const maxAreaRatioAtom = atom(0.5)
+export const maxAreaRatioAtom = atom(0.9)
 export const minSquarishAtom = atom(0.85)
 export const configReady = atom<boolean|undefined>(undefined)
 
@@ -41,7 +41,7 @@ export const modified = atom(false)
 export const drafted = atom(false)
 
 export const filter = atom('all')
-export const grid = atom('2x1') //'1x1')
+export const grid = atom('3x2') 
 
 export const keyDown = atom('')
 export const focused = atom('')
@@ -59,3 +59,5 @@ export const configs = atom<ScamOptions[]>([])
 
 export const selectedRatio = atom(0)
 export const selectedAreaRatio = atom(0)
+
+export const showSettings = atom(false);

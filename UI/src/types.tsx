@@ -70,7 +70,7 @@ export type Orientation = "vertical" | "horizontal" | "custom"
 
 export type Direction = "vertical" | "horizontal"  ;
 
-export type ScamDataState = 'new' | 'modified' | 'savedDraft' | 'savedOnline'
+export type ScamDataState = 'new' | 'modified' | 'savedDraft' | 'uploaded'
 
 export type SavedScamData = {
   time: number;
@@ -99,7 +99,8 @@ export type LocalData = {
   }, 
   sessions: {
     [str:string]: number
-  }
+  },
+  grid: string
 }
 
 export type ScamOptions = {
