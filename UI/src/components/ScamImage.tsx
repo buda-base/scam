@@ -636,7 +636,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               type: 'ADD_DATA',
               payload: {
                 id: image.thumbnail_path,
-                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked, ...selected ? {options: { ...scamOptionsSelected }}:{}}
+                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked, options: selected ? { ...scamOptionsSelected}:{...scamOptions} } 
               }
             })
            

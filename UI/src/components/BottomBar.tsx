@@ -321,6 +321,17 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     saveGrid() 
   }, [grid])
   
+  const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+
+  const selectWithWarnings = useCallback(() => {
+    const selected = images.filter(im => ( allScamData[im.thumbnail_path]?.data?.rects && (
+        allScamData[im.thumbnail_path]?.data?.rects?.some(p => p.warning) 
+        || allScamData[im.thumbnail_path]?.data?.rects?.length != (allScamData[im.thumbnail_path]?.options?.nbPages || nbPages)
+      )
+    )).map(im => im.thumbnail_path)
+    setSelectedItems(selected)
+  }, [selectedItems, allScamData, nbPages])
+
   return (<nav className="bot">
     <Box>
       <IconButton onClick={() => handleSettings()}>
@@ -364,6 +375,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       >
         <MenuItem value={0} disabled>{"..."}</MenuItem>
         <hr/>
+        <MenuItem value={1} onClick={selectWithWarnings}>{"Select images with warnings"}</MenuItem>
         <MenuItem value={1} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
         <MenuItem value={1} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
         <hr/>
