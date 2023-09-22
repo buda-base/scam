@@ -6,7 +6,7 @@ import copy
 import math
 import json
 
-DEBUG = False
+DEBUG = True
 
 class AnnotationInfo:
     def __init__(self, sam_annotation, original_img_width, original_img_height, rotation=0):
@@ -322,9 +322,12 @@ def add_scam_results(file_info, sam_ann_list, scam_options):
         ann_ratio = ann.bbox[2] / float(ann.bbox[3])
         print_debug("ann %d, bbox %s, aspect ratio %f" % (i, str(ann.bbox), ann_ratio))
         area_ratio = ann.contour_area / total_area
-        if area_ratio < scam_options["area_ratio_range"][0] or area_ratio > scam_options["area_ratio_range"][1]:
+        if area_ratio < scam_options["area_ratio_range"][0]:
             print_debug("reject annotation with ratio = %f not in [%f, %f]" % (area_ratio, scam_options["area_ratio_range"][0], scam_options["area_ratio_range"][1]))
             break
+        if  area_ratio > scam_options["area_ratio_range"][1]:
+            print_debug("reject annotation with ratio = %f not in [%f, %f]" % (area_ratio, scam_options["area_ratio_range"][0], scam_options["area_ratio_range"][1]))
+            continue
         if scam_options["direction"] == "vertical" and ann.touches_top_bottom():
             print_debug("ann %d touches top and bottom edges, exclude" % i)
             continue
