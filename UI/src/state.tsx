@@ -6,17 +6,17 @@ import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction
 
 const debug = debugFactory("scam:state")
 
-const hasCustomOptions:ScamOptions|undefined = (JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).options 
+const hasCustomOptions:ScamOptions|undefined = (JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).options
 
 // global settings
 export const orientAtom = atom<Orientation>("horizontal") 
 export const direcAtom = atom<Direction>("horizontal") 
-export const minRatioAtom = atom(hasCustomOptions.minRatio || 0.145)
-export const maxRatioAtom = atom(hasCustomOptions.maxRatio || 0.5)
-export const nbPagesAtom = atom(hasCustomOptions.nbPages || 2)
-export const minAreaRatioAtom = atom(hasCustomOptions.minAreaRatio || 0.2)
-export const maxAreaRatioAtom = atom(hasCustomOptions.maxAreaRatio || 0.9)
-export const minSquarishAtom = atom(hasCustomOptions.minSquarish || 0.85)
+export const minRatioAtom = atom(hasCustomOptions?.minRatio || 0.145)
+export const maxRatioAtom = atom(hasCustomOptions?.maxRatio || 0.5)
+export const nbPagesAtom = atom(hasCustomOptions?.nbPages || 2)
+export const minAreaRatioAtom = atom(hasCustomOptions?.minAreaRatio || 0.2)
+export const maxAreaRatioAtom = atom(hasCustomOptions?.maxAreaRatio || 0.9)
+export const minSquarishAtom = atom(hasCustomOptions?.minSquarish || 0.85)
 export const configReady = atom<boolean|undefined>(undefined)
 
 export const shouldRunAfterAtom = atom(123)
