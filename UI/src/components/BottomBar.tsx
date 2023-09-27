@@ -107,7 +107,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
         }
         return acc
       }, {}) },
-      options: orient != "custom" ? { orient: orient as Orientation} : { ...selectedItems.length>0?scamOptionsSelected:scamOptions }
+      options: orient != "custom" ? { orient: orient as Orientation} : scamOptions // better keep global options now that custom options saved to localStorage // { ...selectedItems.length>0?scamOptionsSelected:scamOptions }
     }
     localStorage.setItem("scamUI", JSON.stringify(local))
     //setModified(false)
