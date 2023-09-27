@@ -65,12 +65,17 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
 
-  const updateOptions = useCallback(() => {
+  const updateOptions = useCallback(async () => {
     const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish }:{} }
     //debug("opts!", opts, selectedItems.length, globalScamOptionsUpdate, checkedRestrict)
     if(selectedItems.length > 0 && !checkedRestrict || !selectedItems.length || globalScamOptionsUpdate) setScamOptions(opts)
     else setScamOptionsSelected(opts)    
     if(globalScamOptionsUpdate != false) setGlobalScamOptionsUpdate(false)
+
+    const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+    local.options = { orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish }
+    localStorage.setItem("scamUI", JSON.stringify(local))
+
   }, [orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, selectedItems.length, checkedRestrict, globalScamOptionsUpdate, 
       setScamOptions, setScamOptionsSelected, setGlobalScamOptionsUpdate])   
     
@@ -266,7 +271,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       setCheckedRestrict(true)      
       let found = false
       for(const it of selectedItems) { 
-        if(allScamData[it].options) {
+        if(allScamData[it]?.options) {
           setOptions(allScamData[it].options as ScamOptions)
           found = true
           break ;
