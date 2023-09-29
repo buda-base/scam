@@ -53,7 +53,6 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   //debug("mod:", modified, drafted, published)
 
   useEffect(() => {
-    debug("mod?", modified)
     if(modified) {
       setDrafted(false)
       setPublished(false)
