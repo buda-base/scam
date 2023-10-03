@@ -636,7 +636,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               type: 'ADD_DATA',
               payload: {
                 id: image.thumbnail_path,
-                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked, ...selected ? {options: { ...scamOptionsSelected }}:{}}
+                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked, options: selected ? { ...scamOptionsSelected}:{...scamOptions} } 
               }
             })
            
@@ -712,7 +712,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           id: image.thumbnail_path,
           val: { data: newData, state: 'modified', time: shouldRunAfter }
         }
-      })
+      })        
+      if(modified) setDrafted(false) 
       setModified(true)
       selectShape(newData.pages.length ? newData.pages.length - 1 : null)
     }
@@ -770,7 +771,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
             val: { data, state: 'modified', time: shouldRunAfter }
           }
         })
-        setModified(true)
+        if(!modified) setModified(true)
         if(drafted) setDrafted(false)
       }
     }
@@ -866,6 +867,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     const newImage = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
     if(newImage.pages) delete newImage.pages
     setImageData(newImage)    
+    if(modified) setDrafted(false) 
     setModified(true)
     setLastRun(1)
   }, [ image, shouldRunAfter ])
@@ -879,9 +881,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       }
     })
     setVisible(!visible)
+    if(modified) setDrafted(false) 
     setModified(true)
     setImageData({...image, hidden: visible })    
-  }, [checked, dispatch, image, scamData, setModified, setVisible, shouldRunAfter, visible])
+  }, [checked, dispatch, image, scamData, setModified, setVisible, shouldRunAfter, visible, modified])
 
   const toggleCheck = useCallback(() => {
     dispatch({
@@ -892,6 +895,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       }
     })
     setChecked(!checked)
+    if(modified) setDrafted(false) 
     setModified(true)
     setImageData({...image, checked: !checked })    
   }, [checked, dispatch, image, scamData, setModified, shouldRunAfter, visible])  

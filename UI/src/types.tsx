@@ -100,7 +100,8 @@ export type LocalData = {
   sessions: {
     [str:string]: number
   },
-  grid: string
+  grid: string,
+  options:ScamOptions
 }
 
 export type ScamOptions = {

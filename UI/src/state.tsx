@@ -2,19 +2,21 @@ import { atom } from "jotai"
 import { atomWithReducer } from "jotai/utils"
 import debugFactory from "debug"
 
-import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction, Orientation } from "./types"
+import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction, Orientation, LocalData } from "./types"
 
 const debug = debugFactory("scam:state")
+
+const hasCustomOptions:ScamOptions|undefined = (JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).options
 
 // global settings
 export const orientAtom = atom<Orientation>("horizontal") 
 export const direcAtom = atom<Direction>("horizontal") 
-export const minRatioAtom = atom(0.145)
-export const maxRatioAtom = atom(0.5)
-export const nbPagesAtom = atom(2)
-export const minAreaRatioAtom = atom(0.2)
-export const maxAreaRatioAtom = atom(0.9)
-export const minSquarishAtom = atom(0.85)
+export const minRatioAtom = atom(hasCustomOptions?.minRatio || 0.145)
+export const maxRatioAtom = atom(hasCustomOptions?.maxRatio || 0.5)
+export const nbPagesAtom = atom(hasCustomOptions?.nbPages || 2)
+export const minAreaRatioAtom = atom(hasCustomOptions?.minAreaRatio || 0.2)
+export const maxAreaRatioAtom = atom(hasCustomOptions?.maxAreaRatio || 0.9)
+export const minSquarishAtom = atom(hasCustomOptions?.minSquarish || 0.85)
 export const configReady = atom<boolean|undefined>(undefined)
 
 export const shouldRunAfterAtom = atom(123)

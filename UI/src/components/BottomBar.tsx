@@ -53,7 +53,6 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   //debug("mod:", modified, drafted, published)
 
   useEffect(() => {
-    debug("mod?", modified)
     if(modified) {
       setDrafted(false)
       setPublished(false)
@@ -65,12 +64,17 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
 
-  const updateOptions = useCallback(() => {
+  const updateOptions = useCallback(async () => {
     const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish }:{} }
     //debug("opts!", opts, selectedItems.length, globalScamOptionsUpdate, checkedRestrict)
     if(selectedItems.length > 0 && !checkedRestrict || !selectedItems.length || globalScamOptionsUpdate) setScamOptions(opts)
     else setScamOptionsSelected(opts)    
     if(globalScamOptionsUpdate != false) setGlobalScamOptionsUpdate(false)
+
+    const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+    local.options = { orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish }
+    localStorage.setItem("scamUI", JSON.stringify(local))
+
   }, [orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, selectedItems.length, checkedRestrict, globalScamOptionsUpdate, 
       setScamOptions, setScamOptionsSelected, setGlobalScamOptionsUpdate])   
     
@@ -102,7 +106,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
         }
         return acc
       }, {}) },
-      options: orient != "custom" ? { orient: orient as Orientation} : { ...selectedItems.length>0?scamOptionsSelected:scamOptions }
+      options: orient != "custom" ? { orient: orient as Orientation} : scamOptions // better keep global options now that custom options saved to localStorage // { ...selectedItems.length>0?scamOptionsSelected:scamOptions }
     }
     localStorage.setItem("scamUI", JSON.stringify(local))
     //setModified(false)
@@ -266,7 +270,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       setCheckedRestrict(true)      
       let found = false
       for(const it of selectedItems) { 
-        if(allScamData[it].options) {
+        if(allScamData[it]?.options) {
           setOptions(allScamData[it].options as ScamOptions)
           found = true
           break ;
@@ -321,6 +325,17 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     saveGrid() 
   }, [grid])
   
+  const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
+
+  const selectWithWarnings = useCallback(() => {
+    const selected = images.filter(im => ( allScamData[im.thumbnail_path]?.data?.rects && (
+        allScamData[im.thumbnail_path]?.data?.rects?.some(p => p.warning) 
+        || allScamData[im.thumbnail_path]?.data?.rects?.length != (allScamData[im.thumbnail_path]?.options?.nbPages || nbPages)
+      )
+    )).map(im => im.thumbnail_path)
+    setSelectedItems(selected)
+  }, [selectedItems, allScamData, nbPages])
+
   return (<nav className="bot">
     <Box>
       <IconButton onClick={() => handleSettings()}>
@@ -364,6 +379,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       >
         <MenuItem value={0} disabled>{"..."}</MenuItem>
         <hr/>
+        <MenuItem value={1} onClick={selectWithWarnings}>{"Select images with warning"}</MenuItem>
         <MenuItem value={1} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
         <MenuItem value={1} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
         <hr/>
