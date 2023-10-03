@@ -112,7 +112,10 @@ export type ScamOptions = {
   maxRatio?: number
   minAreaRatio?: number,
   maxAreaRatio?: number,
-  minSquarish?: number
+  minSquarish?: number,
+  fixedWidth?: number,
+  fixedHeight?: number,
+  cutAtFixed?: boolean
 }
 
 export type Filter = 'all' | 'warning' | 'unchecked'

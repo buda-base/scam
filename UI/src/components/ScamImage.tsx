@@ -38,7 +38,7 @@ const scam_options: ScamOptionsMap = {
   "cut_at_fixed": false
 }
 
-const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean,
+const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean, page?: Page,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
   const { x, y, width, height, rotation, warning, rotatedHandle } = props.shapeProps;
   const { isSelected, addNew, portrait, onSelect, onChange } = props
@@ -64,6 +64,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 
   const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
   const [selectedAreaRatio, setSelectedAreaRatio ] = useAtom(state.selectedAreaRatio) 
+  const [selectedCutAtFixed, setSelectedCutAtFixed ] = useAtom(state.selectedCutAtFixed) 
   useEffect(() => {
     if(isSelected && shRef.current) {
       const stage = shRef.current.getStage()
@@ -421,6 +422,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [minAreaRatio, setMinAreaRatio] = useAtom(state.minAreaRatioAtom)
   const [maxAreaRatio, setMaxAreaRatio] = useAtom(state.maxAreaRatioAtom)
   const [minSquarish, setMinSquarish] = useAtom(state.minSquarishAtom)
+  const [fixedWidth, setFixedWidth] = useAtom(state.fixedWidthAtom)
+  const [fixedHeight, setFixedHeight] = useAtom(state.fixedHeightAtom)
+  const [cutAtFixed, setCutAtFixed] = useAtom(state.cutAtFixedAtom)
   
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
@@ -429,6 +433,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   
   const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
   const [selectedAreaRatio, setSelectedAreaRatio ] = useAtom(state.selectedAreaRatio) 
+  const [selectedCutAtFixed, setSelectedCutAtFixed ] = useAtom(state.selectedCutAtFixed) 
 
   useEffect(() => {
     //debug("des:", image.thumbnail_path, deselectAll)
@@ -601,7 +606,16 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           : [0.2, 0.9],
         "squarishness_min": orient == "custom" 
           ? minSquarish
-          : 0.85
+          : 0.85,
+        "cut_at_fixed": orient == "custom" 
+          ? cutAtFixed
+          : false,
+        "fixed_width": orient == "custom" 
+          ? fixedWidth
+          : -1,
+        "fixed_height": orient == "custom" 
+          ? fixedHeight
+          : -1,
       }
       
 
@@ -674,6 +688,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       selectShape(null);
       setSelectedRatio(0);
       setSelectedAreaRatio(0);
+      setSelectedCutAtFixed([]);
     }
   };
   const checkDeselectDiv: MouseEventHandler<HTMLDivElement> = (e) => {
@@ -683,6 +698,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       selectShape(null);
       setSelectedRatio(0);
       setSelectedAreaRatio(0);
+      setSelectedCutAtFixed([]);
     }
   };
 
@@ -966,7 +982,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
                 shapeProps={!checked || !rect.warning ? rect : { ...rect, warning: false }}
                 isSelected={rect.n === selectedId}
                 onSelect={() => onSelect(rect.n)}
-                {...{ onChange, addNew, portrait  }}
+                {...{ onChange, addNew, portrait, ...scamData?.pages && scamData?.pages[i] ? {page: scamData?.pages[i]}: {}   }}
               />)
             )
           }

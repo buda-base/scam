@@ -1,4 +1,4 @@
-import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, IconButton } from "@mui/material"
+import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, IconButton, Checkbox } from "@mui/material"
 import { useEffect, useState } from "react"
 import { useAtom } from "jotai"
 import { SystemUpdateAlt } from "@mui/icons-material"
@@ -20,14 +20,19 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
   const [minAreaRatio, setMinAreaRatio] = useAtom(state.minAreaRatioAtom)
   const [maxAreaRatio, setMaxAreaRatio] = useAtom(state.maxAreaRatioAtom)
   const [minSquarish, setMinSquarish] = useAtom(state.minSquarishAtom)
+  const [fixedWidth, setFixedWidth] = useAtom(state.fixedWidthAtom)
+  const [fixedHeight, setFixedHeight] = useAtom(state.fixedHeightAtom)
+  const [cutAtFixed, setCutAtFixed] = useAtom(state.cutAtFixedAtom)
   
   //const [modified, setModified] = useAtom(state.modified)
 
   const [editRatio, setEditRatio] = useState(false)
   const [editAreaRatio, setEditAreaRatio] = useState(false)
+  const [editCutAtFixed, setEditCutAtFixed] = useState(false)
 
   const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
   const [selectedAreaRatio, setSelectedAreaRatio ] = useAtom(state.selectedAreaRatio) 
+  const [selectedCutAtFixed, setSelectedCutAtFixed ] = useAtom(state.selectedCutAtFixed) 
 
   /* // better show a warning
   useEffect(() => {
@@ -176,6 +181,51 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               label="Min. squarishness"
               onChange={(r) => setMinSquarish(Number(r.target.value))}
             />
+          </Box>
+          <Box sx={{ marginRight:"16px", marginTop:"16px", alignItems: "baseline" }}>
+            <InputLabel shrink={false} id="custom-label" style={{ fontSize:12, lineHeight: "14px", height:16, color: editCutAtFixed ? theme.palette.primary.main : theme.palette.text.secondary }}>
+              Cut at fixed resolution
+            </InputLabel>
+            <Checkbox checked={cutAtFixed} sx={{ marginLeft:"-12px", marginTop:"-6px"}} onChange={(ev) => setCutAtFixed(ev.target.checked)} />
+            <span>
+              <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedWidth(selectedCutAtFixed[0]) }
+                  sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
+                <SystemUpdateAlt sx={{height:16}} />
+              </IconButton>
+              <TextField
+                type="number"
+                sx={{ width:"100px", marginRight:"8px" }}
+                inputProps={{ style:{ textAlign: "left", paddingLeft:"28px" }, step: 1, min:-1, max:10000 }}
+                variant="standard"                
+                value={fixedWidth}
+                disabled={!cutAtFixed}
+                onChange={(e) => setFixedWidth(Number(e.target.value))}
+                onFocus={() => setEditCutAtFixed(true)}
+                onBlur={() => setEditCutAtFixed(false)}
+              />
+            </span>
+            <span style={{ fontSize: "16px", lineHeight: "30px" }}> : </span>
+            <span>
+              <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedHeight(selectedCutAtFixed[1]) }
+                  sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
+                <SystemUpdateAlt sx={{height:16}} />
+              </IconButton>
+              <TextField
+                type="number"
+                sx={{ width:"100px", marginLeft:"8px" }}
+                inputProps={{ step: 1, min:-1, max:10000, style: { paddingLeft:"28px" }}}
+                variant="standard"
+                value={fixedHeight}
+                disabled={!cutAtFixed}
+                onChange={(e) => setFixedHeight(Number(e.target.value))}
+                onFocus={() => setEditCutAtFixed(true)}
+                onBlur={() => setEditCutAtFixed(false)}
+                />
+            </span>
+              {/* <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length} onClick={() => { setFixedWidth(selectedCutAtFixed[0]); setFixedHeight(selectedCutAtFixed[1]); }}
+                  sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", marginLeft:"5px", marginTop:"-5px", zIndex:1}}>
+                <SystemUpdateAlt sx={{height:16}} />
+              </IconButton> */}
           </Box>
         </>
       }

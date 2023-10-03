@@ -18,6 +18,9 @@ export const minAreaRatioAtom = atom(hasCustomOptions?.minAreaRatio || 0.2)
 export const maxAreaRatioAtom = atom(hasCustomOptions?.maxAreaRatio || 0.9)
 export const minSquarishAtom = atom(hasCustomOptions?.minSquarish || 0.85)
 export const configReady = atom<boolean|undefined>(undefined)
+export const fixedWidthAtom = atom(hasCustomOptions?.fixedWidth || -1)
+export const fixedHeightAtom = atom(hasCustomOptions?.fixedHeight || -1)
+export const cutAtFixedAtom = atom(hasCustomOptions?.cutAtFixed || false)
 
 export const shouldRunAfterAtom = atom(123)
 
@@ -61,5 +64,6 @@ export const configs = atom<ScamOptions[]>([])
 
 export const selectedRatio = atom(0)
 export const selectedAreaRatio = atom(0)
+export const selectedCutAtFixed = atom<number[]>([])
 
 export const showSettings = atom(false);

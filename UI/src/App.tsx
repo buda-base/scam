@@ -221,6 +221,9 @@ function App() {
   const [minAreaRatio, setMinAreaRatio] = useAtom(state.minAreaRatioAtom)
   const [maxAreaRatio, setMaxAreaRatio] = useAtom(state.maxAreaRatioAtom)
   const [minSquarish, setMinSquarish] = useAtom(state.minSquarishAtom)
+  const [fixedWidth, setFixedWidth] = useAtom(state.fixedWidthAtom)
+  const [fixedHeight, setFixedHeight] = useAtom(state.fixedHeightAtom)
+  const [cutAtFixed, setCutAtFixed] = useAtom(state.cutAtFixedAtom)
   const [configReady, setConfigReady] = useAtom(state.configReady)
 
   const [configs, setConfigs] = useAtom(state.configs)
@@ -355,6 +358,9 @@ function App() {
     if(options.minAreaRatio) setMinAreaRatio(options.minAreaRatio)
     if(options.maxAreaRatio) setMaxAreaRatio(options.maxAreaRatio)
     if(options.minSquarish) setMinSquarish(options.minSquarish)
+    if(options.fixedWidth) setFixedWidth(options.fixedWidth)
+    if(options.fixedHeight) setFixedHeight(options.fixedHeight)
+    if(options.cutAtFixed) setCutAtFixed(options.cutAtFixed)
   }
 
   useEffect(() => {
