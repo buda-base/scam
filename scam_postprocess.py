@@ -4,7 +4,7 @@ import os
 import logging
 from PIL import Image
 from tqdm import tqdm
-from img_utils import encode_img_uncompressed
+from img_utils import encode_img_uncompressed, rotate_warp_affine
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3
@@ -75,14 +75,14 @@ def derive_from_file(scam_json, file_info, postprocess_options):
         return
     if file_info["rotation"] != 0:
         pil_img = pil_img.rotate(file_info["rotation"], expand=True)
-    if "pages" not in scam_json or len(scam_json["pages"]) == 0:
+    if "pages" not in file_info or len(file_info["pages"]) == 0:
         derive_from_page(scam_json, file_info, pil_img, None, 1, postprocess_options)
         return
-    pages = scam_json["pages"]
+    pages = file_info["pages"]
     # reorder pages if scam_json["pages_order"] is false
     if "pages_order" not in scam_json or not scam_json["pages_order"]:
         pages = order_pages(pages)
-    for i, page in pages.items():
+    for i, page in enumerate(pages):
         derive_from_page(scam_json, file_info, pil_img, page, i+1, postprocess_options)
 
 def derive_from_page(scam_json, file_info, pil_img, page_info, page_position, postprocess_options):
@@ -96,7 +96,8 @@ def derive_from_page(scam_json, file_info, pil_img, page_info, page_position, po
             bbox = get_bounding_box(page_info["minAreaRect"], pil_img.width, pil_img.height)
             extract = pil_img.crop((bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]))
         else:
-            extract = rotate_warp_affine(pil_img, page_info["minAreaRect"])
+            mar = page_info["minAreaRect"]
+            extract = rotate_warp_affine(pil_img, ((mar[0], mar[1]), (mar[2], mar[3]), mar[4]))
     if postprocess_options["dst_storage"] == "s3":
         s3key = "scam_cropped/"+scam_json["folder_path"]
         s3key += os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
