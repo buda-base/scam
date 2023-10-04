@@ -28,15 +28,17 @@ class AnnotationInfo:
         # resize the mask
         self.mask = cv2.resize(self.mask, (original_img_width, original_img_height), interpolation = cv2.INTER_NEAREST ).astype('uint8')
         self.contour, self.contour_area = self.get_largest_contour()
-        self.minAreaRect = cv2.minAreaRect(self.contour)
+        # some normalization to make it easier
+        (cx, cy), (w, h), angle = cv2.minAreaRect(self.contour)
+        if angle > 45:
+            angle = angle-90
+            w, h = h, w
+        self.minAreaRect = ((cx, cy), (w, h), angle)
         self.bbox = cv2.boundingRect(self.contour)
         self.warns = []
 
     def to_scam_json_obj(self):
         (cx, cy), (w, h), angle = self.minAreaRect
-        if angle > 45:
-            angle = angle-90
-            w, h = h, w
         return {
             "minAreaRect": [cx, cy, w, h, angle],
             "warnings": self.warns
@@ -98,6 +100,21 @@ class AnnotationInfo:
         _, (width, height), _ = self.minAreaRect
         rect_area = width * height
         return self.contour_area / rect_area
+
+    def move_side_inwards(self, side, shift):
+        (cx, cy), (w, h), angle = self.minAreaRect
+        rad_angle = math.radians(angle)
+
+        if side == "left" or side == "right":
+            w -= shift
+            if side == "left":
+                cx += shift*math.cos(rad_angle)/2
+                cy -= shift*math.sin(rad_angle)/2
+            else:
+                cx -= shift*math.cos(rad_angle)/2
+                cy += shift*math.sin(rad_angle)/2
+
+        self.minAreaRect = ((cx, cy), (w, h), angle)
 
 def find_anomalies(data):
     """
@@ -365,8 +382,16 @@ def add_scam_results(file_info, sam_ann_list, scam_options):
         #else:
         #    break
     image_anns = handle_unions(image_anns, potential_split_anns)
-    # we sort according to the split direction:
     image_anns = order_image_annotation(image_anns)
+    for i, image_ann in enumerate(image_anns):
+        if scam_options["cut_at_fixed"] and scam_options["fixed_width"] > 0 and scam_options["direction"] == "horizontal":
+            _, (width, _), _ = image_ann.minAreaRect
+            if width <= scam_options["fixed_width"]:
+                continue
+            side = "left" if i == 0 else "right" 
+            image_ann.move_side_inwards(side, width - scam_options["fixed_width"])
+
+    # we sort according to the split direction:
     file_info["pages"] = []
     for image_ann in image_anns:
         ann_obj = image_ann.to_scam_json_obj()
