@@ -103,15 +103,16 @@ class AnnotationInfo:
 
     def move_side_inwards(self, side, shift):
         (cx, cy), (w, h), angle = self.minAreaRect
+        rad_angle = math.radians(angle)
 
         if side == "left" or side == "right":
             w -= shift
             if side == "left":
-                cx += shift*math.cos(angle)/2
-                cy -= shift*math.sin(angle)/2
+                cx += shift*math.cos(rad_angle)/2
+                cy -= shift*math.sin(rad_angle)/2
             else:
-                cx -= shift*math.cos(angle)/2
-                cy += shift*math.sin(angle)/2
+                cx -= shift*math.cos(rad_angle)/2
+                cy += shift*math.sin(rad_angle)/2
 
         self.minAreaRect = ((cx, cy), (w, h), angle)
 
@@ -383,12 +384,9 @@ def add_scam_results(file_info, sam_ann_list, scam_options):
     image_anns = handle_unions(image_anns, potential_split_anns)
     image_anns = order_image_annotation(image_anns)
     for i, image_ann in enumerate(image_anns):
-        print("test0")
         if scam_options["cut_at_fixed"] and scam_options["fixed_width"] > 0 and scam_options["direction"] == "horizontal":
-            print("test1")
             _, (width, _), _ = image_ann.minAreaRect
             if width <= scam_options["fixed_width"]:
-                print("test2")
                 continue
             side = "left" if i == 0 else "right" 
             image_ann.move_side_inwards(side, width - scam_options["fixed_width"])
