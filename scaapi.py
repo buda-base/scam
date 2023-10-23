@@ -104,7 +104,10 @@ def get_thumbnail_bytes_api_get():
 def get_scam_json_api():
     data = request.json
     folder_path = data.get('folder_path')
-    return get_scam_json(folder_path)
+    res = get_scam_json(folder_path)
+    if not res:
+        return "could not find json", 404
+    return res
 
 @api.route('/run_scam_file', methods=['POST'])
 def run_scam_file_api():
@@ -117,11 +120,10 @@ def run_scam_file_api():
 @api.route('/run_scam', methods=['POST'])
 def run_scam_api():
     data = request.json
-    print(data)
     folder_path = data.get('folder_path')
     scam_options = data.get('scam_options')
     scam_json = data.get('scam_json')
     return run_scam_folder(folder_path, scam_json, scam_options)
 
 if __name__ == '__main__':
-    api.run(debug=True)
+    api.run(debug=False)
