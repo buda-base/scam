@@ -188,7 +188,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
             </InputLabel>
             <Checkbox checked={cutAtFixed} sx={{ marginLeft:"-12px", marginTop:"-6px"}} onChange={(ev) => setCutAtFixed(ev.target.checked)} />
             <span>
-              <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedWidth(selectedCutAtFixed[0]) }
+              <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedWidth(Math.round(selectedCutAtFixed[0])) }
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
               </IconButton>
@@ -206,7 +206,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
             </span>
             <span style={{ fontSize: "16px", lineHeight: "30px" }}> : </span>
             <span>
-              <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedHeight(selectedCutAtFixed[1]) }
+              <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedHeight(Math.round(selectedCutAtFixed[1])) }
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
               </IconButton>

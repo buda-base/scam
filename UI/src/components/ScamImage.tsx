@@ -41,7 +41,7 @@ const scam_options: ScamOptionsMap = {
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean, page?: Page,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
   const { x, y, width, height, rotation, warning, rotatedHandle } = props.shapeProps;
-  const { isSelected, addNew, portrait, onSelect, onChange } = props
+  const { isSelected, addNew, portrait, page, onSelect, onChange } = props
 
   const shRef = useRef<Konva.Rect>(null)
   const trRef = useRef<Konva.Transformer>(null)
@@ -74,21 +74,32 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
           areaRatio = Math.round(1000 * (w * h) / (W * H)) / 1000
         setSelectedRatio(ratio)
         setSelectedAreaRatio(areaRatio)
+
+        if(rotatedHandle) setSelectedCutAtFixed([page?.minAreaRect[3] || 0, page?.minAreaRect[2] || 0])
+        else setSelectedCutAtFixed([page?.minAreaRect[2] || 0, page?.minAreaRect[3] || 0])
       }
     }
-  }, [isSelected, ratio])
+  }, [isSelected, ratio, rotatedHandle])
 
   
+  const res = useMemo(() => (rotatedHandle 
+    ? Math.round(page?.minAreaRect[3] || 0) + " x " + Math.round(page?.minAreaRect[2] || 0)
+    : Math.round(page?.minAreaRect[2] || 0) + " x " + Math.round(page?.minAreaRect[3] || 0)
+  ), [page, rotatedHandle])
 
   return (
     <>
       { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
-          text={"[ratio="+ratio+"]"} verticalAlign='middle' align='center' width={150} height={30} fontSize={15}
-          {...{ x: x + (portrait ? handleY : handleX) - 75 + padding, y: y + (portrait ? handleX : handleY) - 10 - 15 + padding }} 
+          text={res} verticalAlign='middle' align='center' width={150} height={30} fontSize={15}
+          {...{ x: x + (portrait ? handleY : handleX) - 75 + padding, y: y + (portrait ? handleX : handleY) - 15 - 15 + padding }} 
         /> }
       { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
-        text={"[area ratio="+selectedAreaRatio+"]"} verticalAlign='middle' align='center' width={200} height={30} fontSize={15}
-        {...{ x: x + (portrait ? handleY : handleX) - 100 + padding, y: y + (portrait ? handleX : handleY) + 10 - 15 + padding}} 
+          text={"ratio="+ratio+""} verticalAlign='middle' align='center' width={150} height={30} fontSize={15}
+          {...{ x: x + (portrait ? handleY : handleX) - 75 + padding, y: y + (portrait ? handleX : handleY) - 0 - 15 + padding }} 
+        /> }
+      { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
+        text={"area ratio="+selectedAreaRatio+""} verticalAlign='middle' align='center' width={200} height={30} fontSize={15}
+        {...{ x: x + (portrait ? handleY : handleX) - 100 + padding, y: y + (portrait ? handleX : handleY) + 15 - 15 + padding}} 
       /> }
       <Rect
         ref={shRef}
