@@ -80,7 +80,12 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
     files = scam_json["files"]
     for img_path in tqdm(img_paths):
         # pil_img is not rotated
-        pil_img = get_pil_img(folder_path, img_path)
+        pil_img = None
+        try:
+            pil_img = get_pil_img(folder_path, img_path)
+        except Exception as e:
+            logging.error("error on %s/%s" % (folder_path, img_path), error)
+            return
         if preprocess_options["use_exif_rotation"]:
             pil_img = apply_exif_rotation(img)
         sam_res = run_sam(pil_img, preprocess_options)
