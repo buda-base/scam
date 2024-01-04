@@ -401,6 +401,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const globalData = allScamData[image.thumbnail_path]
 
+
+  const [published, setPublished] = useState(false)
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
@@ -666,9 +668,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               }
             })
            
-            if(state === "modified") {
-              setModified(true)
-            }
+            // #9 always ungray save buttons after run_
+            //if(state === "modified") {
+              if(!modified) setModified(true)
+              if(drafted) setDrafted(false)
+              if(published) setPublished(false)
+            //}
             
           }
         })
