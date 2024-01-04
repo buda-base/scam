@@ -404,7 +404,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
-  const [scamData, setScamData] = useState<ScamImageData | boolean>((!draft || loadDraft == false) && uploadedData || (globalData?.time >= shouldRunAfter ? globalData.data : false))
+  const [scamData, setScamData] = useState<ScamImageData | boolean>((!draft || loadDraft == false) && globalData?.state != "modified" && uploadedData 
+                                                                  || (globalData?.time >= shouldRunAfter ? globalData.data : false))
   const [lastRun, setLastRun] = useState(globalData?.time <= shouldRunAfter ? globalData.time : 0)  
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)

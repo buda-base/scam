@@ -252,7 +252,7 @@ function App() {
 
     debug("folder?", folder, json)
 
-    // #5 fix when parenthesis in folder name (es: X_Basgo_Complete/10 mDo/mDo 04 Nga (aus Phal chen)/
+    // #6 fix when parenthesis in folder name (ex: X_Basgo_Complete/10 mDo/mDo 04 Nga (aus Phal chen)/
     const escapeRegExp = (str:string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     if(config.auth && folder && (!json || typeof json === 'object' && jsonPath && !jsonPath.match(new RegExp("^"+escapeRegExp(folder))))) {
