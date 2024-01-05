@@ -123,9 +123,36 @@ function App() {
 
   }, [allScamData, images, keyDown, lastSelectedItem, scamOptions, selectedItems])
 
-  const handleKeyDown = useCallback((e: { key: string; }) => {
-    //debug("down", e.key, showSettings)
-    if(!showSettings) setKeyDown(e.key)
+  const handleKeyDown = useCallback((ev:KeyboardEvent) => {
+    //debug("down", ev, showSettings)
+    if(!showSettings) setKeyDown(ev.key)
+    if(ev.key == " ") {
+      ev.preventDefault()
+      let next:any, nextBB:any
+      document.querySelectorAll(".scam-image:not(.not-visible)").forEach((e,i) => {
+        const bbox = e.getBoundingClientRect()        
+        if(!ev.shiftKey) {
+          if(!next && bbox.top < window.innerHeight && bbox.bottom > window.innerHeight ) {
+            //debug(i, bbox.y, bbox.x, e)
+            next = e
+            nextBB = bbox
+          } else if(next && bbox.top < nextBB.top) {
+            next = e
+            nextBB = bbox
+          }
+        } else {
+          if(!next && bbox.bottom > 0 && bbox.top < 0 ) {
+            //debug(i, bbox.y, bbox.x, e)
+            next = e
+            nextBB = bbox
+          } else if(next && bbox.bottom > nextBB.bottom && bbox.bottom > 0 && bbox.top < 0) {
+            next = e
+            nextBB = bbox
+          }
+        }
+      })
+      if(next) next.scrollIntoView()
+    }
   }, [showSettings])
 
   const handleKeyUp = useCallback(() => {
