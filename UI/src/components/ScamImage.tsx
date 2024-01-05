@@ -10,6 +10,7 @@ import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
 import { Warning, WarningAmber } from "@mui/icons-material";
 import { Checkbox, FormControlLabel } from "@mui/material";
+import _ from "lodash";
 
 import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap } from "../types";
 import { apiUrl } from "../App";
@@ -234,7 +235,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 
 
 export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, selected:boolean,
-    setImageData: (data:ScamImageData) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
+    setImageData: (data:ScamImageData|ScamImageData[]) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
   const { image, selected, handleSelectItem } = props;
 
   const { ref, inView, entry } = useInView({
@@ -348,7 +349,7 @@ function useWindowSize() {
 
 const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
     loadDraft: boolean | undefined, checked: boolean, selected:boolean,
-    setImageData:(data:ScamImageData)=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
+    setImageData:(data:ScamImageData|ScamImageData[])=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
   const { folder, config, image, divRef, draft, loadDraft, visible, checked, selected, setImageData, setVisible, setChecked, handleSelectItem } = props;
 
   const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)
@@ -401,10 +402,13 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const globalData = allScamData[image.thumbnail_path]
 
+
+  const [published, setPublished] = useState(false)
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
-  const [scamData, setScamData] = useState<ScamImageData | boolean>((!draft || loadDraft == false) && uploadedData || (globalData?.time >= shouldRunAfter ? globalData.data : false))
+  const [scamData, setScamData] = useState<ScamImageData | boolean>((!draft || loadDraft == false) && globalData?.state != "modified" && uploadedData 
+                                                                  || (globalData?.time >= shouldRunAfter ? globalData.data : false))
   const [lastRun, setLastRun] = useState(globalData?.time <= shouldRunAfter ? globalData.time : 0)  
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
@@ -665,9 +669,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               }
             })
            
-            if(state === "modified") {
-              setModified(true)
-            }
+            // #9 always ungray save buttons after run_
+            //if(state === "modified") {
+              if(!modified) setModified(true)
+              if(drafted) setDrafted(false)
+              if(published) setPublished(false)
+            //}
             
           }
         })
@@ -913,19 +920,33 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     setImageData({...image, hidden: visible })    
   }, [checked, dispatch, image, scamData, setModified, setVisible, shouldRunAfter, visible, modified])
 
-  const toggleCheck = useCallback(() => {
-    dispatch({
-      type: 'UPDATE_DATA',
-      payload: {
-        id: image.thumbnail_path,
-        val: { state: 'modified', time: shouldRunAfter, checked: !checked }
-      }
-    })
-    setChecked(!checked)
+  const toggleCheck = useCallback((multi?:boolean) => {
+    if(!multi) {
+      dispatch({
+        type: 'UPDATE_DATA',
+        payload: {
+          id: image.thumbnail_path,
+          val: { state: 'modified', time: shouldRunAfter, checked: !checked }
+        }
+      })
+      //setChecked(!checked) // redundant with below
+      setImageData({...image, checked: !checked })    
+    } else {
+      let keys = _.orderBy(Object.keys(allScamData))
+      keys = keys.slice(0, keys.indexOf(image.thumbnail_path) + 1)
+      //debug("aSD:", keys) 
+      dispatch({
+        type: 'UPDATE_DATA_MULTI',
+        payload: {
+          multid: keys,
+          val: { state: 'modified', time: shouldRunAfter, checked: !checked }
+        }
+      })
+      setImageData(keys.map(k => ({...allScamData[k].image, checked: !checked })))
+    }
     if(modified) setDrafted(false) 
     setModified(true)
-    setImageData({...image, checked: !checked })    
-  }, [checked, dispatch, image, scamData, setModified, shouldRunAfter, visible])  
+  }, [checked, dispatch, image, scamData, setModified, shouldRunAfter, visible, allScamData, modified])  
   
   useEffect( () => {
     if(typeof scamData === 'object') { 

@@ -103,7 +103,8 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       images: { ...Object.keys(allScamData).reduce( (acc,a) => {
         const val = allScamData[a]
         val.data = { ...val.data }
-        if(["draft", "modified", "uploaded"].includes(val.state)) { 
+        // #9 always ungray save buttons after run_ (=> save previous scam run as draft)
+        if(["new", "draft", "modified", "uploaded"].includes(val.state)) { 
           if(val.data.pages) val.data.pages = val.data.pages.map(withoutRotatedHandle) as Page[]
           return ({ ...acc, [a]: val })
         }
@@ -250,6 +251,8 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   };
 
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
+
+  const [modified, setModified] = useAtom(state.modified)
 
   const handleRun = useCallback(() => { 
     setShouldRunAfter(Date.now()); 

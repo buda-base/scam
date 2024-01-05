@@ -252,7 +252,7 @@ function App() {
 
     debug("folder?", folder, json)
 
-    // #5 fix when parenthesis in folder name (es: X_Basgo_Complete/10 mDo/mDo 04 Nga (aus Phal chen)/
+    // #6 fix when parenthesis in folder name (ex: X_Basgo_Complete/10 mDo/mDo 04 Nga (aus Phal chen)/
     const escapeRegExp = (str:string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     if(config.auth && folder && (!json || typeof json === 'object' && jsonPath && !jsonPath.match(new RegExp("^"+escapeRegExp(folder))))) {
@@ -303,13 +303,16 @@ function App() {
     if(typeof json === 'object' && json.files) setImages(json.files)
   }, [json])
 
-  const setImageData = useCallback((data:ScamImageData) => {
+  const setImageData = useCallback((data:ScamImageData|ScamImageData[]) => {
     if(typeof json !== 'object') return
-    const idx = json.files.findIndex((im) => im.thumbnail_path === data.thumbnail_path)
-    debug("set:", data, data.thumbnail_path, idx)
-    const newJson = { ...json }
-    newJson.files[idx] = { ...data }
-    setJson(newJson)
+    if(!Array.isArray(data)) data = [ data ]
+    for(const d of data) {
+      const idx = json.files.findIndex((im) => im.thumbnail_path === d.thumbnail_path)
+      debug("set:", d, d.thumbnail_path, idx)
+      const newJson = { ...json }
+      newJson.files[idx] = { ...d }
+      setJson(newJson)
+    }
   }, [json])
 
   const handleClose = useCallback(async (discard?: boolean) => {

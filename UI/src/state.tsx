@@ -24,13 +24,20 @@ export const cutAtFixedAtom = atom(hasCustomOptions?.cutAtFixed || false)
 
 export const shouldRunAfterAtom = atom(123)
 
-export const scamDataReducer = (state: any, action: { type: string; payload: { id: string; val: ScamImageData } }) => {
+export const scamDataReducer = (state: any, action: { type: string; payload: { id: string; val: ScamImageData; multid?:string[] } }) => {
   //debug("!!", action)
   switch (action.type) {
     case 'ADD_DATA':
       return { ...state, [action.payload.id]: { ...action.payload.val } };
     case 'UPDATE_DATA':
-        return { ...state, [action.payload.id]: { ...state[action.payload.id]||{}, ...action.payload.val } };
+      return { ...state, [action.payload.id]: { ...state[action.payload.id]||{}, ...action.payload.val } };
+    case 'UPDATE_DATA_MULTI': {
+      const newState = { ...state }
+      for(const id of action.payload.multid || []) {
+        newState[id] = { ...newState[id], ...action.payload.val }
+      }  
+      return newState
+    }
     case 'LOAD_DRAFT':
       return { [action.payload.id]: action.payload.val };
     case 'RESET_DATA':
