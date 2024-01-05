@@ -48,11 +48,14 @@ def save_thumbnail(folder_path, img_path, pil_img, preprocess_options):
     new_width = int(pil_img.width * ratio)
     new_height = int(pil_img.height * ratio)
     pil_img = pil_img.resize((new_width, new_height), Image.LANCZOS)
+    path = "thumbnails/"+folder_path+img_path+ext
     if preprocess_options["pre_rotate"] != 0:
         pil_img = pil_img.rotate(preprocess_options["pre_rotate"], expand=True)
-    byts, ext = encode_img(pil_img, mozjpeg_optimize=True)
-    path = "thumbnails/"+folder_path+img_path+ext
-    upload_to_s3(byts, path)
+    try:
+        byts, ext = encode_img(pil_img, mozjpeg_optimize=True)
+        upload_to_s3(byts, path)
+    except:
+        print("error saving %s" % (folder_path+img_path+ext))
     return path, new_width, new_height
 
 def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS):
