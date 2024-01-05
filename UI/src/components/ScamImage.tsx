@@ -750,6 +750,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       if(modified) setDrafted(false) 
       setModified(true)
       selectShape(newData.pages.length ? newData.pages.length - 1 : null)
+      if(!checked) setChecked(true)
     }
   }, [checked, dimensions.height, dimensions.width, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
 
@@ -807,6 +808,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         })
         if(!modified) setModified(true)
         if(drafted) setDrafted(false)
+        if(!checked) setChecked(true)
       }
     }
   }, [checked, dimensions.height, dimensions.width, dispatch, drafted, handleZindex, image, scamData, setDrafted, setModified, shouldRunAfter, visible])
@@ -904,7 +906,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     if(modified) setDrafted(false) 
     setModified(true)
     setLastRun(1)
-  }, [ image, shouldRunAfter ])
+    if(!checked) setChecked(true)
+  }, [ modified, image, shouldRunAfter ])
 
   const toggleVisible = useCallback(() => {
     dispatch({
@@ -918,6 +921,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     if(modified) setDrafted(false) 
     setModified(true)
     setImageData({...image, hidden: visible })    
+    if(!checked) setChecked(true)
   }, [checked, dispatch, image, scamData, setModified, setVisible, shouldRunAfter, visible, modified])
 
   const toggleCheck = useCallback((multi?:boolean) => {
