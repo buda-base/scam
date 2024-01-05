@@ -6,7 +6,7 @@ from datetime import datetime
 import logging
 from PIL import Image
 from cal_sam_pickles import get_sam_output
-from img_utils import apply_exif_rotation, encode_img
+from img_utils import apply_exif_rotation, encode_img, get_best_mode
 from tqdm import tqdm
 
 DEFAULT_PREPROCESS_OPTIONS = {
@@ -48,14 +48,16 @@ def save_thumbnail(folder_path, img_path, pil_img, preprocess_options):
     new_width = int(pil_img.width * ratio)
     new_height = int(pil_img.height * ratio)
     pil_img = pil_img.resize((new_width, new_height), Image.LANCZOS)
+    ext = ".png" if get_best_mode(pil_img) == "1" else ".jpg"
     path = "thumbnails/"+folder_path+img_path+ext
     if preprocess_options["pre_rotate"] != 0:
         pil_img = pil_img.rotate(preprocess_options["pre_rotate"], expand=True)
     try:
         byts, ext = encode_img(pil_img, mozjpeg_optimize=True)
         upload_to_s3(byts, path)
-    except:
-        print("error saving %s" % (folder_path+img_path+ext))
+    except Exception as e:
+        print("error saving %s" % (folder_path+img_path))
+        print(e)
     return path, new_width, new_height
 
 def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS):
@@ -91,9 +93,9 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
             return
         if preprocess_options["use_exif_rotation"]:
             pil_img = apply_exif_rotation(img)
-        sam_res = run_sam(pil_img, preprocess_options)
+        #sam_res = run_sam(pil_img, preprocess_options)
         pickle_path = get_pickle_path(folder_path, img_path)
-        save_sam_pickle(pickle_path, sam_res)
+        #save_sam_pickle(pickle_path, sam_res)
         # thumbnail will get rotated
         thumbnail_path, w, h = save_thumbnail(folder_path, img_path, pil_img, preprocess_options)
         files.append({
