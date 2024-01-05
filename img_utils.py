@@ -128,9 +128,9 @@ def encode_img(img, target_mode=None, mozjpeg_optimize=True):
 def get_best_mode(img):
     """
     returns the best Pillow mode for an image
-
-    TODO
     """
+    if img.mode == "1":
+        return "1"
     return "L"
 
 def is_grayscale(img):
