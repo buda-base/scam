@@ -93,9 +93,9 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
             return
         if preprocess_options["use_exif_rotation"]:
             pil_img = apply_exif_rotation(img)
-        #sam_res = run_sam(pil_img, preprocess_options)
+        sam_res = run_sam(pil_img, preprocess_options)
         pickle_path = get_pickle_path(folder_path, img_path)
-        #save_sam_pickle(pickle_path, sam_res)
+        save_sam_pickle(pickle_path, sam_res)
         # thumbnail will get rotated
         thumbnail_path, w, h = save_thumbnail(folder_path, img_path, pil_img, preprocess_options)
         files.append({
