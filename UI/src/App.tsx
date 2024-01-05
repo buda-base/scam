@@ -129,7 +129,7 @@ function App() {
     if(ev.key == " ") {
       ev.preventDefault()
       let next:any, nextBB:any
-      document.querySelectorAll(".scam-image:not(.not-visible)").forEach((e,i) => {
+      document.querySelectorAll(".scam-image:not(.not-visible)").forEach((e) => {
         const bbox = e.getBoundingClientRect()        
         if(!ev.shiftKey) {
           if(!next && bbox.top < window.innerHeight && bbox.bottom > window.innerHeight ) {
