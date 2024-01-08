@@ -21,7 +21,7 @@ import * as state from "../state"
 import { ColorButton } from "./theme"
 import { apiUrl, discardDraft } from "../App";
 import axios from "axios";
-import { withoutRotatedHandle } from "./ScamImage";
+import { withRotatedHandle, withoutRotatedHandle, recomputeCoords } from "./ScamImage";
 
 const debug = debugFactory("scam:bbar")
 
@@ -232,9 +232,11 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   )
 }
 
-export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[],
-    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void  }) => {
-  const { folder, config, json, selectedItems, images, setSelectedItems, markChecked, markHidden, setOptions } = props;
+let unmount = false
+
+export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[], options: ScamOptionsMap,
+    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void, setJson?:(s:ScamData)=>void  }) => {
+  const { folder, config, json, selectedItems, images, options, setSelectedItems, markChecked, markHidden, setOptions, setJson } = props;
 
   const [showSettings, setShowSettings] = useAtom(state.showSettings)
 
@@ -253,6 +255,8 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
 
   const [modified, setModified] = useAtom(state.modified)
+  const [published, setPublished] = useState(false)
+  const [drafted, setDrafted] = useAtom(state.drafted)
 
   const handleRun = useCallback(() => { 
     setShouldRunAfter(Date.now()); 
@@ -297,7 +301,9 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     debug("data:",allScamData)
   }, [allScamData])
   */
-   
+  
+  let controller = new AbortController();   
+
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)
   useEffect(() => {
@@ -306,6 +312,18 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       if(local.grid) setGrid(local.grid)
     }
     restoreGrid()
+
+    unmount = false
+    if(controller.signal.aborted) {
+      controller = new AbortController();   
+    }
+
+    return () => {
+      //debug("unmount:",image.thumbnail_path)
+      unmount = true
+      controller.abort()
+    }
+    
   }, [])
 
 
@@ -341,6 +359,70 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     )).map(im => im.thumbnail_path)
     setSelectedItems(selected)
   }, [selectedItems, allScamData, nbPages])
+
+  const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
+
+  const handleScamQueue = useCallback(async () => {
+
+    if(!scamQueue.todo && json?.files) {
+     
+      //setScamQueue({ todo: [ ...json?.files.map(m => m.thumbnail_path) || [] ] })
+
+      for(const image of json?.files || []) {
+
+        try {
+          
+          setScamQueue({ todo: [], pending: [ image.thumbnail_path ] })
+
+          const response = await axios.post(apiUrl + "run_scam_file", {
+            folder_path: folder,
+            scam_options: options,
+            file_info: image
+          }, {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: "Basic " + encode(config.auth.join(":"))
+            },
+            signal: controller.signal
+          })
+        
+          debug("json:", response.data);
+          
+          if (response.data) {
+            
+            const state = 'new'
+            const visible = !image.hidden
+            const checked = image.checked
+            const selected = selectedItems.includes(image.thumbnail_path)
+            
+            dispatch({
+              type: 'ADD_DATA',
+              payload: {
+                id: image.thumbnail_path,
+                val: { data: response.data, state, time: shouldRunAfter, image, visible, checked, options: selected ? { ...scamOptionsSelected}:{...scamOptions} } 
+              }
+            })            
+          
+            // #9 always ungray save buttons after run_
+            if(!modified) setModified(true)
+            if(drafted) setDrafted(false)
+            if(published) setPublished(false)
+            
+
+            setScamQueue({ todo: [], pending: [ image.thumbnail_path ] })
+          }        
+        }
+        catch(error:any) {
+          if(error.message != "canceled") console.error(error);
+        }
+      }
+      
+    }
+  }, [scamQueue, json, setScamQueue, folder, options, config, controller, selectedItems, dispatch, shouldRunAfter, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
+
+  useEffect(() => {
+    handleScamQueue()
+  }, [scamQueue])
 
   return (<nav className="bot">
     <Box>

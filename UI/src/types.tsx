@@ -119,3 +119,9 @@ export type ScamOptions = {
 }
 
 export type Filter = 'all' | 'warning' | 'unchecked'
+
+export type ScamQueue = {
+  todo?:string[],
+  pending?:string[],
+  done?:string[]
+} 

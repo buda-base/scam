@@ -21,24 +21,6 @@ const debug = debugFactory("scam:img")
 
 const padding = 56
 
-const scam_options: ScamOptionsMap = {
-  "alter_checked": false,
-  "direction": "vertical",
-  "squarishness_min": 0.85,
-  "squarishness_min_warn": 0.7,
-  "nb_pages_expected": 2,
-  "wh_ratio_range": [2.0, 7.0],
-  "wh_ratio_range_warn": [1.5, 10],
-  "area_ratio_range": [0.2, 0.5],
-  "area_diff_max": 0.15,
-  "area_diff_max_warn": 0.7,
-  "use_rotation": true,
-  "fixed_width": null,
-  "fixed_height": null,
-  "expand_to_fixed": false,
-  "cut_at_fixed": false
-}
-
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean, page?: Page,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
   const { x, y, width, height, rotation, warning, rotatedHandle } = props.shapeProps;
@@ -258,9 +240,29 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
   
   const [grid, setGrid] = useAtom(state.grid)  
 
-  if (inView) {    
-    //debug("scanImageContainer:", image.thumbnail_path, JSON.stringify(props, null, 3))
-    return <ScamImage {...props} divRef={ref} {...{visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
+  const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
+
+  if (inView) { 
+    if(!scamQueue.pending?.includes(image.thumbnail_path)) {    
+      //debug("scanImageContainer:", image.thumbnail_path, JSON.stringify(props, null, 3))
+      return <ScamImage {...props} divRef={ref} {...{visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
+    } else {
+
+      const w = (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding
+      const h = w * image.thumbnail_info.height / image.thumbnail_info.width
+
+      return (
+        <div ref={ref} className={"scam-image loading" + (" grid-" + grid)}
+          style={{ height: h + 2 * padding, maxWidth: image.thumbnail_info.width + 2*padding }}
+        >
+          <figure ref={figureRef} style={{ display: "block" }}>
+            <figcaption>
+              <FormControlLabel label={image.img_path} control={<Checkbox checked={selected} sx={{padding: "0 8px" }}/>}  /> 
+            </figcaption>
+          </figure>
+        </div>
+      )
+    }
   }
   else {    
 
@@ -549,7 +551,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    //debug("gSR!", image?.thumbnail_path, restrictRun, selected, configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
+    //debug("gSR!", image?.thumbnail_path, shouldRunAfter, restrictRun, selected, configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
 
     if ((!restrictRun || selected) && configReady != false && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
@@ -597,10 +599,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       if(checked) return 
 
       setScamData(true)
-      setLastRun(now)
-
+      
       //debug("getScamResults:",image.thumbnail_path)
-
+      
+      /* // lets move this elsewhere...
+      
+      setLastRun(now)
 
       const opts= {
         ...scam_options,  
@@ -681,6 +685,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         .catch(error => {
           if(error.message != "canceled") console.error(error);
         });
+
+      */
     }
   }, [configs, restrictRun, selected, configReady, visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, scamOptionsSelected, setModified])
 

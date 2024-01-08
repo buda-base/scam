@@ -13,7 +13,7 @@ import { useAtom } from 'jotai';
 
 import { ScamImageContainer, recomputeCoords, withRotatedHandle } from "./components/ScamImage"
 import './App.css'
-import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData, ScamOptions } from './types';
+import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData, ScamOptions, ScamOptionsMap } from './types';
 import { BottomBar } from './components/BottomBar';
 import { TopBar } from './components/TopBar';
 import { ColorButton, theme } from "./components/theme"
@@ -27,6 +27,24 @@ export const discardDraft = async (folder: string) => {
   const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
   if(local.drafts && local.drafts[folder]) delete local.drafts[folder] 
   localStorage.setItem("scamUI", JSON.stringify(local))
+}
+
+const scam_options: ScamOptionsMap = {
+  "alter_checked": false,
+  "direction": "vertical",
+  "squarishness_min": 0.85,
+  "squarishness_min_warn": 0.7,
+  "nb_pages_expected": 2,
+  "wh_ratio_range": [2.0, 7.0],
+  "wh_ratio_range_warn": [1.5, 10],
+  "area_ratio_range": [0.2, 0.5],
+  "area_diff_max": 0.15,
+  "area_diff_max_warn": 0.7,
+  "use_rotation": true,
+  "fixed_width": null,
+  "fixed_height": null,
+  "expand_to_fixed": false,
+  "cut_at_fixed": false
 }
 
 let oldHandleSelectStart: { (this: Window, ev: Event): any; (ev: any): void; (this: Window, ev: Event): any; } | null = null
@@ -396,6 +414,37 @@ function App() {
     if(options.cutAtFixed) setCutAtFixed(options.cutAtFixed)
   }
 
+  const options= {
+    ...scam_options,  
+    "wh_ratio_range": orient == "custom"
+      ? [minRatio, maxRatio]
+      : orient == "horizontal"
+        ? [2.0, 7.0]
+        : [0.6, 0.8], // TODO: check values for vertical mode    
+    "wh_ratio_range_warn": [1.5, 10], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
+    "nb_pages_expected": orient == "custom" ? nbPages : 2,
+    "direction": orient == "custom"
+      ? direc
+      : orient === 'horizontal'
+        ? 'vertical'
+        : 'horizontal',
+    "area_ratio_range": orient == "custom"
+      ? [minAreaRatio, maxAreaRatio]
+      : [0.2, 0.9],
+    "squarishness_min": orient == "custom" 
+      ? minSquarish
+      : 0.85,
+    "cut_at_fixed": orient == "custom" 
+      ? cutAtFixed
+      : false,
+    "fixed_width": orient == "custom" 
+      ? fixedWidth
+      : -1,
+    "fixed_height": orient == "custom" 
+      ? fixedHeight
+      : -1,
+  }
+
   useEffect(() => {
     const hasDraft = ((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) 
     if(loadDraft) {
@@ -456,7 +505,7 @@ function App() {
       <main onClick={checkDeselectMain}>{
         images.map(image => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
       }</main>
-      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, setOptions }}/></footer>}
+      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json, setJson}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, options, setOptions }}/></footer>}
     </ThemeProvider>
   )
 }

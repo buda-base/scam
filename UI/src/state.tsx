@@ -2,7 +2,7 @@ import { atom } from "jotai"
 import { atomWithReducer } from "jotai/utils"
 import debugFactory from "debug"
 
-import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction, Orientation, LocalData } from "./types"
+import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction, Orientation, LocalData, ScamQueue } from "./types"
 
 const debug = debugFactory("scam:state")
 
@@ -74,3 +74,5 @@ export const selectedAreaRatio = atom(0)
 export const selectedCutAtFixed = atom<number[]>([])
 
 export const showSettings = atom(false);
+
+export const scamQueue = atom<ScamQueue>({});
