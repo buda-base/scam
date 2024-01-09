@@ -240,29 +240,9 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
   
   const [grid, setGrid] = useAtom(state.grid)  
 
-  const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
-
   if (inView) { 
-    if(!scamQueue.pending?.includes(image.thumbnail_path)) {    
-      //debug("scanImageContainer:", image.thumbnail_path, JSON.stringify(props, null, 3))
-      return <ScamImage {...props} divRef={ref} {...{visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
-    } else {
-
-      const w = (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding
-      const h = w * image.thumbnail_info.height / image.thumbnail_info.width
-
-      return (
-        <div ref={ref} className={"scam-image loading" + (" grid-" + grid)}
-          style={{ height: h + 2 * padding, maxWidth: image.thumbnail_info.width + 2*padding }}
-        >
-          <figure ref={figureRef} style={{ display: "block" }}>
-            <figcaption>
-              <FormControlLabel label={image.img_path} control={<Checkbox checked={selected} sx={{padding: "0 8px" }}/>}  /> 
-            </figcaption>
-          </figure>
-        </div>
-      )
-    }
+    
+    return <ScamImage {...props} divRef={ref} {...{visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
   }
   else {    
 
@@ -548,10 +528,29 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   //debug("im:",image.thumbnail_path,lastRun,shouldRunAfter,image,scamData)
 
+  const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
+
+  const reloadData = useCallback(() => {
+    if(globalData && globalData.data && globalData?.time != lastRun) { 
+      debug("gD!",lastRun,image.thumbnail_path,globalData?.time,scamQueue,globalData.data.pages,globalData.data.rects)
+      
+      const newData = { 
+        ...globalData.data,
+        rects: globalData.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, globalData.data.width, globalData.data.height))
+      }
+      setScamData(newData)
+      setLastRun(globalData.time)
+    }
+  }, [dimensions, globalData, image, lastRun, scamQueue])
+
+  useEffect(() => {
+    reloadData()
+  }, [globalData])
+
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    //debug("gSR!", image?.thumbnail_path, shouldRunAfter, restrictRun, selected, configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
+    debug("gSR!", image?.thumbnail_path, shouldRunAfter, restrictRun, selected, configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
 
     if ((!restrictRun || selected) && configReady != false && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
@@ -598,12 +597,13 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       if(checked) return 
 
-      setScamData(true)
       
       //debug("getScamResults:",image.thumbnail_path)
       
       /* // lets move this elsewhere...
       
+      setScamData(true)
+
       setLastRun(now)
 
       const opts= {
@@ -688,7 +688,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       */
     }
-  }, [configs, restrictRun, selected, configReady, visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, scamOptionsSelected, setModified])
+  }, [scamOptions, configs, restrictRun, selected, configReady, visible, config, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, scamOptionsSelected, setModified])
 
   
   useEffect(() => {
@@ -758,7 +758,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       selectShape(newData.pages.length ? newData.pages.length - 1 : null)
       if(!checked) setChecked(true)
     }
-  }, [checked, dimensions.height, dimensions.width, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
+  }, [checked, dimensions, modified, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
 
   useEffect(() => {
     if(focused != image.thumbnail_path) {
@@ -973,7 +973,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
  
   //debug("dim:",image.thumbnail_path, dimensions, actualW, actualH, portrait)
 
-  return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
+  return (<div ref={divRef} className={"scam-image" + (scamData === true || scamQueue.todo?.length && !scamQueue.done?.includes(image.thumbnail_path)? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid)}
     style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info[portrait ? "height":"width"] + 2*padding }}
     onMouseDown={checkDeselectDiv}
