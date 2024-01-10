@@ -991,7 +991,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
  
   //debug("dim:",image.thumbnail_path, dimensions, actualW, actualH, portrait)
 
-  return (<div ref={divRef} className={"scam-image" + (scamData === true || scamQueue.todo?.length && scamQueue.todo?.includes(image.thumbnail_path) && !scamQueue.done?.includes(image.thumbnail_path)? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
+  const loading = scamData === true || scamQueue.todo?.length && scamQueue.todo?.includes(image.thumbnail_path) && !scamQueue.done?.includes(image.thumbnail_path)
+
+  return (<div ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid)}
     style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info[portrait ? "height":"width"] + 2*padding }}
     onMouseDown={checkDeselectDiv}
@@ -1062,7 +1064,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       <figcaption><FormControlLabel label={image.img_path} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} control={<Checkbox checked={selected} sx={{padding: "0 8px" }}/>}  />
         { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "4px" }} /> }
         {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
-        { typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
+        { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
       </figcaption>
       {showDebug && visible && typeof scamData === 'object' &&
         <div className="debug">
