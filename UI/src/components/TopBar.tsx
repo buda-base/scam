@@ -123,7 +123,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
     </Dialog>
   ), [config, confirmAct, folder, handleClose, modified, onConfirmed, showDialog])
 
-  debug("tb:",confirmAct, modified, folder, error, showDialog)
+  //debug("tb:",confirmAct, modified, folder, error, showDialog)
 
   const folderDialog = useMemo(() => (
     <Dialog open={(!folder || confirmAct == false || !modified) && (folder == "" || error != "" || showDialog)} onClose={handleClose} disableScrollLock={true} hideBackdrop={!showDialog || folder != jsonPath}>

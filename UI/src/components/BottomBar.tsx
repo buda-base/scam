@@ -370,72 +370,90 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       go = true
       abort = false
 
-      let todo = json?.files.filter(m => !m.checked && !m.hidden)
+      let todo = json?.files.filter(m => (!m.checked || allScamData[m.thumbnail_path] && !allScamData[m.thumbnail_path]?.checked) && (!m.hidden || allScamData[m.thumbnail_path]?.visible))
       if(checkedRestrict) todo = todo.filter(m => selectedItems.includes(m.thumbnail_path))
+      const todoStr = todo.map(m => m.thumbnail_path)
       const done:string[] = []
       setScamQueue({ todo:todo.map(m => m.thumbnail_path), done })
 
-      for(const image of todo) {
-        
-        if(unmount || abort) {
-          setScamQueue({todo:[], done:[]})
-          break ;
-        }
-        
-        try {
-                    
-          const response = await axios.post(apiUrl + "run_scam_file", {
-            folder_path: folder,
-            scam_options: options,
-            file_info: image
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: "Basic " + encode(config.auth.join(":"))
-            },
-            //signal: controller.signal
-          })
-        
-          //debug("json:", response.data);
+      debug("sq:",todo)
+      
+      const handleSlice = async (list:ScamImageData[]) => {
+        for(const image of list) {          
+          if(unmount || abort) {
+            setScamQueue({ todo: [], done: [] })
+            break ;
+          }          
+          try {
+                      
+            const response = await axios.post(apiUrl + "run_scam_file", {
+              folder_path: folder,
+              scam_options: options,
+              file_info: image
+            }, {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: "Basic " + encode(config.auth.join(":"))
+              },
+              //signal: controller.signal
+            })
           
-          if (response.data) {
+            debug("json:", response.data.thumbnail_path);
             
-            const state = 'new'
-            const visible = !image.hidden
-            const checked = image.checked
-            const selected = selectedItems.includes(image.thumbnail_path)
-                        
-            dispatch({
-              type: 'ADD_DATA',
-              payload: {
-                id: image.thumbnail_path,
-                val: { data: response.data, state, time: Date.now(), image, visible, checked, options: selected ? { ...scamOptionsSelected}:{...scamOptions} } 
-              }
-            })                      
-            
-            // #9 always ungray save buttons after run_
-            if(!modified) setModified(true)
-            if(drafted) setDrafted(false)
-            if(published) setPublished(false)
-                        
-            done.push(image.thumbnail_path)
-            //debug("done:",done, scamQueue.todo)
-            setScamQueue({ todo: todo.map(m => m.thumbnail_path), done })
-            
-          }        
+            if (response.data) {
+              
+              const state = 'new'
+              const visible = !image.hidden
+              const checked = image.checked
+              const selected = selectedItems.includes(image.thumbnail_path)
+                          
+              dispatch({
+                type: 'ADD_DATA',
+                payload: {
+                  id: image.thumbnail_path,
+                  val: { data: response.data, state, time: Date.now(), image, visible, checked, options: selected ? { ...scamOptionsSelected}:{...scamOptions} } 
+                }
+              })                      
+              
+              // #9 always ungray save buttons after run_
+              if(!modified) setModified(true)
+              if(drafted) setDrafted(false)
+              if(published) setPublished(false)
+                          
+              done.push(image.thumbnail_path)
+              //debug("done:",done, scamQueue.todo)
+              setScamQueue({ todo: todoStr, done })
+              
+            }        
+          }
+          catch(error:any) {
+            if(error.message != "canceled") console.error(error);
+          }
         }
-        catch(error:any) {
-          if(error.message != "canceled") console.error(error);
+        if(!todoStr.some(m => !done.includes(m))) {
+          debug("end of run")
+          setScamQueue({ todo: [], done: [] })
         }
       }
 
-      setScamQueue({ todo: [], done: [] })
       
+      const N_threads = 6;
+      const chunkSize = todo.length / N_threads;
+      const chunks:ScamImageData[][] = [];
+      for (let i = 0; i < N_threads; i ++) {
+        chunks.push([])
+      }
+      for (let i = 0; i < todo.length; i ++) {
+        chunks[i%N_threads].push(todo[i]);
+      }
+      chunks.map(handleSlice)      
+        
     }
-  }, [scamQueue, json, setScamQueue, folder, options, config, controller, selectedItems, dispatch, shouldRunAfter, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
+  }, [scamQueue, json, checkedRestrict, setScamQueue, selectedItems, folder, options, config.auth, dispatch, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
 
   useEffect(() => {
-    handleScamQueue()
+    // not sure we should run without user interaction?
+    //handleRerun()
 
     return () => {
       go = false
