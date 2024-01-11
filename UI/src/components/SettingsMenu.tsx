@@ -1,11 +1,12 @@
 import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, IconButton, Checkbox } from "@mui/material"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAtom } from "jotai"
 import { SystemUpdateAlt } from "@mui/icons-material"
 import debugFactory from "debug"
 
 import * as state from "../state"
 import { Orientation, Direction } from "../types"
+import { ColorButtonAlt } from "./theme"
 
 const debug = debugFactory("scam:menu")
 
@@ -58,19 +59,32 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
 
   const theme = useTheme()
 
+  const importFromAnnotation = useCallback(() => {
+    setMinRatio(selectedRatio*0.85)
+    setMaxRatio(selectedRatio*1.15)
+    setMinAreaRatio(selectedAreaRatio*0.85)
+    setMaxAreaRatio(selectedAreaRatio*1.15)
+  }, [selectedRatio, selectedAreaRatio])
+
   return (<>
-      <TextField
-        sx={{ minWidth: 100, marginRight:"16px" }}
-        select
-        variant="standard"
-        value={orient}
-        label="Configuration" //"Pages orientation"
-        onChange={(r) => setOrient(r.target.value as Orientation)}
-      >
-        <MenuItem value={"vertical"}>vertical (modern books)</MenuItem>
-        <MenuItem value={"horizontal"}>horizontal (pechas)</MenuItem>
-        <MenuItem value={"custom"}>custom</MenuItem>
-      </TextField>
+      <Box sx={{ display:"flex", alignItems: "flex-end" }}>
+        <TextField
+          sx={{ minWidth: 100, marginRight:"16px" }}
+          select
+          variant="standard"
+          value={orient}
+          label="Configuration" //"Pages orientation"
+          onChange={(r) => setOrient(r.target.value as Orientation)}
+          >
+          <MenuItem value={"vertical"}>vertical (modern books)</MenuItem>
+          <MenuItem value={"horizontal"}>horizontal (pechas)</MenuItem>
+          <MenuItem value={"custom"}>custom</MenuItem>
+        </TextField>
+        { orient === "custom" && <ColorButtonAlt onClick={importFromAnnotation} disabled={selectedRatio === 0} sx={{ margin:"0px 0 0 20px", textAlign: "right" }}>
+          <SystemUpdateAlt sx={{height:16,transform:"rotate(180deg)"}} />
+          import from<br/>annotation
+        </ColorButtonAlt> }
+      </Box>
 
       { orient === "custom" && <>
           <Box sx={{ marginRight:"16px", marginTop:"16px" }}>
