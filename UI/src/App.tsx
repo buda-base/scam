@@ -29,7 +29,7 @@ export const discardDraft = async (folder: string) => {
   localStorage.setItem("scamUI", JSON.stringify(local))
 }
 
-const scam_options: ScamOptionsMap = {
+export const scam_options: ScamOptionsMap = {
   "alter_checked": false,
   "direction": "vertical",
   "squarishness_min": 0.85,
@@ -422,7 +422,7 @@ function App() {
         ? [2.0, 7.0]
         : [0.6, 0.8], // TODO: check values for vertical mode    
     "wh_ratio_range_warn": [1.5, 10], // TODO: shouldn't it be updated w.r.t wh_ratio_range?
-    "nb_pages_expected": orient == "custom" ? nbPages : 2,
+    "nb_pages_expected": orient == "custom" ? nbPages : scam_options.nb_pages_expected,
     "direction": orient == "custom"
       ? direc
       : orient === 'horizontal'

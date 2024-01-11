@@ -438,7 +438,6 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
 
       
       const N_threads = 6;
-      const chunkSize = todo.length / N_threads;
       const chunks:ScamImageData[][] = [];
       for (let i = 0; i < N_threads; i ++) {
         chunks.push([])

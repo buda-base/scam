@@ -13,7 +13,7 @@ import { Checkbox, FormControlLabel } from "@mui/material";
 import _ from "lodash";
 
 import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap } from "../types";
-import { apiUrl } from "../App";
+import { apiUrl, scam_options } from "../App";
 import ImageMenu from "./ImageMenu";
 import * as state from "../state"
 
@@ -978,13 +978,14 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   
   useEffect( () => {
     if(typeof scamData === 'object') { 
-      if(scamData?.rects?.length != nbPages || scamData?.rects?.some(r => r.warning)) {
+      const numP = globalData?.options?.nbPages ?? scam_options.nb_pages_expected 
+      if(scamData?.rects?.length != numP || scamData?.rects?.some(r => r.warning)) {
         setWarning(true)
       } else {
         setWarning(false)
       }
     }
-  }, [ scamData, nbPages ])
+  }, [ scamData, globalData ])
 
   const actualW = (portrait ? dimensions.height : dimensions.width)
   const actualH = (portrait ? dimensions.width : dimensions.height)
