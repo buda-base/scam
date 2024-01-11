@@ -757,7 +757,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         type: 'UPDATE_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data: newData, state: 'modified', time: shouldRunAfter }
+          val: { data: newData, state: 'modified', time: shouldRunAfter, checked:true }
         }
       })        
       if(modified) setDrafted(false) 
@@ -826,7 +826,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         type: 'UPDATE_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data, state: 'modified', time: shouldRunAfter, image, visible: true }
+          val: { data, state: 'modified', time: shouldRunAfter, image, visible: true, checked: true }
         }
       })
       if(!modified) setModified(true)
@@ -938,7 +938,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       type: 'UPDATE_DATA',
       payload: {
         id: image.thumbnail_path,
-        val: { state: 'modified', time: shouldRunAfter, visible: !visible }
+        val: { state: 'modified', time: shouldRunAfter, visible: !visible, checked: true }
       }
     })
     setVisible(!visible)

@@ -370,13 +370,13 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       go = true
       abort = false
 
-      let todo = json?.files.filter(m => (!m.checked || allScamData[m.thumbnail_path] && !allScamData[m.thumbnail_path]?.checked) && (!m.hidden || allScamData[m.thumbnail_path]?.visible))
+      let todo = json?.files.filter(m => (!m.checked || allScamData[m.thumbnail_path] && !allScamData[m.thumbnail_path].checked) && (!allScamData[m.thumbnail_path] || !allScamData[m.thumbnail_path]?.checked) && (!m.hidden || allScamData[m.thumbnail_path]?.visible))
       if(checkedRestrict) todo = todo.filter(m => selectedItems.includes(m.thumbnail_path))
       const todoStr = todo.map(m => m.thumbnail_path)
       const done:string[] = []
       setScamQueue({ todo:todo.map(m => m.thumbnail_path), done })
 
-      debug("sq:",todo)
+      //debug("sq:",todo, allScamData)
       
       const handleSlice = async (list:ScamImageData[]) => {
         for(const image of list) {          
@@ -448,7 +448,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       chunks.map(handleSlice)      
         
     }
-  }, [scamQueue, json, checkedRestrict, setScamQueue, selectedItems, folder, options, config.auth, dispatch, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
+  }, [allScamData, scamQueue, json, checkedRestrict, setScamQueue, selectedItems, folder, options, config.auth, dispatch, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
 
   useEffect(() => {
     // not sure we should run without user interaction?
