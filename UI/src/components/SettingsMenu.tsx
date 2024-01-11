@@ -64,7 +64,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
         select
         variant="standard"
         value={orient}
-        label="Pages orientation"
+        label="Configuration" //"Pages orientation"
         onChange={(r) => setOrient(r.target.value as Orientation)}
       >
         <MenuItem value={"vertical"}>vertical (modern books)</MenuItem>
@@ -126,11 +126,11 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               select
               variant="standard"
               value={direc}
-              label="Direction"
+              label="Annotation layout" //"Direction"
               onChange={(r) => setDirec(r.target.value as Direction)}
             >
-              <MenuItem value={"vertical"}>vertical</MenuItem>
-              <MenuItem value={"horizontal"}>horizontal</MenuItem>
+              <MenuItem value={"vertical"}>vertical (top to bottom)</MenuItem>
+              <MenuItem value={"horizontal"}>horizontal (left to right)</MenuItem>
             </TextField>
           </Box>
           <Box sx={{ marginRight:"16px", marginTop:"16px" }}>
