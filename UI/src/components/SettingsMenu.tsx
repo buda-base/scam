@@ -77,7 +77,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
             <InputLabel shrink={false} id="custom-label" style={{ fontSize:12, lineHeight: "14px", height:16, color: editRatio ? theme.palette.primary.main : theme.palette.text.secondary }}>
               Page aspect ratio range
             </InputLabel>
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={selectedRatio === 0} onClick={() => setMinRatio(selectedRatio)}
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
@@ -94,7 +94,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               />
             </span>
             <span style={{ fontSize: "16px", lineHeight: "30px" }}>...</span>
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={selectedRatio === 0}  onClick={() => setMaxRatio(selectedRatio)}
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
@@ -121,6 +121,8 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               label="Num. of pages expected"
               onChange={(r) => setNbPages(Number(r.target.value))}
             />
+          </Box>
+          <Box sx={{ marginTop:"16px" }}>
             <TextField
               sx={{ minWidth: 100, marginRight:"16px" }}
               select
@@ -137,7 +139,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
             <InputLabel shrink={false} id="custom-label" style={{ fontSize:12, lineHeight: "14px", height:16, color: editAreaRatio ? theme.palette.primary.main : theme.palette.text.secondary }}>
               Area ratio range
             </InputLabel>
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={selectedAreaRatio === 0} onClick={() => setMinAreaRatio(selectedAreaRatio)}
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
@@ -154,7 +156,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               />
             </span>
             <span style={{ fontSize: "16px", lineHeight: "30px" }}>...</span>
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={selectedAreaRatio === 0}  onClick={() => setMaxAreaRatio(selectedAreaRatio)}
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
@@ -187,7 +189,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               Cut at fixed resolution
             </InputLabel>
             <Checkbox checked={cutAtFixed} sx={{ marginLeft:"-12px", marginTop:"-6px"}} onChange={(ev) => setCutAtFixed(ev.target.checked)} />
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedWidth(Math.round(selectedCutAtFixed[0])) }
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
@@ -205,7 +207,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               />
             </span>
             <span style={{ fontSize: "16px", lineHeight: "30px" }}> : </span>
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedHeight(Math.round(selectedCutAtFixed[1])) }
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
