@@ -773,16 +773,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     }
   }, [focused, image.thumbnail_path])
 
-  useEffect(()=>{
-    if(selectedId != null && keyDown == 'Delete') {
-      removeId(selectedId)
-      setKeyDown('')
-    }
-  }, [selectedId, keyDown, removeId, setKeyDown])
-
+  const [clipboard, setClipboard] = useAtom(state.clipboard)
 
   const onChange = useCallback((p: KonvaPage, add?: boolean) => {
-
     
     let data:ScamImageData 
     if (typeof scamData !== 'object') {
@@ -835,6 +828,36 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     }
   
   }, [checked, dimensions, modified, dispatch, drafted, handleZindex, image, scamData, setDrafted, setModified, shouldRunAfter, visible])
+
+  const handleKeyDown = useCallback( () => {
+    if(keyDown == 'Delete' && selectedId != null) {
+      removeId(selectedId)
+      setKeyDown('')
+    } else if(keyDown.startsWith("CTRL+")){
+      //debug("key:", keyDown, focused, image.thumbnail_path)      
+      if(selectedId != null && keyDown === "CTRL+C"  && typeof scamData === "object" && scamData.rects ) {
+        //debug(scamData.rects[selectedId])
+        setClipboard({ ...scamData.rects[selectedId] })
+      } else if(selectedId != null && keyDown === "CTRL+X"  && typeof scamData === "object" && scamData.rects) {
+        setClipboard({ ...scamData.rects[selectedId] })
+        removeId(selectedId)
+      } else if(focused === image.thumbnail_path && keyDown === "CTRL+V") { 
+        //debug(clipboard)
+        if(clipboard) { 
+          const n = typeof scamData === "object" ? scamData?.rects?.length ?? 0 : 0
+          selectShape(null)
+          onChange({...clipboard, n}, true)
+          selectShape(n)
+        }
+
+      }
+      setKeyDown('')
+    }
+  }, [keyDown, selectedId, scamData, removeId, setKeyDown, setClipboard, clipboard, onChange, focused, image])
+
+  useEffect(()=>{
+    handleKeyDown()
+  }, [keyDown])
 
   useEffect(() => {
     if (typeof scamData === 'object' && scamData.rects && scamData.selected != selectedId && selectedId != undefined) {
@@ -1003,7 +1026,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         // {... !visible ? { style: { width: dimensions.width + padding * 2, height: 80 } }:{} }
         >
       { !visible && typeof konvaImg == "object" && <img src={konvaImg?.src} className={"mini"+((image.rotation + 360) % 360 != 0 ? " rotated": "")} style={{transform: "rotate("+image.rotation+"deg)" }}/> }
-      { visible  && <Stage
+      { visible  && <Stage        
         width={actualW + padding * 2}
         height={actualH + padding * 2}
         onMouseDown={handleMouseDown}

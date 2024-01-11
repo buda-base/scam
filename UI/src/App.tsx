@@ -143,7 +143,10 @@ function App() {
 
   const handleKeyDown = useCallback((ev:KeyboardEvent) => {
     //debug("down", ev, showSettings)
-    if(!showSettings) setKeyDown(ev.key)
+    if(!showSettings) { 
+      if(ev.ctrlKey && ["C","V","X"].includes(ev.key.toUpperCase())) setKeyDown("CTRL+"+ev.key.toUpperCase())
+      else setKeyDown(ev.key)
+    }
     if(ev.key == " ") {
       ev.preventDefault()
       let next:any, nextBB:any
