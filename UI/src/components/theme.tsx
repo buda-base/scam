@@ -21,7 +21,7 @@ const ColorButtonStyle = styled(Button)<ButtonProps>(({ theme }) => ({
 })) as typeof Button;
 
 
-const ColorButtonStyleAlt = styled(Button)<ButtonProps>(({ theme }) => ({
+const ColorButtonStyleAlt = styled(Button)<ButtonProps>(() => ({
   minWidth: "120px",
   fontSize: "12px",
   fontWeight: "600",
