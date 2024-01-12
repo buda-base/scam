@@ -837,9 +837,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       //debug("key:", keyDown, focused, image.thumbnail_path)      
       if(selectedId != null && keyDown === "CTRL+C"  && typeof scamData === "object" && scamData.rects ) {
         //debug(scamData.rects[selectedId])
-        setClipboard({ ...scamData.rects[selectedId] })
+        const page_n = scamData.rects.findIndex(r => r.n === selectedId) 
+        setClipboard({ ...scamData.rects[page_n] })
       } else if(selectedId != null && keyDown === "CTRL+X"  && typeof scamData === "object" && scamData.rects) {
-        setClipboard({ ...scamData.rects[selectedId] })
+        const page_n = scamData.rects.findIndex(r => r.n === selectedId) 
+        setClipboard({ ...scamData.rects[page_n] })
         removeId(selectedId)
       } else if(focused === image.thumbnail_path && keyDown === "CTRL+V") { 
         //debug(clipboard)
