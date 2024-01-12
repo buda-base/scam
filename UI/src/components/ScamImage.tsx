@@ -999,22 +999,24 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     setModified(true)
   }, [checked, dispatch, image, scamData, setModified, shouldRunAfter, visible, allScamData, modified])  
   
+  const [checkedRestrict, setCheckedRestrict] = useAtom(state.checkedRestrict)
+
   useEffect( () => {
     if(typeof scamData === 'object') { 
-      const numP = globalData?.options?.nbPages ?? scam_options.nb_pages_expected 
+      const numP = (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected
       if(scamData?.rects?.length != numP || scamData?.rects?.some(r => r.warning)) {
         setWarning(true)
       } else {
         setWarning(false)
       }
     }
-  }, [ scamData, globalData ])
+  }, [ scamData, globalData, scamOptions, scamOptionsSelected, checkedRestrict ])
 
   const actualW = (portrait ? dimensions.height : dimensions.width)
   const actualH = (portrait ? dimensions.width : dimensions.height)
  
   //debug("dim:",image.thumbnail_path, dimensions, actualW, actualH, portrait)
-
+  
   const loading = scamData === true || scamQueue.todo?.length && scamQueue.todo?.includes(image.thumbnail_path) && !scamQueue.done?.includes(image.thumbnail_path)
 
   return (<div ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 

@@ -19,7 +19,7 @@ import { ConfigData, LocalData, Orientation, Page, SavedScamData, ScamData, Scam
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
-import { apiUrl, discardDraft } from "../App";
+import { apiUrl, discardDraft, scam_options } from "../App";
 import axios from "axios";
 import { withRotatedHandle, withoutRotatedHandle, recomputeCoords } from "./ScamImage";
 import CircularProgressWithLabel from "./CircularProgressWithLabel"
@@ -246,6 +246,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
 
   const [restrictRun, setRestrictRun] = useAtom(state.restrictRun)
   const [checkedRestrict, setCheckedRestrict] = useAtom(state.checkedRestrict)
+  const [checkedRestrictWarning, setCheckedRestrictWarning] = useAtom(state.checkedRestrictWarning)
 
   const [globalScamOptionsUpdate, setGlobalScamOptionsUpdate] = useAtom(state.globalScamOptionsUpdate)
 
@@ -363,6 +364,10 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
 
   const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
 
+  let pages
+  const hasWarning:ScamImageData[] = (json?.files && Object.values(json.files).filter(m => (pages = allScamData[m.thumbnail_path]?.data?.pages ?? m.pages) 
+    && pages.length != (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages ?? scam_options.nb_pages_expected) || pages?.some(p => p.warnings?.length))) ?? [] 
+
   const handleScamQueue = useCallback(async () => {    
 
     if(!scamQueue.todo?.length && json?.files && !go) {
@@ -372,11 +377,13 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
 
       let todo = json?.files.filter(m => (!m.checked || allScamData[m.thumbnail_path] && !allScamData[m.thumbnail_path].checked) && (!allScamData[m.thumbnail_path] || !allScamData[m.thumbnail_path]?.checked) && (!m.hidden || allScamData[m.thumbnail_path]?.visible))
       if(checkedRestrict) todo = todo.filter(m => selectedItems.includes(m.thumbnail_path))
+      if(checkedRestrictWarning && hasWarning.length > 0) todo = todo.filter(m => hasWarning.find(im => im.thumbnail_path === m.thumbnail_path))
+
+      //debug("sq:",todo, allScamData, hasWarning)
+
       const todoStr = todo.map(m => m.thumbnail_path)
       const done:string[] = []
       setScamQueue({ todo:todo.map(m => m.thumbnail_path), done })
-
-      //debug("sq:",todo, allScamData)
       
       const handleSlice = async (list:ScamImageData[]) => {
         for(const image of list) {          
@@ -448,7 +455,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       chunks.map(handleSlice)      
         
     }
-  }, [allScamData, scamQueue, json, checkedRestrict, setScamQueue, selectedItems, folder, options, config.auth, dispatch, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
+  }, [allScamData, scamQueue, json, checkedRestrict, checkedRestrictWarning, setScamQueue, selectedItems, folder, options, config.auth, dispatch, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
 
   useEffect(() => {
     // not sure we should run without user interaction?
@@ -488,6 +495,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       handleScamQueue()
     }, 350)
   }, [checkedRestrict, handleScamQueue, restrictRun, scamOptionsSelected, selectedItems, setGlobalScamOptionsUpdate, setOptions, setRestrictRun, setShouldRunAfter, setShowSettings])
+
 
   return (<nav className="bot">
     <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
@@ -576,7 +584,14 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         </IconButton>
         <SettingsMenu />
         <br/>
-        <br/>
+        <div>
+          <FormControlLabel 
+            disabled={hasWarning.length === 0}
+            label={"only run on images with warning"} 
+            onChange={() => setCheckedRestrictWarning(!checkedRestrictWarning)} 
+            control={<Checkbox checked={hasWarning.length > 0 && checkedRestrictWarning} sx={{padding: "0 8px" }}/>}  
+          />
+        </div>
         <div>
           <FormControlLabel 
             disabled={!selectedItems.length}

@@ -62,6 +62,7 @@ export const deselectAll = atom(false)
 
 export const restrictRun = atom(false)
 export const checkedRestrict = atom(false)
+export const checkedRestrictWarning = atom(false)
 
 export const scamOptions = atom<ScamOptions>({ orient: "horizontal" })
 export const scamOptionsSelected = atom<ScamOptions>({ orient: "horizontal" })
