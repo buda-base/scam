@@ -819,12 +819,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         type: 'UPDATE_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data, state: 'modified', time: shouldRunAfter, image, visible: true, checked: true }
+          val: { data, state: 'modified', time: shouldRunAfter, image, visible: true, ...!add?{checked: true}:{} }
         }
       })
       if(!modified) setModified(true)
       if(drafted) setDrafted(false)
-      if(!checked) setChecked(true)
+      if(!checked && !add) setChecked(true)
     }
   
   }, [checked, dimensions, modified, dispatch, drafted, handleZindex, image, scamData, setDrafted, setModified, shouldRunAfter, visible])
@@ -980,7 +980,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           val: { state: 'modified', time: shouldRunAfter, checked: !checked }
         }
       })
-      //setChecked(!checked) // redundant with below
+      setChecked(!checked) 
       setImageData({...image, checked: !checked })    
     } else {
       let keys = _.orderBy(Object.keys(allScamData))
