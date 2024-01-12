@@ -538,7 +538,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   const reloadData = useCallback(() => {
     //debug("rD?",lastRun,image.thumbnail_path)
-    if(globalData && globalData.data && globalData?.time != lastRun) { 
+    if(globalData && globalData.data) {  //&& globalData?.time != lastRun) { 
       //debug("gD!",lastRun,image.thumbnail_path,globalData?.time,scamQueue,globalData.data.pages,globalData.data.rects)
       
       const newData = { 
