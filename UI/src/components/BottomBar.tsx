@@ -490,10 +490,21 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   }, [checkedRestrict, handleScamQueue, restrictRun, scamOptionsSelected, selectedItems, setGlobalScamOptionsUpdate, setOptions, setRestrictRun, setShouldRunAfter, setShowSettings])
 
   return (<nav className="bot">
+    <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
+      { scamQueue.todo && scamQueue.todo.length > 0 && progress < 100 
+        ? <div style={{ display:"flex", alignItems:"center" }}>
+            <ColorButton onClick={abortRun} sx={{ margin:"10px" }}>abort run</ColorButton>
+            <CircularProgressWithLabel value={progress} />
+          </div> 
+        : <ColorButton onClick={() => handleSettings()} disabled={scamQueue.todo?.length ? true : false} sx={{ margin: "10px" }}>
+            Run scam...
+          </ColorButton>
+        }
+    </Box>
     <Box>
-      <IconButton onClick={() => handleSettings()} disabled={scamQueue.todo?.length ? true : false} >
+      {/* <IconButton onClick={() => handleSettings()} disabled={scamQueue.todo?.length ? true : false} >
         <Settings />
-      </IconButton>
+      </IconButton> */}
       <TextField
         SelectProps={{ 
           MenuProps : { disableScrollLock: true }
@@ -544,10 +555,6 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         <MenuItem value={4} disabled={!selectedItems.length} onClick={() => setShowSettings(true)}>{"Run SCAM on selection"}</MenuItem>
       </TextField>
     </Box>    
-    { scamQueue.todo && scamQueue.todo.length > 0 && progress < 100 && <div style={{ display:"flex", alignItems:"center" }}>
-      <CircularProgressWithLabel value={progress} />
-      <ColorButton onClick={abortRun} sx={{ marginLeft:"10px" }}>abort run</ColorButton>
-    </div> }
     <div>
       <SaveButtons {...{ progress, folder, config, json, selectedItems, checkedRestrict }} />
     </div>
