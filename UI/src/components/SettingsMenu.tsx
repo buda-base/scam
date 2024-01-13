@@ -1,11 +1,12 @@
 import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, IconButton, Checkbox } from "@mui/material"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAtom } from "jotai"
 import { SystemUpdateAlt } from "@mui/icons-material"
 import debugFactory from "debug"
 
 import * as state from "../state"
 import { Orientation, Direction } from "../types"
+import { ColorButtonAlt } from "./theme"
 
 const debug = debugFactory("scam:menu")
 
@@ -58,26 +59,39 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
 
   const theme = useTheme()
 
+  const importFromAnnotation = useCallback(() => {
+    setMinRatio(selectedRatio*0.85)
+    setMaxRatio(selectedRatio*1.15)
+    setMinAreaRatio(selectedAreaRatio*0.85)
+    setMaxAreaRatio(selectedAreaRatio*1.15)
+  }, [selectedRatio, selectedAreaRatio])
+
   return (<>
-      <TextField
-        sx={{ minWidth: 100, marginRight:"16px" }}
-        select
-        variant="standard"
-        value={orient}
-        label="Pages orientation"
-        onChange={(r) => setOrient(r.target.value as Orientation)}
-      >
-        <MenuItem value={"vertical"}>vertical (modern books)</MenuItem>
-        <MenuItem value={"horizontal"}>horizontal (pechas)</MenuItem>
-        <MenuItem value={"custom"}>custom</MenuItem>
-      </TextField>
+      <Box sx={{ display:"flex", alignItems: "flex-end" }}>
+        <TextField
+          sx={{ minWidth: 100, marginRight:"16px" }}
+          select
+          variant="standard"
+          value={orient}
+          label="Configuration" //"Pages orientation"
+          onChange={(r) => setOrient(r.target.value as Orientation)}
+          >
+          <MenuItem value={"vertical"}>vertical (modern books)</MenuItem>
+          <MenuItem value={"horizontal"}>horizontal (pechas)</MenuItem>
+          <MenuItem value={"custom"}>custom</MenuItem>
+        </TextField>
+        { orient === "custom" && <ColorButtonAlt onClick={importFromAnnotation} disabled={selectedRatio === 0} sx={{ margin:"0px 0 0 20px", textAlign: "right" }}>
+          <SystemUpdateAlt sx={{height:16,transform:"rotate(180deg)"}} />
+          import from<br/>annotation
+        </ColorButtonAlt> }
+      </Box>
 
       { orient === "custom" && <>
           <Box sx={{ marginRight:"16px", marginTop:"16px" }}>
             <InputLabel shrink={false} id="custom-label" style={{ fontSize:12, lineHeight: "14px", height:16, color: editRatio ? theme.palette.primary.main : theme.palette.text.secondary }}>
               Page aspect ratio range
             </InputLabel>
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={selectedRatio === 0} onClick={() => setMinRatio(selectedRatio)}
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
@@ -94,7 +108,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               />
             </span>
             <span style={{ fontSize: "16px", lineHeight: "30px" }}>...</span>
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={selectedRatio === 0}  onClick={() => setMaxRatio(selectedRatio)}
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
@@ -121,23 +135,25 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               label="Num. of pages expected"
               onChange={(r) => setNbPages(Number(r.target.value))}
             />
+          </Box>
+          <Box sx={{ marginTop:"16px" }}>
             <TextField
               sx={{ minWidth: 100, marginRight:"16px" }}
               select
               variant="standard"
               value={direc}
-              label="Direction"
+              label="Annotation layout" //"Direction"
               onChange={(r) => setDirec(r.target.value as Direction)}
             >
-              <MenuItem value={"vertical"}>vertical</MenuItem>
-              <MenuItem value={"horizontal"}>horizontal</MenuItem>
+              <MenuItem value={"vertical"}>vertical (top to bottom)</MenuItem>
+              <MenuItem value={"horizontal"}>horizontal (left to right)</MenuItem>
             </TextField>
           </Box>
           <Box sx={{ marginRight:"16px", marginTop:"16px" }}>
             <InputLabel shrink={false} id="custom-label" style={{ fontSize:12, lineHeight: "14px", height:16, color: editAreaRatio ? theme.palette.primary.main : theme.palette.text.secondary }}>
               Area ratio range
             </InputLabel>
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={selectedAreaRatio === 0} onClick={() => setMinAreaRatio(selectedAreaRatio)}
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
@@ -154,7 +170,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               />
             </span>
             <span style={{ fontSize: "16px", lineHeight: "30px" }}>...</span>
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={selectedAreaRatio === 0}  onClick={() => setMaxAreaRatio(selectedAreaRatio)}
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
@@ -187,7 +203,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               Cut at fixed resolution
             </InputLabel>
             <Checkbox checked={cutAtFixed} sx={{ marginLeft:"-12px", marginTop:"-6px"}} onChange={(ev) => setCutAtFixed(ev.target.checked)} />
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedWidth(Math.round(selectedCutAtFixed[0])) }
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
@@ -205,7 +221,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
               />
             </span>
             <span style={{ fontSize: "16px", lineHeight: "30px" }}> : </span>
-            <span>
+            <span style={{ position:"relative" }}>
               <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedHeight(Math.round(selectedCutAtFixed[1])) }
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />

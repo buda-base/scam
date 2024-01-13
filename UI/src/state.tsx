@@ -2,7 +2,7 @@ import { atom } from "jotai"
 import { atomWithReducer } from "jotai/utils"
 import debugFactory from "debug"
 
-import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction, Orientation, LocalData } from "./types"
+import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction, Orientation, LocalData, ScamQueue, KonvaPage } from "./types"
 
 const debug = debugFactory("scam:state")
 
@@ -62,6 +62,7 @@ export const deselectAll = atom(false)
 
 export const restrictRun = atom(false)
 export const checkedRestrict = atom(false)
+export const checkedRestrictWarning = atom(false)
 
 export const scamOptions = atom<ScamOptions>({ orient: "horizontal" })
 export const scamOptionsSelected = atom<ScamOptions>({ orient: "horizontal" })
@@ -74,3 +75,7 @@ export const selectedAreaRatio = atom(0)
 export const selectedCutAtFixed = atom<number[]>([])
 
 export const showSettings = atom(false);
+
+export const scamQueue = atom<ScamQueue>({});
+
+export const clipboard = atom<KonvaPage|null>(null)

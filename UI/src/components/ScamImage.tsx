@@ -8,36 +8,18 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import Konva from "konva";
 import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
-import { Warning, WarningAmber } from "@mui/icons-material";
+import { ErrorOutline, Warning, WarningAmber } from "@mui/icons-material";
 import { Checkbox, FormControlLabel } from "@mui/material";
 import _ from "lodash";
 
 import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap } from "../types";
-import { apiUrl } from "../App";
+import { apiUrl, scam_options } from "../App";
 import ImageMenu from "./ImageMenu";
 import * as state from "../state"
 
 const debug = debugFactory("scam:img")
 
 const padding = 56
-
-const scam_options: ScamOptionsMap = {
-  "alter_checked": false,
-  "direction": "vertical",
-  "squarishness_min": 0.85,
-  "squarishness_min_warn": 0.7,
-  "nb_pages_expected": 2,
-  "wh_ratio_range": [2.0, 7.0],
-  "wh_ratio_range_warn": [1.5, 10],
-  "area_ratio_range": [0.2, 0.5],
-  "area_diff_max": 0.15,
-  "area_diff_max_warn": 0.7,
-  "use_rotation": true,
-  "fixed_width": null,
-  "fixed_height": null,
-  "expand_to_fixed": false,
-  "cut_at_fixed": false
-}
 
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean, page?: Page,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
@@ -258,8 +240,8 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
   
   const [grid, setGrid] = useAtom(state.grid)  
 
-  if (inView) {    
-    //debug("scanImageContainer:", image.thumbnail_path, JSON.stringify(props, null, 3))
+  if (inView) { 
+    
     return <ScamImage {...props} divRef={ref} {...{visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
   }
   else {    
@@ -271,8 +253,14 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
       <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid)}
         style={{ height: h + 2 * padding, maxWidth: image.thumbnail_info.width + 2*padding }}
       >
-        <figure ref={figureRef}>
+        <figure ref={figureRef} style={{ display: "block" }}>
           <figcaption>{image.img_path}</figcaption>
+          {/* 
+          // good idea but slows scrolling a lot..
+          <figcaption>
+            <FormControlLabel label={image.img_path} control={<Checkbox checked={selected} sx={{padding: "0 8px" }}/>}  /> 
+          </figcaption> 
+          */}
         </figure>
       </div>
     )
@@ -408,7 +396,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [drafted, setDrafted] = useAtom(state.drafted)
 
   const [scamData, setScamData] = useState<ScamImageData | boolean>((!draft || loadDraft == false) && globalData?.state != "modified" && uploadedData 
-                                                                  || (globalData?.time >= shouldRunAfter ? globalData.data : false))
+                                                                  || globalData?.data || false ) //(globalData?.time >= shouldRunAfter ? globalData.data : false))
   const [lastRun, setLastRun] = useState(globalData?.time <= shouldRunAfter ? globalData.time : 0)  
 
   const [konvaImg, setKonvaImg] = useState<HTMLImageElement | boolean>(false)
@@ -546,10 +534,30 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   //debug("im:",image.thumbnail_path,lastRun,shouldRunAfter,image,scamData)
 
+  const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
+
+  const reloadData = useCallback(() => {
+    //debug("rD?",lastRun,image.thumbnail_path)
+    if(globalData && globalData.data) {  //&& globalData?.time != lastRun) { 
+      //debug("gD!",lastRun,image.thumbnail_path,globalData?.time,scamQueue,globalData.data.pages,globalData.data.rects)
+      
+      const newData = { 
+        ...globalData.data,
+        rects: globalData.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, globalData.data.width, globalData.data.height))
+      }
+      setScamData(newData)
+      setLastRun(globalData.time)
+    }
+  }, [dimensions, globalData, image, lastRun, scamQueue])
+
+  useEffect(() => {
+    reloadData()
+  }, [globalData])
+
   const getScamResults = useCallback(() => {
     const now = Date.now()
 
-    //debug("gSR!", image?.thumbnail_path, restrictRun, selected, configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
+    //debug("gSR!", image?.thumbnail_path, shouldRunAfter, restrictRun, selected, configReady, scamOptions, loadDraft, draft, globalData, typeof scamData === 'object' && scamData.pages)    
 
     if ((!restrictRun || selected) && configReady != false && visible && config.auth && scamData != true && (lastRun == 1 || lastRun < shouldRunAfter || typeof scamData === 'object' && image.rotation != scamData.rotation)) {
       
@@ -596,11 +604,14 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       if(checked) return 
 
-      setScamData(true)
-      setLastRun(now)
-
+      
       //debug("getScamResults:",image.thumbnail_path)
+      
+      /* // lets move this elsewhere...
+      
+      setScamData(true)
 
+      setLastRun(now)
 
       const opts= {
         ...scam_options,  
@@ -681,8 +692,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         .catch(error => {
           if(error.message != "canceled") console.error(error);
         });
+
+      */
     }
-  }, [configs, restrictRun, selected, configReady, visible, config.auth, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, scamOptionsSelected, setModified])
+  }, [scamOptions, configs, restrictRun, selected, configReady, visible, config, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, scamOptionsSelected, setModified])
 
   
   useEffect(() => {
@@ -744,14 +757,15 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         type: 'UPDATE_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data: newData, state: 'modified', time: shouldRunAfter }
+          val: { data: newData, state: 'modified', time: shouldRunAfter, checked:true }
         }
       })        
       if(modified) setDrafted(false) 
       setModified(true)
       selectShape(newData.pages.length ? newData.pages.length - 1 : null)
+      if(!checked) setChecked(true)
     }
-  }, [checked, dimensions.height, dimensions.width, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
+  }, [checked, dimensions, modified, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
 
   useEffect(() => {
     if(focused != image.thumbnail_path) {
@@ -759,57 +773,93 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     }
   }, [focused, image.thumbnail_path])
 
-  useEffect(()=>{
-    if(selectedId != null && keyDown == 'Delete') {
-      removeId(selectedId)
-      setKeyDown('')
-    }
-  }, [selectedId, keyDown, removeId, setKeyDown])
-
+  const [clipboard, setClipboard] = useAtom(state.clipboard)
 
   const onChange = useCallback((p: KonvaPage, add?: boolean) => {
-    if (typeof scamData === 'object' && scamData.pages) {
-      const data = { ...scamData }
+    
+    let data:ScamImageData 
+    if (typeof scamData !== 'object') {
+      data = { ...image, pages:[] }
+    } else {
+      data = { ...scamData }
+    }
 
-      if(scamData.pages.length <= p.n && data.pages) {
-        if(!add) return
-        data.pages.push({ minAreaRect:[0,0,0,0,0], warnings:[] })
+    debug("ch:", p, data)
+
+    if(!data.pages) data.pages = []
+
+    if(data.pages.length <= p.n && data.pages) {
+      if(!add) return
+      data.pages.push({ minAreaRect:[0,0,0,0,0], warnings:[] })
+    }
+
+    const W = data?.width
+    const H = data?.height
+    const w = dimensions.width
+    const h = dimensions.height
+
+    if (data.pages) {
+              
+      if(p.warning === false && data.pages[p.n].warnings.length) {
+        data.pages[p.n].warnings = []
       }
 
-      const W = scamData?.width
-      const H = scamData?.height
-      const w = dimensions.width
-      const h = dimensions.height
+      data.pages[p.n].minAreaRect[0] = W * (p.x + p.width / 2) / w
+      data.pages[p.n].minAreaRect[1] = H * (p.y + p.height / 2) / h
+      data.pages[p.n].minAreaRect[2] = W * p.width / w
+      data.pages[p.n].minAreaRect[3] = H * p.height / h
+      data.pages[p.n].minAreaRect[4] = p.rotation
+      data.pages = data.pages.map(p => withRotatedHandle(p, data)) as Page[]
+      data.rects = handleZindex(data.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
 
-      if (data.pages) {
-                
-        if(p.warning === false && data.pages[p.n].warnings.length) {
-          data.pages[p.n].warnings = []
+      debug(W, H, w, h, p) //,scamData.pages[p.n].minAreaRect)
+
+      setScamData(data)
+      dispatch({
+        type: 'UPDATE_DATA',
+        payload: {
+          id: image.thumbnail_path,
+          val: { data, state: 'modified', time: shouldRunAfter, image, visible: true, ...!add?{checked: true}:{} }
+        }
+      })
+      if(!modified) setModified(true)
+      if(drafted) setDrafted(false)
+      if(!checked && !add) setChecked(true)
+    }
+  
+  }, [checked, dimensions, modified, dispatch, drafted, handleZindex, image, scamData, setDrafted, setModified, shouldRunAfter, visible])
+
+  const handleKeyDown = useCallback( () => {
+    if(keyDown == 'Delete' && selectedId != null) {
+      removeId(selectedId)
+      setKeyDown('')
+    } else if(keyDown.startsWith("CTRL+")){
+      //debug("key:", keyDown, focused, image.thumbnail_path)      
+      if(selectedId != null && keyDown === "CTRL+C"  && typeof scamData === "object" && scamData.rects ) {
+        //debug(scamData.rects[selectedId])
+        const page_n = scamData.rects.findIndex(r => r.n === selectedId) 
+        setClipboard({ ...scamData.rects[page_n] })
+      } else if(selectedId != null && keyDown === "CTRL+X"  && typeof scamData === "object" && scamData.rects) {
+        const page_n = scamData.rects.findIndex(r => r.n === selectedId) 
+        setClipboard({ ...scamData.rects[page_n] })
+        removeId(selectedId)
+      } else if(focused === image.thumbnail_path && keyDown === "CTRL+V") { 
+        //debug(clipboard)
+        if(clipboard) { 
+          const n = typeof scamData === "object" ? scamData?.rects?.length ?? 0 : 0
+          selectShape(null)
+          onChange({...clipboard, n}, true)
+          selectShape(n)
         }
 
-        data.pages[p.n].minAreaRect[0] = W * (p.x + p.width / 2) / w
-        data.pages[p.n].minAreaRect[1] = H * (p.y + p.height / 2) / h
-        data.pages[p.n].minAreaRect[2] = W * p.width / w
-        data.pages[p.n].minAreaRect[3] = H * p.height / h
-        data.pages[p.n].minAreaRect[4] = p.rotation
-        data.pages = data.pages.map(p => withRotatedHandle(p, data)) as Page[]
-        data.rects = handleZindex(data.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
-
-        debug(W, H, w, h, p) //,scamData.pages[p.n].minAreaRect)
-
-        setScamData(data)
-        dispatch({
-          type: 'UPDATE_DATA',
-          payload: {
-            id: image.thumbnail_path,
-            val: { data, state: 'modified', time: shouldRunAfter }
-          }
-        })
-        if(!modified) setModified(true)
-        if(drafted) setDrafted(false)
       }
+      setKeyDown('')
     }
-  }, [checked, dimensions.height, dimensions.width, dispatch, drafted, handleZindex, image, scamData, setDrafted, setModified, shouldRunAfter, visible])
+  }, [keyDown, selectedId, scamData, removeId, setKeyDown, setClipboard, clipboard, onChange, focused, image])
+
+  useEffect(()=>{
+    handleKeyDown()
+  }, [keyDown])
 
   useEffect(() => {
     if (typeof scamData === 'object' && scamData.rects && scamData.selected != selectedId && selectedId != undefined) {
@@ -825,7 +875,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
     const container = event.target.getStage()?.container();
     if (addNew || container?.style.cursor == "copy") {
-      if (typeof scamData !== 'object' || !scamData.pages) return
+      //if (typeof scamData !== 'object' || !scamData.pages) return
       if (newPage.length === 0) {
         setAddNew(true)
         const stage = event.target.getStage()
@@ -833,8 +883,9 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         const vect = stage.getPointerPosition() 
         if(!vect) return
         const { x, y } = vect
-        setNewPage([{ x, y, width: 0, height: 0, n: scamData.pages?.length, rotation:0, warning:false }]);
-        selectShape(scamData.pages?.length)
+        const len = typeof scamData === 'object' ? scamData.pages?.length ?? 0 : 0
+        setNewPage([{ x, y, width: 0, height: 0, n: len, rotation:0, warning:false }]);
+        selectShape(len)
       }
     } else {
       checkDeselect(event)
@@ -842,7 +893,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   }, [addNew, focused, image.thumbnail_path, newPage.length, scamData, setFocused]);
 
   const handleMouseUp = (event:KonvaEventObject<MouseEvent>) => {
-    if (typeof scamData !== 'object' || !scamData.pages) return
+    //if (typeof scamData !== 'object' || !scamData.pages) return
     if (newPage.length === 1) {
       const sx = newPage[0].x;
       const sy = newPage[0].y;
@@ -873,7 +924,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   };
 
   const handleMouseMove = (event:KonvaEventObject<MouseEvent>) => {
-    if (typeof scamData !== 'object' || !scamData.pages) return
+    //if (typeof scamData !== 'object' || !scamData.pages) return
     if (newPage.length === 1) {
       const sx = newPage[0].x;
       const sy = newPage[0].y;
@@ -904,20 +955,22 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     if(modified) setDrafted(false) 
     setModified(true)
     setLastRun(1)
-  }, [ image, shouldRunAfter ])
+    if(!checked) setChecked(true)
+  }, [ modified, image, shouldRunAfter ])
 
   const toggleVisible = useCallback(() => {
     dispatch({
       type: 'UPDATE_DATA',
       payload: {
         id: image.thumbnail_path,
-        val: { state: 'modified', time: shouldRunAfter, visible: !visible }
+        val: { state: 'modified', time: shouldRunAfter, visible: !visible, checked: true }
       }
     })
     setVisible(!visible)
     if(modified) setDrafted(false) 
     setModified(true)
     setImageData({...image, hidden: visible })    
+    if(!checked) setChecked(true)
   }, [checked, dispatch, image, scamData, setModified, setVisible, shouldRunAfter, visible, modified])
 
   const toggleCheck = useCallback((multi?:boolean) => {
@@ -929,7 +982,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           val: { state: 'modified', time: shouldRunAfter, checked: !checked }
         }
       })
-      //setChecked(!checked) // redundant with below
+      setChecked(!checked) 
       setImageData({...image, checked: !checked })    
     } else {
       let keys = _.orderBy(Object.keys(allScamData))
@@ -948,22 +1001,27 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     setModified(true)
   }, [checked, dispatch, image, scamData, setModified, shouldRunAfter, visible, allScamData, modified])  
   
+  const [checkedRestrict, setCheckedRestrict] = useAtom(state.checkedRestrict)
+
   useEffect( () => {
     if(typeof scamData === 'object') { 
-      if(scamData?.rects?.length != nbPages || scamData?.rects?.some(r => r.warning)) {
+      const numP = (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected
+      if(scamData?.rects?.length != numP || scamData?.rects?.some(r => r.warning)) {
         setWarning(true)
       } else {
         setWarning(false)
       }
     }
-  }, [ scamData, nbPages ])
+  }, [ scamData, globalData, scamOptions, scamOptionsSelected, checkedRestrict ])
 
   const actualW = (portrait ? dimensions.height : dimensions.width)
   const actualH = (portrait ? dimensions.width : dimensions.height)
  
   //debug("dim:",image.thumbnail_path, dimensions, actualW, actualH, portrait)
+  
+  const loading = scamData === true || scamQueue.todo?.length && scamQueue.todo?.includes(image.thumbnail_path) && !scamQueue.done?.includes(image.thumbnail_path)
 
-  return (<div ref={divRef} className={"scam-image" + (scamData === true ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
+  return (<div ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid)}
     style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info[portrait ? "height":"width"] + 2*padding }}
     onMouseDown={checkDeselectDiv}
@@ -972,7 +1030,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         // {... !visible ? { style: { width: dimensions.width + padding * 2, height: 80 } }:{} }
         >
       { !visible && typeof konvaImg == "object" && <img src={konvaImg?.src} className={"mini"+((image.rotation + 360) % 360 != 0 ? " rotated": "")} style={{transform: "rotate("+image.rotation+"deg)" }}/> }
-      { visible  && <Stage
+      { visible  && <Stage        
         width={actualW + padding * 2}
         height={actualH + padding * 2}
         onMouseDown={handleMouseDown}
@@ -1034,6 +1092,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       <figcaption><FormControlLabel label={image.img_path} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} control={<Checkbox checked={selected} sx={{padding: "0 8px" }}/>}  />
         { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "4px" }} /> }
         {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
+        { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
       </figcaption>
       {showDebug && visible && typeof scamData === 'object' &&
         <div className="debug">

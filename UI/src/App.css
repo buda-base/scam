@@ -55,7 +55,6 @@ body {
   display:block;
   margin:0;
   background:#ddd;
-
 }
 
 main {
@@ -71,7 +70,6 @@ main {
 
 main .select-folder { background-color: white; align-self: center; justify-self: center; padding:16px; box-shadow:0 0 5px 1px rgba(0,0,0,0.125)}
 
-
 .scam-image {
   position:relative;
   text-align:center;
@@ -79,6 +77,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   margin:2px;  
   width:100%;  
   align-self: center;
+  scroll-margin-top:60px;
 }
 
 .scam-image.grid-1x1 {
@@ -110,7 +109,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 .scam-image > figure {
   font-size:0;
   position:relative;
-  display: inline-block;
+  display: block;
   max-width:100%;
   margin:0;
 }

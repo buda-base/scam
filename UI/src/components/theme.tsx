@@ -20,8 +20,30 @@ const ColorButtonStyle = styled(Button)<ButtonProps>(({ theme }) => ({
   }
 })) as typeof Button;
 
+
+const ColorButtonStyleAlt = styled(Button)<ButtonProps>(() => ({
+  minWidth: "120px",
+  fontSize: "12px",
+  fontWeight: "600",
+  lineHeight: "16px",
+  padding:"6px 8px",
+  borderRadius: "3px",
+  color: "#4b4b4b",
+  backgroundColor: "rgba(0,0,0,0.05)",
+  '&:hover': {
+    color: "#4b4b4b",
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  '&:disabled': {
+    color: "black",
+    backgroundColor: "rgba(0,0,0,0.05)",
+    opacity:0.5
+  }
+})) as typeof Button;
+
 export const ColorButton = (props:ButtonProps) => (<ColorButtonStyle variant="contained" disableElevation {...props} />)
 
+export const ColorButtonAlt = (props:ButtonProps) => (<ColorButtonStyleAlt variant="contained" disableElevation {...props} />)
 
 export const theme = createTheme({
   palette: {

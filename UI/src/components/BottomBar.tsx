@@ -19,14 +19,15 @@ import { ConfigData, LocalData, Orientation, Page, SavedScamData, ScamData, Scam
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
-import { apiUrl, discardDraft } from "../App";
+import { apiUrl, discardDraft, scam_options } from "../App";
 import axios from "axios";
-import { withoutRotatedHandle } from "./ScamImage";
+import { withRotatedHandle, withoutRotatedHandle, recomputeCoords } from "./ScamImage";
+import CircularProgressWithLabel from "./CircularProgressWithLabel"
 
 const debug = debugFactory("scam:bbar")
 
-export const SaveButtons = (props: { folder: string, config: ConfigData, json?:ScamData, selectedItems:string[], checkedRestrict: boolean }) => {
-  const { folder, json, config, selectedItems, checkedRestrict } = props;
+export const SaveButtons = (props: { folder: string, config: ConfigData, json?:ScamData, selectedItems:string[], checkedRestrict: boolean, progress: number }) => {
+  const { folder, json, config, selectedItems, checkedRestrict, progress } = props;
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
 
@@ -216,9 +217,9 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
             : <>Failed to save<br/>(<i>{error}</i>)</> }
         </Paper>
       </Popper>
-      <ColorButton onClick={saveDraft} disabled={!modified || drafted || popChecked}>save draft</ColorButton>
+      <ColorButton onClick={saveDraft} disabled={progress != 100 || !modified || drafted || popChecked}>save draft</ColorButton>
       <span ref={spanRef}>
-        <ColorButton className={saving?"saving":""} sx={{ marginLeft:"8px" }} onClick={handlePublish} disabled={!modified || published || !config.auth ||  saving}>{ 
+        <ColorButton className={saving?"saving":""} sx={{ marginLeft:"8px" }} onClick={handlePublish} disabled={progress != 100 || !modified || published || !config.auth ||  saving}>{ 
           saving 
           ? "_" 
           : error 
@@ -232,9 +233,11 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   )
 }
 
-export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[],
-    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void  }) => {
-  const { folder, config, json, selectedItems, images, setSelectedItems, markChecked, markHidden, setOptions } = props;
+let unmount = false, go = false, abort = false
+
+export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[], options: ScamOptionsMap,
+    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void, setJson?:(s:ScamData)=>void  }) => {
+  const { folder, config, json, selectedItems, images, options, setSelectedItems, markChecked, markHidden, setOptions, setJson } = props;
 
   const [showSettings, setShowSettings] = useAtom(state.showSettings)
 
@@ -243,6 +246,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
 
   const [restrictRun, setRestrictRun] = useAtom(state.restrictRun)
   const [checkedRestrict, setCheckedRestrict] = useAtom(state.checkedRestrict)
+  const [checkedRestrictWarning, setCheckedRestrictWarning] = useAtom(state.checkedRestrictWarning)
 
   const [globalScamOptionsUpdate, setGlobalScamOptionsUpdate] = useAtom(state.globalScamOptionsUpdate)
 
@@ -253,6 +257,8 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
 
   const [modified, setModified] = useAtom(state.modified)
+  const [published, setPublished] = useState(false)
+  const [drafted, setDrafted] = useAtom(state.drafted)
 
   const handleRun = useCallback(() => { 
     setShouldRunAfter(Date.now()); 
@@ -297,7 +303,9 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     debug("data:",allScamData)
   }, [allScamData])
   */
-   
+  
+  let controller = new AbortController();   
+
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)
   useEffect(() => {
@@ -306,6 +314,18 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       if(local.grid) setGrid(local.grid)
     }
     restoreGrid()
+
+    unmount = false
+    if(controller.signal.aborted) {
+      controller = new AbortController();   
+    }
+
+    return () => {
+      //debug("unmount:",image.thumbnail_path)
+      unmount = true
+      controller.abort()
+    }
+    
   }, [])
 
 
@@ -342,11 +362,157 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     setSelectedItems(selected)
   }, [selectedItems, allScamData, nbPages])
 
+  const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
+
+  let pages
+  const hasWarning:ScamImageData[] = (json?.files && Object.values(json.files).filter(m => (pages = allScamData[m.thumbnail_path]?.data?.pages ?? m.pages) 
+    && pages.length != (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages ?? scam_options.nb_pages_expected) || pages?.some(p => p.warnings?.length))) ?? [] 
+
+  const handleScamQueue = useCallback(async () => {    
+
+    if(!scamQueue.todo?.length && json?.files && !go) {
+
+      go = true
+      abort = false
+
+      let todo = json?.files.filter(m => (!m.checked || allScamData[m.thumbnail_path] && !allScamData[m.thumbnail_path].checked) && (!allScamData[m.thumbnail_path] || !allScamData[m.thumbnail_path]?.checked) && (!m.hidden || allScamData[m.thumbnail_path]?.visible))
+      if(checkedRestrict) todo = todo.filter(m => selectedItems.includes(m.thumbnail_path))
+      if(checkedRestrictWarning && hasWarning.length > 0) todo = todo.filter(m => hasWarning.find(im => im.thumbnail_path === m.thumbnail_path))
+
+      //debug("sq:",todo, allScamData, hasWarning)
+
+      const todoStr = todo.map(m => m.thumbnail_path)
+      const done:string[] = []
+      setScamQueue({ todo:todo.map(m => m.thumbnail_path), done })
+      
+      const handleSlice = async (list:ScamImageData[]) => {
+        for(const image of list) {          
+          if(unmount || abort) {
+            setScamQueue({ todo: [], done: [] })
+            break ;
+          }          
+          try {
+                      
+            const response = await axios.post(apiUrl + "run_scam_file", {
+              folder_path: folder,
+              scam_options: options,
+              file_info: image
+            }, {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: "Basic " + encode(config.auth.join(":"))
+              },
+              //signal: controller.signal
+            })
+          
+            debug("json:", response.data.thumbnail_path);
+            
+            if (response.data) {
+              
+              const state = 'new'
+              const visible = !image.hidden
+              const checked = image.checked
+              const selected = selectedItems.includes(image.thumbnail_path)
+                          
+              dispatch({
+                type: 'ADD_DATA',
+                payload: {
+                  id: image.thumbnail_path,
+                  val: { data: response.data, state, time: Date.now(), image, visible, checked, options: selected ? { ...scamOptionsSelected}:{...scamOptions} } 
+                }
+              })                      
+              
+              // #9 always ungray save buttons after run_
+              if(!modified) setModified(true)
+              if(drafted) setDrafted(false)
+              if(published) setPublished(false)
+                          
+              done.push(image.thumbnail_path)
+              //debug("done:",done, scamQueue.todo)
+              setScamQueue({ todo: todoStr, done })
+              
+            }        
+          }
+          catch(error:any) {
+            if(error.message != "canceled") console.error(error);
+          }
+        }
+        if(!todoStr.some(m => !done.includes(m))) {
+          debug("end of run")
+          setScamQueue({ todo: [], done: [] })
+        }
+      }
+
+      
+      const N_threads = 6;
+      const chunks:ScamImageData[][] = [];
+      for (let i = 0; i < N_threads; i ++) {
+        chunks.push([])
+      }
+      for (let i = 0; i < todo.length; i ++) {
+        chunks[i%N_threads].push(todo[i]);
+      }
+      chunks.map(handleSlice)      
+        
+    }
+  }, [allScamData, scamQueue, json, checkedRestrict, checkedRestrictWarning, setScamQueue, selectedItems, folder, options, config.auth, dispatch, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
+
+  useEffect(() => {
+    // not sure we should run without user interaction?
+    //handleRerun()
+
+    return () => {
+      go = false
+    }
+  }, [])
+
+  const progress = scamQueue.todo?.length && scamQueue.done 
+    ? Math.round(100 * scamQueue.done.length / scamQueue.todo?.length)
+    : 100
+
+  const abortRun = () => {
+    abort = true
+  }
+
+  const handleRerun = useCallback(() => {
+    go = false
+
+    setShouldRunAfter(Date.now()); 
+    setShowSettings(false);  
+
+    if(selectedItems.length > 0 && !checkedRestrict) setGlobalScamOptionsUpdate(true)    
+    if(restrictRun != checkedRestrict) { 
+      setRestrictRun(checkedRestrict)
+      if(checkedRestrict) setTimeout(() => {
+        setRestrictRun(false)
+        setTimeout(() => {
+          setOptions(scamOptionsSelected)          
+        }, 150)
+      }, 150)
+    }
+
+    setTimeout(() => {
+      handleScamQueue()
+    }, 350)
+  }, [checkedRestrict, handleScamQueue, restrictRun, scamOptionsSelected, selectedItems, setGlobalScamOptionsUpdate, setOptions, setRestrictRun, setShouldRunAfter, setShowSettings])
+
+
   return (<nav className="bot">
+    <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
+      { scamQueue.todo && scamQueue.todo.length > 0 && progress < 100 
+        ? <div style={{ display:"flex", alignItems:"center" }}>
+            <ColorButton onClick={abortRun} sx={{ margin:"10px" }}>abort run</ColorButton>
+            <CircularProgressWithLabel value={progress} />
+          </div> 
+        : <ColorButton onClick={() => handleSettings()} disabled={scamQueue.todo?.length ? true : false} sx={{ margin: "10px" }}>
+            Run scam...
+          </ColorButton>
+        }
+    </Box>
     <Box>
-      <IconButton onClick={() => handleSettings()}>
+      {/* <IconButton onClick={() => handleSettings()} disabled={scamQueue.todo?.length ? true : false} >
         <Settings />
-      </IconButton>
+      </IconButton> */}
       <TextField
         SelectProps={{ 
           MenuProps : { disableScrollLock: true }
@@ -396,9 +562,9 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         <hr/>
         <MenuItem value={4} disabled={!selectedItems.length} onClick={() => setShowSettings(true)}>{"Run SCAM on selection"}</MenuItem>
       </TextField>
-    </Box>
+    </Box>    
     <div>
-      <SaveButtons {...{ folder, config, json, selectedItems, checkedRestrict }} />
+      <SaveButtons {...{ progress, folder, config, json, selectedItems, checkedRestrict }} />
     </div>
     <Dialog open={showSettings} onClose={handleClose} disableScrollLock={true} >
       <DialogTitle>Run SCAM</DialogTitle>
@@ -418,7 +584,14 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         </IconButton>
         <SettingsMenu />
         <br/>
-        <br/>
+        <div>
+          <FormControlLabel 
+            disabled={hasWarning.length === 0}
+            label={"only run on images with warning"} 
+            onChange={() => setCheckedRestrictWarning(!checkedRestrictWarning)} 
+            control={<Checkbox checked={hasWarning.length > 0 && checkedRestrictWarning} sx={{padding: "0 8px" }}/>}  
+          />
+        </div>
         <div>
           <FormControlLabel 
             disabled={!selectedItems.length}
@@ -429,7 +602,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         </div>
       </DialogContent>
       <DialogActions sx={{padding:"16px"}}>
-        <ColorButton onClick={handleRun} sx={{ textAlign: "right" }}>re-run SCAM on<br/>unchecked images</ColorButton>
+        <ColorButton onClick={handleRerun} sx={{ textAlign: "right" }}>re-run SCAM on<br/>unchecked images</ColorButton>
         {/* <Button onClick={handleClose}>Close</Button> */}
       </DialogActions>
     </Dialog>
