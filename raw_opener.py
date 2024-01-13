@@ -2,8 +2,6 @@
 import rawpy
 from PIL import Image, ImageFile
 
-CR2_PREFIX = b'\x49\x49\x2A\x00\x10\x00\x00\x00\x43\x52'
-
 class RawImageFile(ImageFile.ImageFile):
     format = 'RAW'
     format_description = "camera raw image"
@@ -46,7 +44,7 @@ class RawDecoder(ImageFile.PyDecoder):
 def register_raw_opener():
     Image.register_open('RAW', RawImageFile)
     Image.register_decoder('RAW', RawDecoder)
-    Image.register_extensions(RawImageFile.format, ['nef', 'cr2', 'dng'])
+    Image.register_extensions(RawImageFile.format, ['nef', 'cr2', 'dng', 'arw'])
 
 def test():
     register_raw_opener()
