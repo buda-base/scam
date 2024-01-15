@@ -695,7 +695,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       */
     }
-  }, [scamOptions, configs, restrictRun, selected, configReady, visible, config, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, scamOptionsSelected, setModified])
+  }, [uploadedData, configs, restrictRun, selected, configReady, visible, config, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, dispatch, setVisible, setChecked, dimensions])
 
   
   useEffect(() => {

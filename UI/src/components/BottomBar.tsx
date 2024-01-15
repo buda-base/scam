@@ -353,20 +353,27 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
 
-  const selectWithWarnings = useCallback(() => {
-    const selected = images.filter(im => ( allScamData[im.thumbnail_path]?.data?.rects && (
-        allScamData[im.thumbnail_path]?.data?.rects?.some(p => p.warning) 
-        || allScamData[im.thumbnail_path]?.data?.rects?.length != (allScamData[im.thumbnail_path]?.options?.nbPages || nbPages)
-      )
-    )).map(im => im.thumbnail_path)
+  const calcHasWarning = useCallback((im:ScamImageData) => { 
+    let image
+    return ((image = allScamData[im.thumbnail_path] ?? im).data ?? image).pages && !image.checked && (!im.hidden || image.visible) && image.visible != false && (
+      (image?.data ?? image).pages?.some(p => p.warnings?.length) 
+      || (image?.data ?? image).pages?.length != (
+          image?.options?.nbPages 
+          || !allScamData[im.thumbnail_path] && json?.options_list && json?.options_list[im.options_index ?? 0]?.nbPages 
+          || (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages ?? scam_options.nb_pages_expected))
+    )
+    }, [allScamData, checkedRestrict, json, scamOptions, scamOptionsSelected])
+
+  const selectWithWarnings = useCallback((hasWarn = true) => {
+    const postproc = (b:boolean|undefined) => hasWarn ? b : !b
+    const selected = images.filter(im => postproc(calcHasWarning(im))
+    ).map(im => im.thumbnail_path)
     setSelectedItems(selected)
-  }, [selectedItems, allScamData, nbPages])
+  }, [selectedItems, allScamData, nbPages, images])
 
   const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
 
-  let pages
-  const hasWarning:ScamImageData[] = (json?.files && Object.values(json.files).filter(m => (pages = allScamData[m.thumbnail_path]?.data?.pages ?? m.pages) 
-    && pages.length != (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages ?? scam_options.nb_pages_expected) || pages?.some(p => p.warnings?.length))) ?? [] 
+  const hasWarning:ScamImageData[] = (json?.files && Object.values(json.files).filter(im => calcHasWarning(im))) ?? [] 
 
   const handleScamQueue = useCallback(async () => {    
 
@@ -551,9 +558,10 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       >
         <MenuItem value={0} disabled>{"..."}</MenuItem>
         <hr/>
-        <MenuItem value={1} onClick={selectWithWarnings}>{"Select images with warning"}</MenuItem>
-        <MenuItem value={1} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
-        <MenuItem value={1} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
+        { hasWarning.length != 0 && <MenuItem value={1} onClick={() => selectWithWarnings(false)}>{"Select images with no warning"}</MenuItem> }
+        { hasWarning.length != 0 && <MenuItem value={2} onClick={() => selectWithWarnings()}>{"Select images with warning"}</MenuItem> }
+        <MenuItem value={3} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
+        <MenuItem value={4} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
         <hr/>
         { (hasUnchecked || !hasChecked) && <MenuItem value={2} disabled={!hasUnchecked} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
         { hasChecked && <MenuItem value={3} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}
