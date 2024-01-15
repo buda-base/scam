@@ -133,14 +133,14 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 }
 
 .scam-image.filter-warning.warning-true.checked-true,
-.scam-image.filter-warning.warning-false,
+.scam-image.filter-warning.warning-false:not(.focus-true),
 .scam-image.filter-unchecked.checked-true {
   height:80px !important; overflow: hidden;
 }
 
 
 .scam-image.filter-warning.warning-true.checked-true > figure > div,
-.scam-image.filter-warning.warning-false > figure > div,
+.scam-image.filter-warning.warning-false:not(.focus-true) > figure > div,
 .scam-image.filter-unchecked.checked-true > figure > div {
   /* display:none;  */
   visibility: hidden; height:45px;
@@ -148,7 +148,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 
 
 .scam-image.filter-warning.warning-true.checked-true > figure figcaption label > span:last-child,
-.scam-image.filter-warning.warning-false > figure figcaption label > span:last-child,
+.scam-image.filter-warning.warning-false:not(.focus-true) > figure figcaption label > span:last-child,
 .scam-image.filter-unchecked.checked-true > figure figcaption label > span:last-child {
   margin-top:0; font-style:italic; opacity:0.5; 
 }
