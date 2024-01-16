@@ -20,7 +20,11 @@ class RawImageFile(ImageFile.ImageFile):
         # mode setting
         typekey = (1, 1) + array.shape[2:], array.__array_interface__["typestr"]
         try:
-            self.mode = Image._fromarray_typemap[typekey][1]
+            if hasattr(self, "_mode"):
+                # for recent versions of pillow
+                self._mode = Image._fromarray_typemap[typekey][1]
+            else:
+                self.mode = Image._fromarray_typemap[typekey][1]
         except KeyError as e:
             raise TypeError("Cannot handle this data type: %s, %s" % typekey) from e
 
