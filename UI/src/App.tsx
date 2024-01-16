@@ -504,7 +504,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       {reloadDialog}
-      <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, config, error, jsonPath, setFolder }}/></header>
+      <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, config, error, json, jsonPath, setFolder }}/></header>
       <main onClick={checkDeselectMain}>{
         images.map(image => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
       }</main>
