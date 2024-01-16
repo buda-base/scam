@@ -10,7 +10,11 @@ class RawImageFile(ImageFile.ImageFile):
         array = None
         try:
             raw = rawpy.imread(self.fp)
-            array = raw.postprocess()
+            # this is where different parameters can be used to convert the raw file to an image
+            # this has a minor impact on preprocessing but a much more significant one on postprocessing
+            # by default we automate the white balance, parameters are documented on
+            # https://letmaik.github.io/rawpy/api/rawpy.Params.html
+            array = raw.postprocess(use_camera_wb=True)
         except:
             raise TypeError("Not a RAW file")
 
