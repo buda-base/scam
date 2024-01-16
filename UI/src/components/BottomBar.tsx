@@ -26,8 +26,9 @@ import CircularProgressWithLabel from "./CircularProgressWithLabel"
 
 const debug = debugFactory("scam:bbar")
 
-export const SaveButtons = (props: { folder: string, config: ConfigData, json?:ScamData, selectedItems:string[], checkedRestrict: boolean, progress: number }) => {
-  const { folder, json, config, selectedItems, checkedRestrict, progress } = props;
+export const SaveButtons = (props: { folder: string, config: ConfigData, json?:ScamData, selectedItems:string[], checkedRestrict: boolean, progress: number, hasWarning:ScamImageData[],
+    setJson?:(s:ScamData)=>void }) => {
+  const { folder, json, config, selectedItems, checkedRestrict, progress, hasWarning, setJson } = props;
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
 
@@ -118,8 +119,61 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
     setDrafted(true)
   }, [allScamData, folder, orient, scamOptions, scamOptionsSelected, selectedItems])
 
+
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+
+  const handleCancelConfirm = () => {
+    setShowConfirmDialog(false)
+    setPopChecked(false)
+  }
+  
+  const handleOkConfirm = useCallback(() => {
+    setConfirmed(true)
+    setShowConfirmDialog(false)    
+  }, [confirmed,showConfirmDialog])
+
+  useEffect(() => {
+    if(confirmed) {
+      publish()
+    }
+  }, [confirmed])
+
+  const confirmDialog = useMemo( () => (
+    <Dialog open={showConfirmDialog} disableScrollLock={true} >
+      <DialogTitle>Warning</DialogTitle>
+      <DialogContent>
+          <IconButton
+            edge="end"
+            color="inherit"
+            onClick={handleCancelConfirm}
+            aria-label="close"
+            style={{ position: 'absolute', top: 2, right: 14 }}
+          >
+            <Close />
+          </IconButton> 
+          Some unchecked images have a warning, proceed anyway?
+        </DialogContent>
+      <DialogActions sx={{padding:"16px"}}>
+        <ColorButton onClick={handleCancelConfirm}>Cancel</ColorButton>
+        <ColorButton onClick={handleOkConfirm}>Ok</ColorButton>
+      </DialogActions>
+    </Dialog>
+  ), [showConfirmDialog])
+
+  //debug("dial:", showConfirmDialog, confirmed)
+
+
+
   const publish = useCallback(async () => {
+
+    debug("pub:",checked,confirmed,showConfirmDialog)
     
+    if(checked && hasWarning.length > 0 && !confirmed)  {
+      setShowConfirmDialog(true)
+      return 
+    }
+
     setSaving(true)
     
     const configs:ScamOptions[] = [{ ...scamOptions }]
@@ -173,17 +227,21 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       setPublished(true)
       discardDraft(folder)
       setDrafted(true)
+      setConfirmed(false)
+
+      if(typeof json === "object" && setJson) setJson({...json, checked})
     })
     .catch(error => {
       debug(error, json);
       
       setSaving(false)
       setError(error.message)
+      setConfirmed(false)
 
     });
 
     
-  }, [allScamData, checked, config.auth, folder, json, setModified])
+  }, [allScamData, checked, config.auth, confirmed, folder, hasWarning.length, json, scamOptions, setDrafted, setModified])
 
   const handleClosePop = () => {
     setPopChecked(false)
@@ -202,6 +260,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
 
   return (
     <>
+      {confirmDialog}
       { (popChecked || error != "") && <div onClick={handleClosePop}>
         <div className="popper-bg"></div>
         {/* 
@@ -572,7 +631,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       </TextField>
     </Box>    
     <div>
-      <SaveButtons {...{ progress, folder, config, json, selectedItems, checkedRestrict }} />
+      <SaveButtons {...{ progress, folder, config, json, setJson, selectedItems, checkedRestrict, hasWarning }} />
     </div>
     <Dialog open={showSettings} onClose={handleClose} disableScrollLock={true} >
       <DialogTitle>Run SCAM</DialogTitle>
