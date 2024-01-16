@@ -5,18 +5,18 @@ import { useState, useMemo, MouseEventHandler, useCallback, ChangeEventHandler, 
 import { Link, useNavigate } from "react-router-dom";
 import { useAtom } from "jotai";
 import { useBeforeunload } from 'react-beforeunload';
-import { Close, Folder, FolderOpen } from "@mui/icons-material";
+import { CheckCircle, Close, Folder, FolderOpen } from "@mui/icons-material";
 import { useClearCache } from "react-clear-cache"
 
 import { ColorButton } from "./theme";
 import * as state from "../state"
 import { SaveButtons } from "./BottomBar";
-import { ConfigData, LocalData } from "../types";
+import { ConfigData, LocalData, ScamData } from "../types";
 
 const debug = debugFactory("scam:tbar")
 
-export const TopBar = (props: { folder:string, config: ConfigData, error: string, jsonPath:string, setFolder:(s:string) => void }) => {
-  const { folder, config, error, jsonPath, setFolder } = props;
+export const TopBar = (props: { folder:string, config: ConfigData, error: string, json:ScamData|boolean, jsonPath:string, setFolder:(s:string) => void }) => {
+  const { folder, config, error, json, jsonPath, setFolder } = props;
 
   const [ path, setPath ] = useState(folder)
   
@@ -153,10 +153,12 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
         { sessions.length > 0 && <div style={{ marginTop:16 }}>
           <InputLabel shrink={true}>Previously open folders</InputLabel>
           <div style={{ marginLeft: -9, marginTop:-4 }}>
-            { sessions.map(s => <Button sx={{ fontSize:16, textTransform: "none", padding:"0px 8px" }}>
+            <div style={{ maxHeight:"250px", overflow:"auto" }}>
+            { sessions.map(s => <Button sx={{ fontSize:16, textTransform: "none", padding:"0px 8px", display:"flex" }}>
                 <Link style={{color:theme.palette.primary.main}} to={"/?folder="+s} onClick={handleClose}>{s}</Link>
               </Button>)}
             </div>
+          </div>
         </div> }
       </DialogContent>
       <DialogActions sx={{padding:"16px"}}>
@@ -182,11 +184,17 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
     </div>
     <div className="nav">
     { folder && <>
-        <div onClick={() => handleConfirm(false)}>
+        <div style={{ display:"flex", alignItems:"center" }} onClick={() => handleConfirm(false)}>
           <IconButton sx={{color:"black"}}>
             <FolderOpen />
           </IconButton>
-          <span>{jsonPath}</span>
+          <div>
+            <div>{jsonPath}</div>
+            {typeof json === "object" && <div style={{color:"#6b6b6b"}}>
+               {json.files?.length} images
+              { json.checked && <CheckCircle sx={{color:"green", verticalAlign:"-8px", marginLeft:"10px"}} /> }
+            </div> }
+          </div>
         </div>
         <IconButton sx={{color:"black"}} onClick={() => handleConfirm(true)}> 
           <Close />
