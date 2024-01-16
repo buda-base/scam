@@ -72,8 +72,13 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
     navigate("/")
   }, [navigate, setFolder])
   
+  const [proceed, setProceed] = useState(false)
+  
   useEffect( () => {
-    if(jsonPath) setPath(jsonPath)
+    if(jsonPath) { 
+      setPath(jsonPath)    
+      setProceed(false)
+    }
   }, [jsonPath])
 
   const handleConfirm = useCallback( (leave: boolean) => {
@@ -125,6 +130,28 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
 
   //debug("tb:",confirmAct, modified, folder, error, showDialog)
 
+  const readyDialog = useMemo(() => (
+    <Dialog open={typeof json === "object" && json.checked && !proceed}  disableScrollLock={true} >     
+      <DialogTitle>Warning</DialogTitle>
+      <DialogContent>
+        <IconButton
+          edge="end"
+          color="inherit"
+          onClick={() => setProceed(true)}
+          aria-label="close"
+          style={{ position: 'absolute', top: 2, right: 14 }}
+        >
+          <Close />
+        </IconButton>
+        This folder has already been marked as ready to process
+      </DialogContent>
+      <DialogActions sx={{padding:"16px"}}>
+        <ColorButton onClick={handleNav}>Cancel</ColorButton>
+        <ColorButton onClick={() => setProceed(true)}>Proceed anyway</ColorButton>
+      </DialogActions>
+    </Dialog>
+  ), [handleNav, json, proceed])
+
   const folderDialog = useMemo(() => (
     <Dialog open={(!folder || confirmAct == false || !modified) && (folder == "" || error != "" || showDialog)} onClose={handleClose} disableScrollLock={true} hideBackdrop={!showDialog || folder != jsonPath}>
       <DialogTitle>Choose folder</DialogTitle>
@@ -173,6 +200,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
   }
 
   return <nav className="top">
+    {readyDialog}
     {confirmDialog}
     {folderDialog}
     <div style={{ fontWeight:600, color:"#000", cursor:"pointer" }} onClick={() => handleConfirm(true)}>SCAM QC</div> 
@@ -192,7 +220,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
             <div>{jsonPath}</div>
             {typeof json === "object" && <div style={{color:"#6b6b6b"}}>
                {json.files?.length} images
-              { json.checked && <CheckCircle sx={{color:"green", verticalAlign:"-8px", marginLeft:"10px"}} /> }
+              { json.checked && <span title="already marked as ready to process"><CheckCircle sx={{color:"green", verticalAlign:"-8px", marginLeft:"10px"}} /></span> }
             </div> }
           </div>
         </div>
