@@ -8,6 +8,7 @@ from PIL import Image
 from cal_sam_pickles import get_sam_output
 from img_utils import apply_exif_rotation, encode_img, get_best_mode
 from tqdm import tqdm
+from raw_opener import register_raw_opener
 
 DEFAULT_PREPROCESS_OPTIONS = {
     "pps": 8,
@@ -36,10 +37,15 @@ def get_all_img_paths(folder_path):
         img_keys.append(img_full_key[len(folder_path):])
     return img_keys
 
+RAW_OPENER_REGISTERED = False
 def get_pil_img(folder_path, img_path):
+    global RAW_OPENER_REGISTERED
     blob = gets3blob(folder_path+img_path)
     if blob is None:
         logging.error("cannot find %s" % (folder_path+img_path))
+    if not RAW_OPENER_REGISTERED and img_path[-4:].lower() in [".nef", ".cr2", ".dng", ".arw"]:
+        register_raw_opener()
+        RAW_OPENER_REGISTERED = True
     img = Image.open(blob)
     return img
 

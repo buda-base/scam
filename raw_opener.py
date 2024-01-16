@@ -20,7 +20,11 @@ class RawImageFile(ImageFile.ImageFile):
         # mode setting
         typekey = (1, 1) + array.shape[2:], array.__array_interface__["typestr"]
         try:
-            self.mode = Image._fromarray_typemap[typekey][1]
+            if hasattr(self, "_mode"):
+                # for recent versions of pillow
+                self._mode = Image._fromarray_typemap[typekey][1]
+            else:
+                self.mode = Image._fromarray_typemap[typekey][1]
         except KeyError as e:
             raise TypeError("Cannot handle this data type: %s, %s" % typekey) from e
 
@@ -42,13 +46,14 @@ class RawDecoder(ImageFile.PyDecoder):
         return raw_decoder.decode(data)
 
 def register_raw_opener():
+    print("register raw opener")
     Image.register_open('RAW', RawImageFile)
     Image.register_decoder('RAW', RawDecoder)
     Image.register_extensions(RawImageFile.format, ['nef', 'cr2', 'dng', 'arw'])
 
 def test():
     register_raw_opener()
-    img = Image.open("/tmp/India_001.nef")
+    img = Image.open("v4_00000.ARW")
     print("dims: %dx%d" % (img.width, img.height))
     img.save("/tmp/India_001.jpg")
 
