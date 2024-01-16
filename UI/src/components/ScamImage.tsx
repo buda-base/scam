@@ -695,7 +695,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       */
     }
-  }, [scamOptions, configs, restrictRun, selected, configReady, visible, config, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, folder, controller.signal, dispatch, setVisible, setChecked, dimensions.width, dimensions.height, scamOptionsSelected, setModified])
+  }, [uploadedData, configs, restrictRun, selected, configReady, visible, config, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, dispatch, setVisible, setChecked, dimensions])
 
   
   useEffect(() => {
@@ -1022,7 +1022,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const loading = scamData === true || scamQueue.todo?.length && scamQueue.todo?.includes(image.thumbnail_path) && !scamQueue.done?.includes(image.thumbnail_path)
 
   return (<div ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
-      + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid)}
+      + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path))}
     style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info[portrait ? "height":"width"] + 2*padding }}
     onMouseDown={checkDeselectDiv}
   >
