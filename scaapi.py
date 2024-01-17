@@ -90,7 +90,7 @@ def save_scam_json_api():
     return save_scam_json(folder_path, scam_json_obj)
 
 @api.route('/get_thumbnail_bytes', methods=['GET'])
-@cache(max_age=86400, public=True)
+@cache(max_age=86400, public=True, no_cache=None)
 def get_thumbnail_bytes_api_get():
     thumbnail_path = request.args.get('thumbnail_path')
     img_bytesio = get_thumbnail_bytesio(thumbnail_path)
