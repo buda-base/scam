@@ -229,7 +229,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       setDrafted(true)
       setConfirmed(false)
 
-      if(typeof json === "object" && setJson) setJson({...json, checked})
+      if(typeof json === "object" && setJson) setJson({...json, checked: "local"})
     })
     .catch(error => {
       debug(error, json);
