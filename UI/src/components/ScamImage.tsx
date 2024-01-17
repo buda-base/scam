@@ -19,7 +19,7 @@ import * as state from "../state"
 
 const debug = debugFactory("scam:img")
 
-const padding = 56
+const mozaicFactor = 0.65
 
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean, page?: Page,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
@@ -29,6 +29,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
   const shRef = useRef<Konva.Rect>(null)
   const trRef = useRef<Konva.Transformer>(null)
 
+  const [padding, setPadding] = useAtom(state.padding)
 
   useEffect(() => {
     if (isSelected && shRef.current) {
@@ -62,7 +63,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
         else setSelectedCutAtFixed([page?.minAreaRect[2] || 0, page?.minAreaRect[3] || 0])
       }
     }
-  }, [isSelected, ratio, rotatedHandle])
+  }, [isSelected, ratio, rotatedHandle, padding])
 
   
   const res = useMemo(() => (rotatedHandle 
@@ -225,6 +226,8 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
     rootMargin: '200% 0px'
   });
 
+  const [padding, setPadding] = useAtom(state.padding)
+
   const [visible, setVisible] = useState(image.hidden ? false : true)
   const [checked, setChecked] = useState(image.checked ? true : false)
   
@@ -240,18 +243,26 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
   
   const [grid, setGrid] = useAtom(state.grid)  
 
+  /*
+  useEffect(() => {
+    debug("inV:", inView, image.thumbnail_path)
+  }, [inView])
+  */
+
   if (inView) { 
     
     return <ScamImage {...props} divRef={ref} {...{visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
   }
   else {    
-
-    const w = (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding
-    const h = w * image.thumbnail_info.height / image.thumbnail_info.width
+    const w = (grid === "mozaic" ? Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * mozaicFactor : image.thumbnail_info.width )
+    const h = Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1) * image.thumbnail_info.height / image.thumbnail_info.width
 
     return (
       <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid)}
-        style={{ height: h + 2 * padding, maxWidth: image.thumbnail_info.width + 2*padding }}
+        style={{ 
+          height: h + 2 * padding, 
+          maxWidth: w + 2 * padding
+        }}
       >
         <figure ref={figureRef} style={{ display: "block" }}>
           <figcaption>{image.img_path}</figcaption>
@@ -347,11 +358,15 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const [filter, setFilter] = useAtom(state.filter)
   const [grid, setGrid] = useAtom(state.grid)  
 
-  const [dimensions, setDimensions] = useState({
-    width: 0,
-    height: image.thumbnail_info.height
-  })
+  const [padding, setPadding] = useAtom(state.padding)
+
   const figureRef = useRef<HTMLElement>(null)
+
+  let initW
+  const [dimensions, setDimensions] = useState({
+    width: (initW = Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1)),
+    height:  initW * image.height / image.width     
+  })
 
   const [portrait, setPortrait] = useState(false)
   useEffect(() => {
@@ -359,6 +374,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   }, [image.rotation])
 
   useEffect(() => {    
+    //debug("setDim?", image.thumbnail_path)
     if (figureRef.current?.parentElement) { 
       let w = Math.max(300, (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding)
       let h = w * image.height / image.width 
@@ -370,14 +386,17 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         }
         w = h * image.width / image.height
       }
+      w = w * (grid === "mozaic" ? mozaicFactor : 1)
+      h = h * (grid === "mozaic" ? mozaicFactor : 1)
       if(w != dimensions.width || h != dimensions.height) {
+        //debug("dim!", dimensions.width, dimensions.height, w, h)
         setDimensions({
           width: w,
           height: h
         })
       }
     }    
-  }, [grid, figureRef, dimensions, image, windowSize, portrait])
+  }, [grid, figureRef, dimensions, image, windowSize, portrait, padding])
 
 
   let tmpPages ;
@@ -695,7 +714,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       */
     }
-  }, [uploadedData, configs, restrictRun, selected, configReady, visible, config, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, dispatch, setVisible, setChecked, dimensions])
+  }, [configs, restrictRun, selected, configReady, visible, config, scamData, lastRun, shouldRunAfter, image, loadDraft, draft, globalData, checked, dispatch, setVisible, setChecked, dimensions])
 
   
   useEffect(() => {
@@ -1014,8 +1033,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     }
   }, [ scamData, globalData, scamOptions, scamOptionsSelected, checkedRestrict ])
 
-  const actualW = (portrait ? dimensions.height : dimensions.width)
-  const actualH = (portrait ? dimensions.width : dimensions.height)
+  const actualW = (portrait ? dimensions.height : dimensions.width) 
+  const actualH = (portrait ? dimensions.width : dimensions.height) 
  
   //debug("dim:",image.thumbnail_path, dimensions, actualW, actualH, portrait)
   
@@ -1023,7 +1042,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   return (<div ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path))}
-    style={{ height: visible ? actualH + 2 * padding : 80, maxWidth: image.thumbnail_info[portrait ? "height":"width"] + 2*padding }}
+    style={{ 
+      height: visible ? actualH + 2 * padding : 80, 
+      maxWidth: (grid === "mozaic" ? (portrait ? actualH : actualW) : image.thumbnail_info[portrait ? "height":"width"]) + 2*padding 
+    }}
     onMouseDown={checkDeselectDiv}
   >
     <figure className={"visible-"+visible + " newPage-"+(newPage.length > 0) + " selected-"+(selectedId == null ? "false":"true")} ref={figureRef} 
@@ -1089,11 +1111,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           )}
         </Layer>
       </Stage> }
-      <figcaption><FormControlLabel label={image.img_path} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} control={<Checkbox checked={selected} sx={{padding: "0 8px" }}/>}  />
+      { grid != "mozaic" && <figcaption><FormControlLabel label={image.img_path} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} control={<Checkbox checked={selected} sx={{padding: "0 8px" }}/>}  />
         { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "4px" }} /> }
         {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
         { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
-      </figcaption>
+      </figcaption> }
       {showDebug && visible && typeof scamData === 'object' &&
         <div className="debug">
           <div>
@@ -1101,7 +1123,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           </div>
         </div>
       }
-      <ImageMenu {...{ selectedId, addNew, visible, checked, removeId, setAddNew, selectShape, rotate, toggleVisible, toggleCheck }}/>
+      { grid != "mozaic" && <ImageMenu {...{ selectedId, addNew, visible, checked, removeId, setAddNew, selectShape, rotate, toggleVisible, toggleCheck }}/> }
     </figure>
   </div>
   );
