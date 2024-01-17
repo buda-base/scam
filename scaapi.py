@@ -5,7 +5,7 @@ import gzip
 from utils import upload_to_s3, gets3blob
 from sam_annotation_utils import add_scam_results
 import logging
-
+from flask_cachecontrol import cache
 from flask_cors import CORS
 
 api = Flask("SCAM-QC")
@@ -90,6 +90,7 @@ def save_scam_json_api():
     return save_scam_json(folder_path, scam_json_obj)
 
 @api.route('/get_thumbnail_bytes', methods=['GET'])
+@cache(max_age=86400, public=True)
 def get_thumbnail_bytes_api_get():
     thumbnail_path = request.args.get('thumbnail_path')
     img_bytesio = get_thumbnail_bytesio(thumbnail_path)
