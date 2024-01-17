@@ -99,6 +99,8 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   width:calc(100% / 4 - 4px); 
 }
 
+.scam-image.grid-mozaic { margin: 1px; }
+
 .scam-image:hover { 
   background-color:#e9e9e9;
 }
@@ -159,6 +161,9 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   background: linear-gradient(0.25turn, #f69d3c 0%, transparent 15%, transparent 85%, #f69d3c 100%);
 }
 
+.scam-image.has-warning.grid-mozaic {
+  background: #f69d3c;
+}
 
 .scam-image .visible-false {
   width:100%;

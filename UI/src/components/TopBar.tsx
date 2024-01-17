@@ -131,7 +131,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
   //debug("tb:",confirmAct, modified, folder, error, showDialog)
 
   const readyDialog = useMemo(() => (
-    <Dialog open={typeof json === "object" && json.checked && !proceed}  disableScrollLock={true} >     
+    <Dialog open={typeof json === "object" && json.checked && json.checked != "local" && !proceed}  disableScrollLock={true} >     
       <DialogTitle>Warning</DialogTitle>
       <DialogContent>
         <IconButton

@@ -58,7 +58,7 @@ type PreprocessRun = {
 };
 
 export type ScamData = {
-  checked: boolean;
+  checked: boolean|"local";
   files:ScamImageData[],
   folder_path: string;
   preprocess_run: PreprocessRun;

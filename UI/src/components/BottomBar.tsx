@@ -229,7 +229,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       setDrafted(true)
       setConfirmed(false)
 
-      if(typeof json === "object" && setJson) setJson({...json, checked})
+      if(typeof json === "object" && setJson) setJson({...json, checked: "local"})
     })
     .catch(error => {
       debug(error, json);
@@ -562,6 +562,15 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     }, 350)
   }, [checkedRestrict, handleScamQueue, restrictRun, scamOptionsSelected, selectedItems, setGlobalScamOptionsUpdate, setOptions, setRestrictRun, setShouldRunAfter, setShowSettings])
 
+  const [padding, setPadding] = useAtom(state.padding)
+
+  useEffect(() => {
+    if(grid === "mozaic") { 
+      if(padding) setPadding(3)
+    } else {
+      if(padding !== state.defaultPadding) setPadding(state.defaultPadding)
+    }
+  }, [grid, padding])
 
   return (<nav className="bot">
     <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
@@ -590,7 +599,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         label="Filter images"
         onChange={(r) => setFilter(r.target.value)}
       >
-        { ["all", "warning", "unchecked" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+        { ["all", "warning", "unchecked", "random" ].map(f => <MenuItem value={f} disabled={f == "random"}>{f}</MenuItem>) }
       </TextField>
       <TextField
         SelectProps={{ 
@@ -603,7 +612,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         label="Display grid"
         onChange={(r) => setGrid(r.target.value)}
       >
-        { ["1x1", "2x1", "3x2", "4x3" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+        { ["1x1", "2x1", "3x2", "4x3", "mozaic" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
       </TextField>
       <TextField
         SelectProps={{ 
