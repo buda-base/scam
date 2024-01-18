@@ -586,10 +586,10 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         const candidateInt = Math.floor(Math.random() * max) 
         if(arr.indexOf(candidateInt) === -1) arr.push(candidateInt)
       }
-      const randAll = Array.from(json?.files, (v:ScamImageData, i:number) => arr.includes(i))
+      const randAll = Array.from(json?.files, (_:ScamImageData, i:number) => arr.includes(i))
 
       debug("rand:", _.orderBy(arr), randAll)
-      
+
       setRandom(randAll)
     }
   }
