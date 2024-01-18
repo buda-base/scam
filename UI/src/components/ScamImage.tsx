@@ -217,9 +217,9 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 }
 
 
-export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, selected:boolean,
+export const ScamImageContainer = (props: { isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, selected:boolean,
     setImageData: (data:ScamImageData|ScamImageData[]) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
-  const { image, selected, handleSelectItem } = props;
+  const { isRandom, image, selected, handleSelectItem } = props;
 
   const { ref, inView, entry } = useInView({
     triggerOnce: false,
@@ -242,6 +242,7 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
   const figureRef = useRef<HTMLElement>(null)
   
   const [grid, setGrid] = useAtom(state.grid)  
+  const [filter, setFilter] = useAtom(state.filter)  
 
   /*
   useEffect(() => {
@@ -251,14 +252,15 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
 
   if (inView) { 
     
-    return <ScamImage {...props} divRef={ref} {...{visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
+    return <ScamImage {...props} divRef={ref} {...{isRandom, visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
   }
   else {    
     const w = (grid === "mozaic" ? Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * mozaicFactor : image.thumbnail_info.width )
     const h = Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1) * image.thumbnail_info.height / image.thumbnail_info.width
 
+
     return (
-      <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid)}
+      <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid) + (" filter-" + filter) + (" random-" + isRandom)}
         style={{ 
           height: h + 2 * padding, 
           maxWidth: w + 2 * padding
@@ -346,10 +348,10 @@ function useWindowSize() {
   return windowSize;
 }
 
-const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
+const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
     loadDraft: boolean | undefined, checked: boolean, selected:boolean,
     setImageData:(data:ScamImageData|ScamImageData[])=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
-  const { folder, config, image, divRef, draft, loadDraft, visible, checked, selected, setImageData, setVisible, setChecked, handleSelectItem } = props;
+  const { isRandom, folder, config, image, divRef, draft, loadDraft, visible, checked, selected, setImageData, setVisible, setChecked, handleSelectItem } = props;
 
   const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
@@ -1041,7 +1043,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   const loading = scamData === true || scamQueue.todo?.length && scamQueue.todo?.includes(image.thumbnail_path) && !scamQueue.done?.includes(image.thumbnail_path)
 
   return (<div title={image.img_path} ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
-      + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path))}
+      + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
+      + (" random-" + isRandom) }
     style={{ 
       height: visible ? actualH + 2 * padding : 80, 
       maxWidth: (grid === "mozaic" ? (portrait ? actualH : actualW) : image.thumbnail_info[portrait ? "height":"width"]) + 2*padding 

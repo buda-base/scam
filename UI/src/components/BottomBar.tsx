@@ -572,6 +572,28 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     }
   }, [grid, padding])
 
+  const [random, setRandom] = useAtom(state.random)
+
+  const handleRandom = () => {    
+    if(typeof json == "object") {
+      const n = json?.files.length
+      const p = Math.floor(json?.files.length / 10)
+
+      //const rand = _.orderBy(Array.from({length: p}, () => Math.floor(Math.random() * n)));      
+
+      const arr:number[] = [], quantity = p, max = n
+      while(arr.length < quantity){
+        const candidateInt = Math.floor(Math.random() * max) 
+        if(arr.indexOf(candidateInt) === -1) arr.push(candidateInt)
+      }
+      const randAll = Array.from(json?.files, (v:ScamImageData, i:number) => arr.includes(i))
+
+      debug("rand:", _.orderBy(arr), randAll)
+      
+      setRandom(randAll)
+    }
+  }
+
   return (<nav className="bot">
     <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
       { scamQueue.todo && scamQueue.todo.length > 0 && progress < 100 
@@ -599,7 +621,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         label="Filter images"
         onChange={(r) => setFilter(r.target.value)}
       >
-        { ["all", "warning", "unchecked", "random" ].map(f => <MenuItem value={f} disabled={f == "random"}>{f}</MenuItem>) }
+        { ["all", "warning", "unchecked", "random" ].map(f => <MenuItem value={f} {...f === "random" ? {onClick:() => handleRandom()}:{}}>{f}</MenuItem>) }
       </TextField>
       <TextField
         SelectProps={{ 

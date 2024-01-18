@@ -82,3 +82,5 @@ export const clipboard = atom<KonvaPage|null>(null)
 
 export const defaultPadding = 56
 export const padding = atom<number>(defaultPadding)
+
+export const random = atom<boolean[]>([])

@@ -69,7 +69,7 @@ main {
 }
 
 main:not(.main-grid-1x1) {
-  justify-content: flex-start;
+  /* justify-content: flex-start; */
 }
 
 main .select-folder { background-color: white; align-self: center; justify-self: center; padding:16px; box-shadow:0 0 5px 1px rgba(0,0,0,0.125)}
@@ -138,18 +138,23 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   left:0;
 }
 
+.scam-image.filter-random.random-false:not(.grid-mozaic),
 .scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic),
 .scam-image.filter-warning.warning-false:not(.focus-true):not(.grid-mozaic),
 .scam-image.filter-unchecked.checked-true:not(.grid-mozaic) {
   height:80px !important;
 }
 
+/*
+.scam-image.filter-random.random-false,
 .scam-image.filter-warning.warning-true.checked-true,
 .scam-image.filter-warning.warning-false:not(.focus-true),
 .scam-image.filter-unchecked.checked-true {
   overflow: hidden;
 }
+*/
 
+.scam-image.filter-random.random-false:not(.grid-mozaic) > figure > div,
 .scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic) > figure > div,
 .scam-image.filter-warning.warning-false:not(.focus-true):not(.grid-mozaic) > figure > div,
 .scam-image.filter-unchecked.checked-true:not(.grid-mozaic) > figure > div {
@@ -157,17 +162,22 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   visibility: hidden; height:45px;
 }
 
+.scam-image.filter-random.random-false.grid-mozaic > figure > div,
 .scam-image.filter-warning.warning-true.checked-true.grid-mozaic > figure > div,
 .scam-image.filter-warning.warning-false:not(.focus-true).grid-mozaic > figure > div,
 .scam-image.filter-unchecked.checked-true.grid-mozaic > figure > div {
   opacity:0.05;
+  pointer-events: none;
 }
 
+.scam-image.filter-random.random-false > figure figcaption label > span:last-child,
 .scam-image.filter-warning.warning-true.checked-true > figure figcaption label > span:last-child,
 .scam-image.filter-warning.warning-false:not(.focus-true) > figure figcaption label > span:last-child,
 .scam-image.filter-unchecked.checked-true > figure figcaption label > span:last-child {
   margin-top:0; font-style:italic; opacity:0.5; 
 }
+
+/* .scam-image.filter-random.random-false { display:none; } */
 
 .scam-image.has-warning {
   content:''; display: block; 
@@ -175,7 +185,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   background: linear-gradient(0.25turn, #f69d3c 0%, transparent 15%, transparent 85%, #f69d3c 100%);
 }
 
-.scam-image.has-warning.grid-mozaic {
+.scam-image.has-warning.grid-mozaic:not(.random-false) {
   background: #f69d3c;
 }
 
