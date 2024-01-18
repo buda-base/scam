@@ -134,12 +134,17 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   left:0;
 }
 
+.scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic),
+.scam-image.filter-warning.warning-false:not(.focus-true):not(.grid-mozaic),
+.scam-image.filter-unchecked.checked-true:not(.grid-mozaic) {
+  height:80px !important;
+}
+
 .scam-image.filter-warning.warning-true.checked-true,
 .scam-image.filter-warning.warning-false:not(.focus-true),
 .scam-image.filter-unchecked.checked-true {
-  height:80px !important; overflow: hidden;
+  overflow: hidden;
 }
-
 
 .scam-image.filter-warning.warning-true.checked-true > figure > div,
 .scam-image.filter-warning.warning-false:not(.focus-true) > figure > div,
@@ -147,7 +152,6 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   /* display:none;  */
   visibility: hidden; height:45px;
 }
-
 
 .scam-image.filter-warning.warning-true.checked-true > figure figcaption label > span:last-child,
 .scam-image.filter-warning.warning-false:not(.focus-true) > figure figcaption label > span:last-child,
@@ -168,6 +172,13 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 .scam-image .visible-false {
   width:100%;
   height:100%;
+}
+
+.scam-image.grid-mozaic::after {
+  content:attr(title);
+  position: absolute;
+  left:0;top:calc(50% - 6px);
+  width:100%;
 }
 
 .scam-image .visible-false img { opacity: 50%; margin:10px; }
