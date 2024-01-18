@@ -68,6 +68,10 @@ main {
   justify-content: center;
 }
 
+main:not(.main-grid-1x1) {
+  justify-content: flex-start;
+}
+
 main .select-folder { background-color: white; align-self: center; justify-self: center; padding:16px; box-shadow:0 0 5px 1px rgba(0,0,0,0.125)}
 
 .scam-image {
@@ -146,11 +150,17 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   overflow: hidden;
 }
 
-.scam-image.filter-warning.warning-true.checked-true > figure > div,
-.scam-image.filter-warning.warning-false:not(.focus-true) > figure > div,
-.scam-image.filter-unchecked.checked-true > figure > div {
+.scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic) > figure > div,
+.scam-image.filter-warning.warning-false:not(.focus-true):not(.grid-mozaic) > figure > div,
+.scam-image.filter-unchecked.checked-true:not(.grid-mozaic) > figure > div {
   /* display:none;  */
   visibility: hidden; height:45px;
+}
+
+.scam-image.filter-warning.warning-true.checked-true.grid-mozaic > figure > div,
+.scam-image.filter-warning.warning-false:not(.focus-true).grid-mozaic > figure > div,
+.scam-image.filter-unchecked.checked-true.grid-mozaic > figure > div {
+  opacity:0.05;
 }
 
 .scam-image.filter-warning.warning-true.checked-true > figure figcaption label > span:last-child,

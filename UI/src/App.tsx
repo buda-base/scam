@@ -501,11 +501,13 @@ function App() {
     </Dialog>
   ), [drafts, folder, handleClose, loadDraft])
   
+  const [grid] = useAtom(state.grid)
+
   return (
     <ThemeProvider theme={theme}>
       {reloadDialog}
       <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, config, error, json, jsonPath, setFolder }}/></header>
-      <main onClick={checkDeselectMain}>{
+      <main onClick={checkDeselectMain} className={"main-grid-"+grid}>{
         images.map(image => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
       }</main>
       { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json, setJson}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, options, setOptions }}/></footer>}
