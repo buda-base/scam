@@ -9,6 +9,7 @@ export type Page = {
   minAreaRect: MinAreaRect;
   warnings: string[];
   rotatedHandle?:boolean;
+  tags?:string[];
 };
 
 export type KonvaPage = {

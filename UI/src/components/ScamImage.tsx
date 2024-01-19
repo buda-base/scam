@@ -8,8 +8,8 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import Konva from "konva";
 import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
-import { ErrorOutline, Warning, WarningAmber } from "@mui/icons-material";
-import { Checkbox, FormControlLabel } from "@mui/material";
+import { ErrorOutline, Warning, WarningAmber, LocalOffer } from "@mui/icons-material";
+import { Checkbox, FormControlLabel, IconButton, MenuItem, Paper } from "@mui/material";
 import _ from "lodash";
 
 import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap } from "../types";
@@ -267,7 +267,7 @@ export const ScamImageContainer = (props: { isRandom:boolean, folder: string, im
         }}
       >
         <figure ref={figureRef} style={{ display: "block" }}>
-          <figcaption>{image.img_path}</figcaption>
+          <figcaption>{image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")}</figcaption>
           {/* 
           // good idea but slows scrolling a lot..
           <figcaption>
@@ -1042,7 +1042,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
   
   const loading = scamData === true || scamQueue.todo?.length && scamQueue.todo?.includes(image.thumbnail_path) && !scamQueue.done?.includes(image.thumbnail_path)
 
-  return (<div title={image.img_path} ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
+  return (<div title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
       + (" random-" + isRandom) }
     style={{ 
@@ -1114,10 +1114,12 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
           )}
         </Layer>
       </Stage> }
-      { grid != "mozaic" && <figcaption><FormControlLabel label={image.img_path} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} control={<Checkbox checked={selected} sx={{padding: "0 8px" }}/>}  />
-        { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "4px" }} /> }
-        {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
-        { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
+      { grid != "mozaic" && <figcaption><FormControlLabel label={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} 
+          control={<Checkbox checked={selected} sx={{padding: "0 8px"}}/>} 
+        />          
+          { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "2px" }} /> }
+          {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
+          { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
       </figcaption> }
       {showDebug && visible && typeof scamData === 'object' &&
         <div className="debug">
