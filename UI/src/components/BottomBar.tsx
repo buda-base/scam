@@ -272,7 +272,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       <Popper open={popChecked || error != ""} anchorEl={spanRef.current} popperOptions={{ placement: "bottom-end" }}>
         <Paper className={"paper error-"+(error != "" ? true : false)} >
           { !error 
-            ? <FormControlLabel control={<Checkbox checked={checked} onChange={handleChecked}/>} label="reviewed complete " /> 
+            ? <FormControlLabel control={<Checkbox checked={checked} onChange={handleChecked}/>} label="review complete " /> 
             : <>Failed to save<br/>(<i>{error}</i>)</> }
         </Paper>
       </Popper>
