@@ -49,7 +49,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const [cutAtFixed, setCutAtFixed] = useAtom(state.cutAtFixedAtom)
 
   const [popChecked, setPopChecked] = useState(false)
-  const [checked, setChecked] = useState(false)
+  const [checked, setChecked] = useState(true)
   const spanRef = useRef<HTMLSpanElement>(null)
 
   const [ saving, setSaving ] = useState(false)
@@ -229,7 +229,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       setDrafted(true)
       setConfirmed(false)
 
-      if(typeof json === "object" && setJson) setJson({...json, checked: "local"})
+      if(typeof json === "object" && setJson) setJson({...json, ...checked ? {checked: "local"}:{}})
     })
     .catch(error => {
       debug(error, json);
@@ -272,7 +272,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       <Popper open={popChecked || error != ""} anchorEl={spanRef.current} popperOptions={{ placement: "bottom-end" }}>
         <Paper className={"paper error-"+(error != "" ? true : false)} >
           { !error 
-            ? <FormControlLabel control={<Checkbox checked={checked} onChange={handleChecked}/>} label="ready to be processed" /> 
+            ? <FormControlLabel control={<Checkbox checked={checked} onChange={handleChecked}/>} label="reviewed complete " /> 
             : <>Failed to save<br/>(<i>{error}</i>)</> }
         </Paper>
       </Popper>
