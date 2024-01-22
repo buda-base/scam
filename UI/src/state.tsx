@@ -9,8 +9,8 @@ const debug = debugFactory("scam:state")
 const hasCustomOptions:ScamOptions|undefined = (JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).options
 
 // global settings
-export const orientAtom = atom<Orientation>("horizontal") 
-export const direcAtom = atom<Direction>("horizontal") 
+export const orientAtom = atom<Orientation>(hasCustomOptions?.orient || "horizontal") 
+export const direcAtom = atom<Direction>(hasCustomOptions?.direc || "horizontal") 
 export const minRatioAtom = atom(hasCustomOptions?.minRatio || 0.145)
 export const maxRatioAtom = atom(hasCustomOptions?.maxRatio || 0.5)
 export const nbPagesAtom = atom(hasCustomOptions?.nbPages || 2)
