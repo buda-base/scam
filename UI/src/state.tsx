@@ -25,7 +25,7 @@ export const cutAtFixedAtom = atom(hasCustomOptions?.cutAtFixed || false)
 export const shouldRunAfterAtom = atom(123)
 
 export const scamDataReducer = (state: any, action: { type: string; payload: { id: string; val: ScamImageData; multid?:string[] } }) => {
-  //debug("!!", action)
+  debug("!!", action)
   switch (action.type) {
     case 'ADD_DATA':
       return { ...state, [action.payload.id]: { ...action.payload.val } };
@@ -84,3 +84,5 @@ export const defaultPadding = 56
 export const padding = atom<number>(defaultPadding)
 
 export const random = atom<boolean[]>([])
+
+export const possibleTags:Record<string,string> = { "T1":"white patch", "T2":"color card" }

@@ -11,10 +11,10 @@ import * as state from "../state"
 
 const debug = debugFactory("scam:imenu");
 
-const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:boolean, checked: boolean,
+const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:boolean, checked: boolean, tags?:string[],
     removeId: (n: number) => void, setAddNew: (b:boolean) => void, selectShape:(n:number|null) => void, rotate:(n:number) => void,
-    toggleVisible:() => void, toggleCheck: (b?:boolean) => void }) => {
-  const { selectedId, addNew, visible, checked, removeId, setAddNew, selectShape, rotate, toggleVisible, toggleCheck } = props;
+    toggleVisible:() => void, toggleCheck: (b?:boolean) => void, updateTags:(t:string[]) => void }) => {
+  const { selectedId, addNew, visible, checked, tags, removeId, setAddNew, selectShape, rotate, toggleVisible, toggleCheck, updateTags } = props;
 
   //debug("menu", selectedId)
 
@@ -60,10 +60,12 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
     if(tagMenu) setCheckedMenu(false)    
   }, [tagMenu])
 
-  const handleAddTag = (t:string) => {
-    debug("t:", t)
-    return
-  }
+  const handleToggleTag = useCallback((t:string) => {
+    debug("t:", t, tags)
+    if(tags?.includes(t)) updateTags(tags.filter(g => g!=t))
+    else updateTags([...tags??[], t])
+    setTagMenu(false)
+  }, [tags])
 
   return (<div className="image-menu" onClick={handleClick}>
     <span>
@@ -103,8 +105,8 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
       <span style={{ position:"relative" }}>
         <IconButton className="tag" onClick={() => setTagMenu(!tagMenu)} disabled={selectedId === null} ><LocalOffer /></IconButton>
         { tagMenu && <Paper sx={{ position: "absolute", right:0, bottom:"calc(100% + 24px)" }}>
-          {["color card", "neutral gray area"].map(t => 
-            <MenuItem title={""} onClick={() => handleAddTag(t)}>{t[0].toUpperCase()+t.substring(1)}</MenuItem>
+          {Object.keys(state.possibleTags).map((t:string) => 
+            <MenuItem title={""} selected={tags?.includes(t)} onClick={() => handleToggleTag(t)}>{state.possibleTags[t][0].toUpperCase()+state.possibleTags[t].substring(1)}</MenuItem>
           )}
         </Paper> }
       </span>
