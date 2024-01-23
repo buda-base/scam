@@ -241,6 +241,33 @@ function App() {
     setModified(true)
   }, [selectedItems, images])
 
+  const batchRotate = useCallback((angle:number) => {
+    const newImages = [...images]
+    for(const im in newImages) {
+      const image = newImages[im]
+      if(selectedItems.includes(image.thumbnail_path)) {
+
+        const rotation = (image.rotation + angle + 360) % 360    
+        newImages[im] = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
+        
+        const newData = allScamData[image.thumbnail_path].data
+        
+        newData.rotation = rotation
+
+        dispatch({
+          type: 'UPDATE_DATA',
+          payload: {
+            id: image.thumbnail_path,
+            val: { state: "modified", data: newData }
+          }
+        })
+
+      }
+    }
+    setImages(newImages)
+    setModified(true)
+  }, [selectedItems, images, allScamData])
+
   useEffect(() => {
     debug("loca?",paramFolder,location)
     if(paramFolder) {
@@ -512,7 +539,7 @@ function App() {
       <main onClick={checkDeselectMain} className={"main-grid-"+grid}>{
         images.map((image,i) => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ isRandom:random[i] || false, folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
       }</main>
-      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json, setJson}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, options, setOptions }}/></footer>}
+      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json, setJson}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, options, setOptions, batchRotate }}/></footer>}
     </ThemeProvider>
   )
 }

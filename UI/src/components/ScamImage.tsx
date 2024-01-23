@@ -988,7 +988,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
       return [nx + handleY, ny + handleX];
     }
 
-    const rotatePage = (p:Page, angle:number): Page => ({
+    const rotatePage90 = (p:Page, angle:number): Page => ({
       ...p,
       minAreaRect: [
         ...rotatePoint(0, 0, p.minAreaRect[0] - handleX, p.minAreaRect[1] - handleY, angle),    
@@ -1007,7 +1007,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
       const newData = { ...scamData }
       if(newData.pages) { 
         newData.rotation = rotation
-        newData.pages = newData.pages.map((p) => withRotatedHandle(rotatePage(withoutRotatedHandle(p) as Page, angle), newData) as Page)
+        newData.pages = newData.pages.map((p) => withRotatedHandle(rotatePage90(withoutRotatedHandle(p) as Page, angle), newData) as Page)
         newData.rects = newData.pages.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, image.width, image.height))        
       }
       dispatch({

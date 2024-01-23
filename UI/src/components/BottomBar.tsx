@@ -295,8 +295,9 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
 let unmount = false, go = false, abort = false
 
 export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[], options: ScamOptionsMap,
-    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void, setJson?:(s:ScamData)=>void  }) => {
-  const { folder, config, json, selectedItems, images, options, setSelectedItems, markChecked, markHidden, setOptions, setJson } = props;
+    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void, setJson?:(s:ScamData)=>void, 
+    batchRotate:(n:number) => void }) => {
+  const { folder, config, json, selectedItems, images, options, setSelectedItems, markChecked, markHidden, setOptions, setJson, batchRotate } = props;
 
   const [showSettings, setShowSettings] = useAtom(state.showSettings)
 
@@ -594,6 +595,10 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     }
   }
 
+  const handleRotate = (angle:number) => {
+    batchRotate(angle)
+  }
+
   return (<nav className="bot">
     <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
       { scamQueue.todo && scamQueue.todo.length > 0 && progress < 100 
@@ -657,6 +662,10 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         { hasChecked && <MenuItem value={3} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}
         { (hasVisible || !hasHidden) && <MenuItem value={4} disabled={!hasVisible} onClick={() => markHidden(true)}>{"Mark hidden"}</MenuItem>}
         { hasHidden && <MenuItem value={5} onClick={() => markHidden(false)}>{"Mark visible"}</MenuItem>}
+        <hr/>
+        <MenuItem value={41} disabled={!selectedItems.length} onClick={() => handleRotate(90)}>{"Rotate 90°"}</MenuItem>
+        <MenuItem value={42} disabled={!selectedItems.length} onClick={() => handleRotate(180)}>{"Rotate 180°"}</MenuItem>
+        <MenuItem value={43} disabled={!selectedItems.length} onClick={() => handleRotate(270)}>{"Rotate 270°"}</MenuItem>
         <hr/>
         <MenuItem value={4} disabled={!selectedItems.length} onClick={() => setShowSettings(true)}>{"Run SCAM on selection"}</MenuItem>
       </TextField>
