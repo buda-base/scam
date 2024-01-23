@@ -12,14 +12,14 @@ import { ErrorOutline, Warning, WarningAmber, LocalOffer } from "@mui/icons-mate
 import { Checkbox, FormControlLabel, IconButton, MenuItem, Paper } from "@mui/material";
 import _ from "lodash";
 
-import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap } from "../types";
+import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap, MinAreaRect } from "../types";
 import { apiUrl, scam_options } from "../App";
 import ImageMenu from "./ImageMenu";
 import * as state from "../state"
 
 const debug = debugFactory("scam:img")
 
-const mozaicFactor = 0.65
+const mozaicFactor = 0.65, minThumbWidth = 200
 
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean, page?: Page,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
@@ -261,8 +261,8 @@ export const ScamImageContainer = (props: { isRandom:boolean, folder: string, im
     return <ScamImage {...props} divRef={ref} {...{isRandom, visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
   }
   else {    
-    const w = (grid === "mozaic" ? Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * mozaicFactor : image.thumbnail_info.width )
-    const h = Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1) * image.thumbnail_info.height / image.thumbnail_info.width
+    const w = (grid === "mozaic" ? Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * mozaicFactor : image.thumbnail_info.width )
+    const h = Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1) * image.thumbnail_info.height / image.thumbnail_info.width
 
 
     return (
@@ -372,7 +372,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
 
   let initW
   const [dimensions, setDimensions] = useState({
-    width: (initW = Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1)),
+    width: (initW = Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1)),
     height:  initW * image.height / image.width     
   })
 
@@ -384,11 +384,11 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
   useEffect(() => {    
     //debug("setDim?", image.thumbnail_path)
     if (figureRef.current?.parentElement) { 
-      let w = Math.max(300, (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding)
+      let w = Math.max(minThumbWidth, (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding)
       let h = w * image.height / image.width 
       if(portrait) {
         if(w > h) {
-          h = Math.max(300, h)
+          h = Math.max(minThumbWidth, h)
         } else if(h > w) { 
           h = w
         }
@@ -974,16 +974,57 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
     }
   };
 
-  const rotate = useCallback((angle: number) => {
+  const rotate = useCallback((angle: number) => {    
+
+    const handleX = portrait ? image.height/2 : image.width/2
+    const handleY = portrait ? image.width/2 : image.height/2
+    
+    const rotatePoint = (cx:number, cy:number, x:number, y:number, angle:number) => {
+      const radians = (Math.PI / 180) * angle,
+          cos = Math.cos(radians),
+          sin = Math.sin(radians),
+          nx = (cos * (x - cx)) + (sin * (y - cy)) + cx,
+          ny = (cos * (y - cy)) - (sin * (x - cx)) + cy;
+      return [nx + handleY, ny + handleX];
+    }
+
+    const rotatePage = (p:Page, angle:number): Page => ({
+      ...p,
+      minAreaRect: [
+        ...rotatePoint(0, 0, p.minAreaRect[0] - handleX, p.minAreaRect[1] - handleY, angle),    
+        p.minAreaRect[3], 
+        p.minAreaRect[2],
+        p.minAreaRect[4]
+      ] as MinAreaRect
+    })
+        
     const rotation = (image.rotation + angle + 360) % 360    
     const newImage = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
-    if(newImage.pages) delete newImage.pages
+    //if(newImage.pages) delete newImage.pages
     setImageData(newImage)    
+    
+    if(typeof scamData === "object") {      
+      const newData = { ...scamData }
+      if(newData.pages) { 
+        newData.rotation = rotation
+        newData.pages = newData.pages.map((p) => withRotatedHandle(rotatePage(withoutRotatedHandle(p) as Page, angle), newData) as Page)
+        newData.rects = newData.pages.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, image.width, image.height))        
+      }
+      dispatch({
+        type: 'UPDATE_DATA',
+        payload: {
+          id: image.thumbnail_path,
+          val: { state: 'modified', data: newData }
+        }
+      })
+    }  
+
     if(modified) setDrafted(false) 
     setModified(true)
     setLastRun(1)
     if(!checked) setChecked(true)
-  }, [ modified, image, shouldRunAfter ])
+    
+  }, [ modified, image, shouldRunAfter, checked, portrait, dimensions, scamData ])
 
   const toggleVisible = useCallback(() => {
     dispatch({

@@ -103,6 +103,10 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   width:calc(100% / 4 - 4px); 
 }
 
+.scam-image.grid-5x3 {
+  width:calc(100% / 5 - 4px); 
+}
+
 .scam-image.grid-mozaic { margin: 1px; }
 
 .scam-image:hover { 

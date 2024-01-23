@@ -634,7 +634,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         label="Display grid"
         onChange={(r) => setGrid(r.target.value)}
       >
-        { ["1x1", "2x1", "3x2", "4x3", "mozaic" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+        { ["1x1", "2x1", "3x2", "4x3", "5x3", "mozaic" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
       </TextField>
       <TextField
         SelectProps={{ 

@@ -67,7 +67,9 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
     setTagMenu(false)
   }, [tags])
 
-  return (<div className="image-menu" onClick={handleClick}>
+  return (
+    <div className="image-menu" onClick={handleClick} style={{justifyContent:"center"}}>
+      <div style={{minWidth:"350px",maxWidth:"100%",display:"flex",justifyContent: "space-around"}}>
     <span>
       <IconButton onClick={() => setCheckedMenu(!checkedMenu)}>
         { checked 
@@ -117,7 +119,7 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
         <DeleteForever />
       </IconButton>
     </span>
-  </div>)
+  </div></div>)
 }
 
 export default ImageMenu ;

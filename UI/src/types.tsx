@@ -3,7 +3,7 @@ export type ConfigData = {
   auth: string[];
 }
 
-type MinAreaRect = [number, number, number, number, number];
+export type MinAreaRect = [number, number, number, number, number];
 
 export type Page = {
   minAreaRect: MinAreaRect;
