@@ -85,4 +85,10 @@ export const padding = atom<number>(defaultPadding)
 
 export const random = atom<boolean[]>([])
 
-export const possibleTags:Record<string,string> = { "T1":"white patch", "T2":"color card" }
+export const possibleTags:Record<string,string> = { 
+  "T1":"white patch", 
+  "T2":"color card",
+  "T3":"detail",
+  "T4":"catalog card",
+  "T5":"missing page card"
+}
