@@ -1041,7 +1041,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
     if(modified) setDrafted(false) 
     setModified(true)
     setImageData({...image, hidden: visible })    
-    if(!checked) setChecked(true)
+    //if(!checked) setChecked(true)
   }, [checked, dispatch, image, scamData, setModified, setVisible, shouldRunAfter, visible, modified])
 
   const toggleCheck = useCallback((multi?:boolean) => {

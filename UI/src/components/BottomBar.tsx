@@ -191,13 +191,18 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
           ...obj.data || {},
           ...currentConfig > 0 ? {options_index: currentConfig} : {}
         }
-        if(data.hidden) delete data.hidden
-        if(data.checked) delete data.checked
-        data = { 
-          ...data,
-          ...obj.visible == false || !obj.visible && obj.data?.hidden ? { hidden: true }  : {},
-          ...obj.checked ? { checked: true } : {}
-        }
+        
+        let hidden = data.hidden
+        if(obj.visible) hidden = undefined
+        let checked = data.checked
+        if(obj.checked === false) checked = undefined
+        
+        if(data.hidden != undefined) delete data.hidden
+        if(data.checked != undefined) delete data.checked        
+        
+        // better fix for #36
+        data = { ...data, hidden, checked }
+
         if(data.rects) delete data.rects
         if(data.pages) data.pages = data.pages.map(withoutRotatedHandle) as Page[]
         return data
