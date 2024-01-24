@@ -194,7 +194,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
         
         let hidden = data.hidden
         if(obj.visible) hidden = undefined
-        let checked = data.checked
+        let checked:boolean|undefined = data.checked || obj.checked
         if(obj.checked === false) checked = undefined
         
         if(data.hidden != undefined) delete data.hidden
