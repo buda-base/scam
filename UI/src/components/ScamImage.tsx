@@ -1034,7 +1034,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
       type: 'UPDATE_DATA',
       payload: {
         id: image.thumbnail_path,
-        val: { state: 'modified', time: shouldRunAfter, visible: !visible, checked: true }
+        val: { state: 'modified', time: shouldRunAfter, visible: !visible /*, checked: true*/ }
       }
     })
     setVisible(!visible)
