@@ -334,6 +334,29 @@ export const withoutRotatedHandle = (r: Page) => {
 }
 
 
+export const rotatePage90 = (p:Page, angle:number, handleX:number, handleY: number): Page => { 
+
+  const rotatePoint = (cx:number, cy:number, x:number, y:number, angle:number) => {
+    const radians = (Math.PI / 180) * angle,
+        cos = Math.cos(radians),
+        sin = Math.sin(radians),
+        nx = (cos * (x - cx)) + (sin * (y - cy)) + cx,
+        ny = (cos * (y - cy)) - (sin * (x - cx)) + cy;
+    return [nx + handleY, ny + handleX];
+  }
+
+  return ({
+    ...p,
+    minAreaRect: [
+      ...rotatePoint(0, 0, p.minAreaRect[0] - handleX, p.minAreaRect[1] - handleY, angle),    
+      p.minAreaRect[3], 
+      p.minAreaRect[2],
+      p.minAreaRect[4]
+    ] as MinAreaRect
+  })
+}
+
+
 // Hook
 function useWindowSize() {
   const [windowSize, setWindowSize] = useState({
@@ -975,29 +998,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
   };
 
   const rotate = useCallback((angle: number) => {    
-
-    const handleX = portrait ? image.height/2 : image.width/2
-    const handleY = portrait ? image.width/2 : image.height/2
     
-    const rotatePoint = (cx:number, cy:number, x:number, y:number, angle:number) => {
-      const radians = (Math.PI / 180) * angle,
-          cos = Math.cos(radians),
-          sin = Math.sin(radians),
-          nx = (cos * (x - cx)) + (sin * (y - cy)) + cx,
-          ny = (cos * (y - cy)) - (sin * (x - cx)) + cy;
-      return [nx + handleY, ny + handleX];
-    }
-
-    const rotatePage90 = (p:Page, angle:number): Page => ({
-      ...p,
-      minAreaRect: [
-        ...rotatePoint(0, 0, p.minAreaRect[0] - handleX, p.minAreaRect[1] - handleY, angle),    
-        p.minAreaRect[3], 
-        p.minAreaRect[2],
-        p.minAreaRect[4]
-      ] as MinAreaRect
-    })
-        
     const rotation = (image.rotation + angle + 360) % 360    
     const newImage = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
     //if(newImage.pages) delete newImage.pages
@@ -1005,10 +1006,12 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
     
     if(typeof scamData === "object") {      
       const newData = { ...scamData }
-      if(newData.pages) { 
+      if(newData.pages) {     
+        const handleX = portrait ? image.height/2 : image.width/2
+        const handleY = portrait ? image.width/2 : image.height/2
         newData.rotation = rotation
-        newData.pages = newData.pages.map((p) => withRotatedHandle(rotatePage90(withoutRotatedHandle(p) as Page, angle), newData) as Page)
-        newData.rects = newData.pages.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, image.width, image.height))        
+        newData.pages = newData.pages.map((p) => withRotatedHandle(rotatePage90(withoutRotatedHandle(p) as Page, angle, handleX, handleY), newData) as Page)
+        if(newData.rects) delete newData.rects
       }
       dispatch({
         type: 'UPDATE_DATA',

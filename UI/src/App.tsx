@@ -11,7 +11,7 @@ import { useAtom } from 'jotai';
 // tmp data
 //import data from "./assets/scam.json"
 
-import { ScamImageContainer, recomputeCoords, withRotatedHandle } from "./components/ScamImage"
+import { ScamImageContainer, recomputeCoords, rotatePage90, withRotatedHandle, withoutRotatedHandle } from "./components/ScamImage"
 import './App.css'
 import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData, ScamOptions, ScamOptionsMap } from './types';
 import { BottomBar } from './components/BottomBar';
@@ -247,13 +247,29 @@ function App() {
       const image = newImages[im]
       if(selectedItems.includes(image.thumbnail_path)) {
 
+        let portrait = [90,270].includes(image.rotation)
         const rotation = (image.rotation + angle + 360) % 360    
+        
         newImages[im] = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
         
         const newData = allScamData[image.thumbnail_path].data
-        
+                
+        let toRotate = angle ;
         newData.rotation = rotation
-
+        if(newData.pages) do { 
+          const handleX = portrait ? image.height/2 : image.width/2
+          const handleY = portrait ? image.width/2 : image.height/2
+          newData.pages = newData.pages.map((p) => withRotatedHandle(rotatePage90(withoutRotatedHandle(p) as Page, Math.abs(toRotate) !== 180 ? toRotate : 90, handleX, handleY), newData) as Page)
+          if(newData.rects) delete newData.rects
+          // we rotate +/-90° by +/-90°
+          if(toRotate === 180 || toRotate === -180) {
+            portrait = !portrait
+            toRotate = 90
+          } else {
+            toRotate = 0
+          }
+        } while(toRotate);
+        
         dispatch({
           type: 'UPDATE_DATA',
           payload: {
@@ -266,7 +282,7 @@ function App() {
     }
     setImages(newImages)
     setModified(true)
-  }, [selectedItems, images, allScamData])
+  }, [selectedItems, images, allScamData, dispatch])
 
   useEffect(() => {
     debug("loca?",paramFolder,location)

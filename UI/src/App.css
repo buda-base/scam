@@ -277,13 +277,13 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   pointer-events: none;
 }
 
-.scam-image.filter-unchecked.checked-true .image-menu > span:first-child,
-.scam-image .visible-false .image-menu > span:first-child {
+.scam-image.filter-unchecked.checked-true .image-menu > div > span:first-child,
+.scam-image .visible-false .image-menu > div > span:first-child {
   pointer-events: auto;
 }
 
-.scam-image.filter-unchecked.checked-true .image-menu > span:not(:first-child),
-.scam-image .visible-false .image-menu > span:not(:first-child) { visibility: hidden;}
+.scam-image.filter-unchecked.checked-true .image-menu > div > span:not(:first-child),
+.scam-image .visible-false .image-menu > div > span:not(:first-child) { visibility: hidden;}
 /* .scam-image .visible-false .image-menu > span:first-child > button:not(.visibility) { display:none; } */
 
 .scam-image .visible-false .mini {
