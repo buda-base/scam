@@ -195,7 +195,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
         if(data.checked) delete data.checked
         data = { 
           ...data,
-          ...obj.visible == false ? { hidden: true }  : {},
+          ...obj.visible == false || !obj.visible && obj.data?.hidden ? { hidden: true }  : {},
           ...obj.checked ? { checked: true } : {}
         }
         if(data.rects) delete data.rects
