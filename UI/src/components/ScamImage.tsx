@@ -840,7 +840,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
 
     if(data.pages.length <= p.n && data.pages) {
       if(!add) return
-      data.pages.push({ minAreaRect:[0,0,0,0,0], warnings:[] })
+      data.pages.push({ minAreaRect:[0,0,0,0,0], warnings:[], rotatedHandle: p.rotatedHandle })
     }
 
     const W = data?.width
