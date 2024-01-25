@@ -198,6 +198,8 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
     e.preventDefault();
     emptyCacheStorage();
   }
+  
+  const [numWarn] = useAtom(state.numWarn)
 
   return <nav className="top">
     {readyDialog}
@@ -219,7 +221,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
           <div>
             <div>{jsonPath}</div>
             {typeof json === "object" && <div style={{color:"#6b6b6b"}}>
-               {json.files?.length} images
+               {json.files?.length} images { !numWarn ? <> | No warning</> : <> | {numWarn} warning{numWarn > 1 ? "s" : ""}</>}
               { json.checked && <span title="already marked as ready to process"><CheckCircle sx={{color:"green", verticalAlign:"-8px", marginLeft:"10px"}} /></span> }
             </div> }
           </div>

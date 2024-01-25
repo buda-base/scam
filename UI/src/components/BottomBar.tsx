@@ -440,6 +440,12 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
 
   const hasWarning:ScamImageData[] = (json?.files && Object.values(json.files).filter(im => calcHasWarning(im))) ?? [] 
 
+  const [,setNumWarn] = useAtom(state.numWarn)
+
+  useEffect(() => {
+    setNumWarn(hasWarning.length)
+  }, [hasWarning.length])
+
   const handleScamQueue = useCallback(async () => {    
 
     if(!scamQueue.todo?.length && json?.files && !go) {
