@@ -100,9 +100,10 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const saveDraft = useCallback(async () => {
     const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
     if(!local.drafts) local.drafts = {}
+    const images = local.drafts[folder]?.images ?? {}
     local.drafts[folder] = { 
       ...local.drafts[folder], 
-      images: { ...Object.keys(allScamData).reduce( (acc,a) => {
+      images: { ...images, ...Object.keys(allScamData).reduce( (acc,a) => {
         const val = allScamData[a]
         val.data = { ...val.data }
         // #9 always ungray save buttons after run_ (=> save previous scam run as draft)
