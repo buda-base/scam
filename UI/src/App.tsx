@@ -398,8 +398,8 @@ function App() {
     if(typeof json !== 'object') return
     if(!Array.isArray(data)) data = [ data ]
     for(const d of data) {
-      const idx = json.files.findIndex((im) => im.thumbnail_path === d.thumbnail_path)
-      debug("set:", d, d.thumbnail_path, idx)
+      const idx = json.files.findIndex((im) => im?.thumbnail_path === d?.thumbnail_path)
+      debug("set:", d, d?.thumbnail_path, idx)
       const newJson = { ...json }
       newJson.files[idx] = { ...d }
       setJson(newJson)
