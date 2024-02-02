@@ -247,6 +247,14 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   color:black;
 }
 
+.scam-image figcaption > label::after {
+  content:attr(attr-numAnno);
+  padding-left:6px;
+  font-style:italic;
+  text-shadow: 0 0 1px black;
+  font-size:14px;
+}
+
 .scam-image:hover figcaption .tag {
   opacity:0.5;
 }

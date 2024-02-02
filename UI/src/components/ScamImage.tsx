@@ -54,8 +54,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
     ctx.fillRect(0, 0, iconCanvas.width, iconCanvas.height);
     ctx.drawImage(icon, 0, 0, iconCanvas.width, iconCanvas.height);
 
-    tr.update = function () {
-      debug("upda")
+    tr.update = function () {      
       Konva.Transformer.prototype.update.call(tr);
       const rot = this.findOne(".rotater");
       (rot as any)
@@ -1151,6 +1150,11 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
     setDrafted(false)
   }, [dispatch, image.thumbnail_path, scamData, selectedId])
 
+  // TODO  use options from actual json if previously uploaded
+  const numAnno = (typeof scamData === "object" 
+    ? scamData?.pages?.length + "/" + (globalData?.options?.nbPages ?? (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected)
+    : "")
+
   return (<div title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
       + (" random-" + isRandom) }
@@ -1223,7 +1227,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
           )}
         </Layer>
       </Stage> }
-      { grid != "mozaic" && <figcaption><FormControlLabel label={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} 
+      { grid != "mozaic" && <figcaption><FormControlLabel attr-numAnno={numAnno} label={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} 
           control={<Checkbox checked={selected} sx={{padding: "0 8px"}}/>} 
         />          
           { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "2px" }} /> }
