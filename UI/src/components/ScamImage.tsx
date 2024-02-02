@@ -807,13 +807,13 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
         type: 'UPDATE_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data: newData, state: 'modified', time: shouldRunAfter, checked:true }
+          val: { data: newData, state: 'modified', time: shouldRunAfter, /*checked:true*/ }
         }
       })        
       if(modified) setDrafted(false) 
       setModified(true)
       selectShape(newData.pages.length ? newData.pages.length - 1 : null)
-      if(!checked) setChecked(true)
+      //if(!checked) setChecked(true)
     }
   }, [checked, dimensions, modified, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
 
@@ -869,12 +869,12 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
         type: 'UPDATE_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data, state: 'modified', time: shouldRunAfter, image, visible: true, ...!add?{checked: true}:{} }
+          val: { data, state: 'modified', time: shouldRunAfter, image, visible: true, /*...!add?{checked: true}:{}*/ }
         }
       })
       if(!modified) setModified(true)
       if(drafted) setDrafted(false)
-      if(!checked && !add) setChecked(true)
+      //if(!checked && !add) setChecked(true)
     }
   
   }, [checked, dimensions, modified, dispatch, drafted, handleZindex, image, scamData, setDrafted, setModified, shouldRunAfter, visible])
@@ -1025,7 +1025,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
     if(modified) setDrafted(false) 
     setModified(true)
     setLastRun(1)
-    if(!checked) setChecked(true)
+    //if(!checked) setChecked(true)
     
   }, [ modified, image, shouldRunAfter, checked, portrait, dimensions, scamData ])
 
