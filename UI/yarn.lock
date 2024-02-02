@@ -2813,6 +2813,11 @@ url@^0.11.0:
     punycode "^1.4.1"
     qs "^6.11.0"
 
+use-image@^1.1.1:
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/use-image/-/use-image-1.1.1.tgz#bdd3f2e1718393ffc0e56136f993467103d9d2df"
+  integrity sha512-n4YO2k8AJG/BcDtxmBx8Aa+47kxY5m335dJiCQA5tTeVU4XdhrhqR6wT0WISRXwdMEOv5CSjqekDZkEMiiWaYQ==
+
 use-persisted-state@^0.3.0:
   version "0.3.3"
   resolved "https://registry.yarnpkg.com/use-persisted-state/-/use-persisted-state-0.3.3.tgz#5e0f2236967cec7c34de33abc07ae6818e7c7451"

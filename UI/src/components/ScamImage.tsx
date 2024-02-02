@@ -11,6 +11,7 @@ import { useReducerAtom } from "jotai/utils"
 import { ErrorOutline, Warning, WarningAmber, LocalOffer } from "@mui/icons-material";
 import { Checkbox, FormControlLabel, IconButton, MenuItem, Paper } from "@mui/material";
 import _ from "lodash";
+import useImage from "use-image";
 
 import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap, MinAreaRect } from "../types";
 import { apiUrl, scam_options } from "../App";
@@ -21,6 +22,8 @@ const debug = debugFactory("scam:img")
 
 const mozaicFactor = 0.65, minThumbWidth = 200
 
+const ICON = "/rotate-option.svg"
+
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean, page?: Page,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
   const { x, y, width, height, rotation, warning, rotatedHandle } = props.shapeProps;
@@ -30,13 +33,51 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
   const trRef = useRef<Konva.Transformer>(null)
 
   const [padding, setPadding] = useAtom(state.padding)
+  const [icon] = useImage(ICON);
+  
+  const setRotateIcon = useCallback(() => {
+    const tr = trRef.current, sh = shRef.current;
+    if (!icon || !tr || !sh) return;
 
+    tr.nodes([sh]);    
+    const rot = tr.findOne(".rotater")
+    
+    // generate rotater background
+    const iconCanvas = document.createElement("canvas");
+    iconCanvas.width = 16
+    iconCanvas.height = 16
+
+    const ctx = iconCanvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.fillStyle = "transparent";
+    ctx.fillRect(0, 0, iconCanvas.width, iconCanvas.height);
+    ctx.drawImage(icon, 0, 0, iconCanvas.width, iconCanvas.height);
+
+    tr.update = function () {
+      debug("upda")
+      Konva.Transformer.prototype.update.call(tr);
+      const rot = this.findOne(".rotater");
+      (rot as any)
+        .fill(null)
+        .fillPatternImage(iconCanvas)
+        .stroke(null)
+        .width(16)
+        .height(16)
+        .offsetX(8)
+        .offsetY(8)
+    };
+    tr.update();
+    tr.getLayer()?.draw();
+  }, [icon]);
+  
   useEffect(() => {
+    setRotateIcon()
     if (isSelected && shRef.current) {
       trRef.current?.nodes([shRef.current]);
       trRef.current?.getLayer()?.batchDraw();
     }
-  }, [isSelected]);
+  }, [isSelected, setRotateIcon]);
 
   const handleX = portrait ? height/2 : width/2
   const handleY = portrait ? width/2 : height/2
