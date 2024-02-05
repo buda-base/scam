@@ -1116,7 +1116,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
 
   useEffect( () => {
     if(typeof scamData === 'object') { 
-      const numP = (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected
+      const numP = globalData?.options?.nbPages ?? (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected
       if(scamData?.rects?.length != numP || scamData?.rects?.some(r => r.warning)) {
         setWarning(true)
       } else {
