@@ -26,9 +26,9 @@ import CircularProgressWithLabel from "./CircularProgressWithLabel"
 
 const debug = debugFactory("scam:bbar")
 
-export const SaveButtons = (props: { folder: string, config: ConfigData, json?:ScamData, selectedItems:string[], checkedRestrict: boolean, progress: number, hasWarning:ScamImageData[],
+export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, folder: string, config: ConfigData, json?:ScamData, selectedItems:string[], checkedRestrict: boolean, progress: number, hasWarning:ScamImageData[],
     setJson?:(s:ScamData)=>void }) => {
-  const { folder, json, config, selectedItems, checkedRestrict, progress, hasWarning, setJson } = props;
+  const { drafts, folder, json, config, selectedItems, checkedRestrict, progress, hasWarning, setJson } = props;
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
 
@@ -181,7 +181,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
     const toSave = { 
       ...json, 
       files: json?.files.map(j => {
-        const obj = allScamData[j.thumbnail_path] || {}
+        const obj = allScamData[j.thumbnail_path] || drafts && drafts[j.thumbnail_path] || {}
         let currentConfig = !obj.options ? 0 : configs.findIndex(c => _.isEqual(c, obj.options))
         if(obj.options && currentConfig == -1) {
           configs.push(obj.options)
@@ -300,10 +300,10 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
 
 let unmount = false, go = false, abort = false
 
-export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[], options: ScamOptionsMap,
+export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[], options: ScamOptionsMap,
     setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void, setJson?:(s:ScamData)=>void, 
     batchRotate:(n:number) => void }) => {
-  const { folder, config, json, selectedItems, images, options, setSelectedItems, markChecked, markHidden, setOptions, setJson, batchRotate } = props;
+  const { drafts, folder, config, json, selectedItems, images, options, setSelectedItems, markChecked, markHidden, setOptions, setJson, batchRotate } = props;
 
   const [showSettings, setShowSettings] = useAtom(state.showSettings)
 
@@ -420,14 +420,20 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
 
   const calcHasWarning = useCallback((im:ScamImageData) => { 
-    let image
-    return ((image = allScamData[im.thumbnail_path] ?? im).data ?? image).pages && !image.checked && (!im.hidden || image.visible) && image.visible != false && (
+    let image, numAnno, expectedNumAnno
+    return ((image = allScamData[im.thumbnail_path] ?? im).data ?? image).pages && (!im.hidden || image.visible) && image.visible != false && (
       (image?.data ?? image).pages?.some(p => p.warnings?.length) 
-      || (image?.data ?? image).pages?.length != (
-          image?.options?.nbPages 
-          || !allScamData[im.thumbnail_path] && json?.options_list && json?.options_list[im.options_index ?? 0]?.nbPages 
-          || (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages ?? scam_options.nb_pages_expected))
-    )
+        || (numAnno = (image?.data ?? image).pages?.length) != (expectedNumAnno = (
+            image?.options?.nbPages ?? (
+              (
+                !allScamData[im.thumbnail_path] && json?.options_list 
+                  ? json?.options_list[im.options_index ?? 0]?.nbPages ?? 0
+                  : ((checkedRestrict && selectedItems.includes(im.thumbnail_path) ? scamOptionsSelected.nbPages: scamOptions.nbPages)) ?? (Number(scam_options.nb_pages_expected) ?? 0)
+              )
+            )
+          )
+        )  && (!image.checked || (expectedNumAnno && numAnno ? numAnno > expectedNumAnno : false))
+      )
     }, [allScamData, checkedRestrict, json, scamOptions, scamOptionsSelected])
 
   const selectWithWarnings = useCallback((hasWarn = true) => {
@@ -534,7 +540,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       chunks.map(handleSlice)      
         
     }
-  }, [allScamData, scamQueue, json, checkedRestrict, checkedRestrictWarning, setScamQueue, selectedItems, folder, options, config.auth, dispatch, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
+  }, [scamQueue.todo?.length, json?.files, checkedRestrict, checkedRestrictWarning, hasWarning, setScamQueue, allScamData, selectedItems, folder, options, config.auth, dispatch, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
 
   useEffect(() => {
     // not sure we should run without user interaction?
@@ -683,7 +689,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       </TextField>
     </Box>    
     <div>
-      <SaveButtons {...{ progress, folder, config, json, setJson, selectedItems, checkedRestrict, hasWarning }} />
+      <SaveButtons {...{ drafts, progress, folder, config, json, setJson, selectedItems, checkedRestrict, hasWarning }} />
     </div>
     <Dialog open={showSettings} onClose={handleClose} disableScrollLock={true} >
       <DialogTitle>Run SCAM</DialogTitle>

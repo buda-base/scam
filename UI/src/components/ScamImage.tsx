@@ -1116,7 +1116,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
 
   useEffect( () => {
     if(typeof scamData === 'object') { 
-      const numP = globalData?.options?.nbPages ?? (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected
+      const numP = globalData?.options?.nbPages ?? (checkedRestrict && selected ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected
       if(scamData?.rects?.length != numP || scamData?.rects?.some(r => r.warning)) {
         setWarning(true)
       } else {
@@ -1150,12 +1150,12 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
     setDrafted(false)
   }, [dispatch, image.thumbnail_path, scamData, selectedId])
 
-  // TODO  use options from actual json if previously uploaded
-  const numAnno = (typeof scamData === "object" 
-    ? scamData?.pages?.length + "/" + (globalData?.options?.nbPages ?? (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected)
-    : "")
+  // use options from actual json if previously uploaded? (already working as is)
+  const expectedNumAnno = (globalData?.options?.nbPages ?? (checkedRestrict && selected ? scamOptionsSelected.nbPages ?? 0 : scamOptions.nbPages ?? 0) ?? scam_options.nb_pages_expected) ?? 0,
+    numAnno = (typeof scamData === "object" ? scamData?.pages?.length ?? 0 : 0)
 
-  return (<div title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
+  return (<div title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} ref={divRef} className={"scam-image" + (loading ? " loading" : "") 
+      + ( scamData != true && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
       + (" random-" + isRandom) }
     style={{ 
@@ -1227,10 +1227,10 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
           )}
         </Layer>
       </Stage> }
-      { grid != "mozaic" && <figcaption><FormControlLabel attr-numAnno={numAnno} label={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} 
+      { grid != "mozaic" && <figcaption><FormControlLabel attr-numanno={numAnno + "/" + expectedNumAnno} label={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} 
           control={<Checkbox checked={selected} sx={{padding: "0 8px"}}/>} 
         />          
-          { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "2px" }} /> }
+          { scamData != true && visible && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "2px" }} /> }
           {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
           { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
       </figcaption> }

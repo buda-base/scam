@@ -70,7 +70,7 @@ function App() {
   const [lastSelectedItem, setLastSelectedItem] = useState("")
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
-
+  
   const [showSettings, setShowSettings] = useAtom(state.showSettings)
 
   const handleSelectStart = useCallback((ev: { preventDefault: () => void; }) => {
@@ -300,7 +300,7 @@ function App() {
 
   const [ drafts, setDrafts ] = useState({} as  { [str:string] : SavedScamData })
   const [ loadDraft, setLoadDraft ] = useState<boolean|undefined>(false)
-  
+
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
@@ -555,7 +555,7 @@ function App() {
       <main onClick={checkDeselectMain} className={"main-grid-"+grid}>{
         images.map((image,i) => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ isRandom:random[i] || false, folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
       }</main>
-      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json, setJson}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, options, setOptions, batchRotate }}/></footer>}
+      { typeof json == "object" && <footer><BottomBar {...{ ...loadDraft?{drafts}:{}, folder, config, ...typeof json === 'object'?{json, setJson}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, options, setOptions, batchRotate }}/></footer>}
     </ThemeProvider>
   )
 }

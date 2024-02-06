@@ -248,7 +248,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 }
 
 .scam-image figcaption > label::after {
-  content:attr(attr-numAnno);
+  content:attr(attr-numanno);
   padding-left:6px;
   font-style:italic;
   text-shadow: 0 0 1px black;
