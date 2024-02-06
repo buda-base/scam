@@ -328,8 +328,18 @@ export const ScamImageContainer = (props: { isRandom:boolean, folder: string, im
 
 let unmount = false
 
+const getMaxArea = (pages?:Page[]): number => {
+  if(pages) {
+    let max = 0
+    for(const p of pages) {
+      max = Math.max(max, p.minAreaRect[2] * p.minAreaRect[3])
+    }
+    return max
+  }
+  return 0
+}
 
-export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: number, H: number) => {
+export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: number, H: number, maxArea?: number) => {
   const { minAreaRect: rect, rotatedHandle } = r
   const n = i
   const width = rect[2] * w / W
@@ -337,7 +347,7 @@ export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: num
   const x = rect[0] * w / W - width / 2
   const y = rect[1] * h / H - height / 2
   const rotation = rect[4]
-  const warning = r.warnings.length > 0
+  const warning = r.warnings.length > 0 || (maxArea ? rect[2] * rect[3] < maxArea / 100 : false)
   return ({ n, x, y, width, height, rotation, warning, rotatedHandle })
 }
 
@@ -470,11 +480,11 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
   }, [grid, figureRef, dimensions, image, windowSize, portrait, padding])
 
 
-  let tmpPages ;
+  let tmpPages: Page[] | undefined, maxArea: number|undefined ;
   const uploadedData = image?.pages ? { 
       ...image, 
       pages: (tmpPages = image.pages.map((p) => withRotatedHandle(p, image)) as Page[]),
-      rects: tmpPages.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, image.width, image.height))
+      rects: tmpPages.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, image.width, image.height, maxArea||(maxArea=getMaxArea(tmpPages))))
     } : null
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
@@ -554,7 +564,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
       const h = dimensions.height
         
       newData.pages = [...scamData.pages]
-      newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))            
+      newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H, maxArea||(maxArea=getMaxArea(newData.pages)))))            
 
       setScamData(newData)
       dispatch({
@@ -631,9 +641,10 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
     if(globalData && globalData.data) {  //&& globalData?.time != lastRun) { 
       //debug("gD!",lastRun,image.thumbnail_path,globalData?.time,scamQueue,globalData.data.pages,globalData.data.rects)
       
+      let maxArea:number|undefined
       const newData = { 
         ...globalData.data,
-        rects: globalData.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, globalData.data.width, globalData.data.height))
+        rects: globalData.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, globalData.data.width, globalData.data.height, maxArea||(maxArea=getMaxArea(globalData.data.pages)) ))
       }
       setScamData(newData)
       setLastRun(globalData.time)
@@ -656,9 +667,10 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
         
         //debug("draft:", draft);
 
+        let maxArea:number|undefined
         const newData = {
           ...draft.data,
-          rects: draft.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, draft.data.width, draft.data.height))
+          rects: draft.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, draft.data.width, draft.data.height, maxArea||(maxArea=getMaxArea(draft.data.pages))))
         }
         setScamData(newData)
         dispatch({
@@ -839,8 +851,9 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
       const w = dimensions.width
       const h = dimensions.height
         
+      let maxArea:number|undefined
       newData.pages = [...scamData.pages.filter((_im,n) => n !== id)]
-      newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
+      newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H, maxArea||(maxArea=getMaxArea(newData.pages)))))
 
       setScamData(newData)
       dispatch({
@@ -900,7 +913,8 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
       data.pages[p.n].minAreaRect[3] = H * p.height / h
       data.pages[p.n].minAreaRect[4] = p.rotation
       data.pages = data.pages.map(p => withRotatedHandle(p, data)) as Page[]
-      data.rects = handleZindex(data.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
+      let maxArea:number|undefined
+      data.rects = handleZindex(data.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H, maxArea||(maxArea=getMaxArea(data.pages)))))
 
       debug(W, H, w, h, p) //,scamData.pages[p.n].minAreaRect)
 
