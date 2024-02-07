@@ -612,7 +612,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
 
       setKonvaImg(true)
 
-      const url = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path
+      const url = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + encodeURIComponent(image.thumbnail_path)
       const conf: AxiosRequestConfig = {
         headers: {
           Authorization: "Basic " + encode(config.auth.join(":"))
@@ -1221,6 +1221,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
             scamData?.rects?.map((rect, i) => (
               <TransformableRect
                 key={i}
+                // TODO orange even when checked
                 shapeProps={!checked || !rect.warning ? rect : { ...rect, warning: false }}
                 isSelected={rect.n === selectedId}
                 onSelect={() => onSelect(rect.n)}
