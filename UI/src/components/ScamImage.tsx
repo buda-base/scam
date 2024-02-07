@@ -134,8 +134,8 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
       <Rect
         ref={shRef}
         {...{ x: x + padding + handleX, y: y + padding + handleY, width, height, rotation, offsetX: handleX, offsetY: handleY }}
-        {...isSelected ? {} : { stroke: warning ? "orange" : "green" }}
-        fill={"rgba(" + (isSelected ? "0,128,255" : warning ? "128,128,0" : "0,255,0") + ",0.1)"}
+        {...isSelected ? {} : { stroke: warning ? "orange" : page?.tags?.length ? "rgb(128,0,192)" : "green" }}
+        fill={"rgba(" + (isSelected ? "0,128,255" : warning ? "128,128,0" : page?.tags?.length ? "128,0,192" : "0,255,0") + ",0.1)"}
         draggable={!addNew}
         onClick={onSelect}
         onTap={onSelect}
@@ -347,7 +347,7 @@ export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: num
   const x = rect[0] * w / W - width / 2
   const y = rect[1] * h / H - height / 2
   const rotation = rect[4]
-  const warning = r.warnings.length > 0 || (maxArea && rect[2] * rect[3] < maxArea / 100 ? "small" : false)
+  const warning = r.warnings.length > 0 || (!r.tags?.length && maxArea && rect[2] * rect[3] < maxArea / 100 ? "small" : false)
   return ({ n, x, y, width, height, rotation, warning, rotatedHandle })
 }
 
@@ -1131,7 +1131,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
   useEffect( () => {
     if(typeof scamData === 'object') { 
       const numP = globalData?.options?.nbPages ?? (checkedRestrict && selected ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected
-      if(scamData?.rects?.length != numP || scamData?.rects?.some(r => r.warning)) {
+      if((scamData?.rects?.length ?? 0) - (scamData?.pages?.filter(p => p.tags?.length ?? 0 > 0).length ?? 0) != numP || scamData?.rects?.some(r => r.warning)) {
         setWarning(true)
       } else {
         setWarning(false)
@@ -1168,7 +1168,8 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
 
   // use options from actual json if previously uploaded? (already working as is)
   const expectedNumAnno = (globalData?.options?.nbPages ?? (checkedRestrict && selected ? scamOptionsSelected.nbPages ?? 0 : scamOptions.nbPages ?? 0) ?? scam_options.nb_pages_expected) ?? 0,
-    numAnno = (typeof scamData === "object" ? scamData?.pages?.length ?? 0 : 0)
+    numAnno = (typeof scamData === "object" ? scamData?.pages?.length ?? 0 : 0),
+    tagAnno = (typeof scamData === "object" ? scamData?.pages?.filter(p => p.tags?.length).length ?? 0 : 0)
 
   return (<div title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} ref={divRef} className={"scam-image" + (loading ? " loading" : "") 
       + ( scamData != true && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && visible ? " has-warning" : "") 
@@ -1243,7 +1244,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
           )}
         </Layer>
       </Stage> }
-      { grid != "mozaic" && <figcaption><FormControlLabel attr-numanno={numAnno + "/" + expectedNumAnno} label={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} 
+      { grid != "mozaic" && <figcaption><FormControlLabel attr-numanno={ (tagAnno ? tagAnno+"+" : "" ) + (numAnno - tagAnno) + "/" + expectedNumAnno } label={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} 
           control={<Checkbox checked={selected} sx={{padding: "0 8px"}}/>} 
         />          
           { scamData != true && visible && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "2px" }} /> }
