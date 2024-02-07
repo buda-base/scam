@@ -617,6 +617,8 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
     batchRotate(angle)
   }
 
+  const [loadThumbnails, setLoadThumbnails] = useAtom(state.loadThumbnails)
+
   return (<nav className="bot">
     <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
       { scamQueue.todo && scamQueue.todo.length > 0 && progress < 100 
@@ -642,9 +644,11 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         variant="standard"
         value={filter}
         label="Filter images"
-        onChange={(r) => setFilter(r.target.value)}
+        onChange={(r) => r.target.value != "load" ? setFilter(r.target.value) : null}
       >
         { ["all", "warning", "unchecked", "random" ].map(f => <MenuItem value={f} {...f === "random" ? {onClick:() => handleRandom()}:{}}>{f}</MenuItem>) }
+        <hr/>
+        <MenuItem value={"load"} onClick={() => setLoadThumbnails(!loadThumbnails)}>{loadThumbnails?<>don't </>:<></>}load thumbnails</MenuItem>
       </TextField>
       <TextField
         SelectProps={{ 

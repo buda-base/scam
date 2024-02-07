@@ -94,3 +94,5 @@ export const possibleTags:Record<string,string> = {
   "T4":"catalog card",
   "T5":"missing page card"
 }
+
+export const loadThumbnails = atom(true);

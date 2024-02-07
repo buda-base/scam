@@ -1164,6 +1164,8 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
     setDrafted(false)
   }, [dispatch, image.thumbnail_path, scamData, selectedId])
 
+  const [loadThumbnails, setLoadThumbnails] = useAtom(state.loadThumbnails)
+
   // use options from actual json if previously uploaded? (already working as is)
   const expectedNumAnno = (globalData?.options?.nbPages ?? (checkedRestrict && selected ? scamOptionsSelected.nbPages ?? 0 : scamOptions.nbPages ?? 0) ?? scam_options.nb_pages_expected) ?? 0,
     numAnno = (typeof scamData === "object" ? scamData?.pages?.length ?? 0 : 0)
@@ -1191,7 +1193,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
         onTouchStart={checkDeselect}        
       >
         <Layer>
-          {typeof konvaImg === 'object' && <>
+          {typeof konvaImg === 'object' && loadThumbnails && <>
             <KImage
               image={konvaImg}
               width={dimensions.width}
