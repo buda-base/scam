@@ -135,7 +135,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
         ref={shRef}
         {...{ x: x + padding + handleX, y: y + padding + handleY, width, height, rotation, offsetX: handleX, offsetY: handleY }}
         {...isSelected ? {} : { stroke: warning ? "orange" : page?.tags?.length ? "rgb(128,0,192)" : "green" }}
-        fill={"rgba(" + (isSelected ? "0,128,255" : warning ? "128,128,0" : page?.tags?.length ? "128,0,192" : "0,255,0") + ",0.1)"}
+        fill={"rgba(" + (isSelected ? "0,128,255,0.1)" : warning ? "128,128,0,0.1)" : page?.tags?.length ? "128,0,192,0.2)" : "0,255,0,0.1)") }
         draggable={!addNew}
         onClick={onSelect}
         onTap={onSelect}
