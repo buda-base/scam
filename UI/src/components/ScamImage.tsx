@@ -347,7 +347,7 @@ export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: num
   const x = rect[0] * w / W - width / 2
   const y = rect[1] * h / H - height / 2
   const rotation = rect[4]
-  const warning = r.warnings.length > 0 || (maxArea ? rect[2] * rect[3] < maxArea / 100 : false)
+  const warning = r.warnings.length > 0 || (maxArea && rect[2] * rect[3] < maxArea / 100 ? "small" : false)
   return ({ n, x, y, width, height, rotation, warning, rotatedHandle })
 }
 
@@ -1221,8 +1221,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
             scamData?.rects?.map((rect, i) => (
               <TransformableRect
                 key={i}
-                // TODO orange even when checked
-                shapeProps={!checked || !rect.warning ? rect : { ...rect, warning: false }}
+                shapeProps={!checked || !rect.warning || rect.warning === "small" ? rect : { ...rect, warning: false }}
                 isSelected={rect.n === selectedId}
                 onSelect={() => onSelect(rect.n)}
                 {...{ onChange, addNew, portrait, ...scamData?.pages && scamData?.pages[rect.n] ? {page: scamData?.pages[rect.n]}: {}   }}

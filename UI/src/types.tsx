@@ -19,7 +19,7 @@ export type KonvaPage = {
   width:number;
   height:number;
   rotation:number;
-  warning:boolean;
+  warning:boolean|string;
   rotatedHandle?:boolean;
 };
 
