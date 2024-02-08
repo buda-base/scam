@@ -339,7 +339,7 @@ const getMaxArea = (pages?:Page[]): number => {
   return 0
 }
 
-const samePage = (p:Page, q:Page) => {
+export const samePage = (p:Page, q:Page) => {
   for(const i in p.minAreaRect) {
     if(p.minAreaRect[i] != q.minAreaRect[i]) return false
   }

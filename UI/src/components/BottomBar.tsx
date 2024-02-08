@@ -21,7 +21,7 @@ import * as state from "../state"
 import { ColorButton } from "./theme"
 import { apiUrl, discardDraft, scam_options } from "../App";
 import axios from "axios";
-import { withRotatedHandle, withoutRotatedHandle, recomputeCoords } from "./ScamImage";
+import { withRotatedHandle, withoutRotatedHandle, recomputeCoords, samePage } from "./ScamImage";
 import CircularProgressWithLabel from "./CircularProgressWithLabel"
 
 const debug = debugFactory("scam:bbar")
@@ -108,7 +108,7 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
         val.data = { ...val.data }
         // #9 always ungray save buttons after run_ (=> save previous scam run as draft)
         if(["new", "draft", "modified", "uploaded"].includes(val.state)) { 
-          if(val.data.pages) val.data.pages = val.data.pages.map(withoutRotatedHandle) as Page[]
+          if(val.data.pages) val.data.pages = val.data.pages.filter((p,i) => !val.data.pages?.some((q,j) => samePage(p,q) && j > i)).map(withoutRotatedHandle) as Page[]
           return ({ ...acc, [a]: val })
         }
         return acc
@@ -205,7 +205,7 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
         data = { ...data, hidden, checked }
 
         if(data.rects) delete data.rects
-        if(data.pages) data.pages = data.pages.map(withoutRotatedHandle) as Page[]
+        if(data.pages) data.pages = data.pages.filter((p,i) => !data.pages?.some((q,j) => samePage(p,q) && j > i)).map(withoutRotatedHandle) as Page[]
         return data
       }),
       checked,
