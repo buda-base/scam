@@ -497,8 +497,6 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const globalData = allScamData[image.thumbnail_path]
 
-
-  const [published, setPublished] = useState(false)
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
 

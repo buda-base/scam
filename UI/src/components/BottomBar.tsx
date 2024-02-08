@@ -33,7 +33,7 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
 
   const [modified, setModified] = useAtom(state.modified)
-  const [published, setPublished] = useState(false)
+  const [published, setPublished] = useAtom(state.published)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
   const [orient, setOrient] = useAtom(state.orientAtom)
@@ -323,7 +323,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
 
   const [modified, setModified] = useAtom(state.modified)
-  const [published, setPublished] = useState(false)
+  const [published, setPublished] = useAtom(state.published)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
   const handleRun = useCallback(() => { 
