@@ -647,8 +647,6 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         onChange={(r) => r.target.value != "load" ? setFilter(r.target.value) : null}
       >
         { ["all", "warning", "unchecked", "random" ].map(f => <MenuItem value={f} {...f === "random" ? {onClick:() => handleRandom()}:{}}>{f}</MenuItem>) }
-        <hr/>
-        <MenuItem value={"load"} onClick={() => setLoadThumbnails(!loadThumbnails)}>{loadThumbnails?<>don't </>:<></>}load thumbnails</MenuItem>
       </TextField>
       <TextField
         SelectProps={{ 
@@ -690,6 +688,22 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         <MenuItem value={43} disabled={!selectedItems.length} onClick={() => handleRotate(270)}>{"Rotate 270°"}</MenuItem>
         <hr/>
         <MenuItem value={4} disabled={!selectedItems.length} onClick={() => setShowSettings(true)}>{"Run SCAM on selection"}</MenuItem>
+      </TextField>
+      <TextField
+        SelectProps={{ 
+          MenuProps : { disableScrollLock: true }
+        }}
+        sx={{ minWidth: 100, marginLeft: "16px" }}
+        select
+        variant="standard"
+        value={0}
+        label="Thumbnails"
+        onChange={(r) => r.target.value != "load" ? setFilter(r.target.value) : null}
+      >
+        <MenuItem value={0} disabled>{"..."}</MenuItem>
+        <hr/>
+        <MenuItem value={"true"} disabled={loadThumbnails} onClick={() => setLoadThumbnails(true)}>load</MenuItem>
+        <MenuItem value={"false"} disabled={!loadThumbnails} onClick={() => setLoadThumbnails(false)}>don't load</MenuItem>
       </TextField>
     </Box>    
     <div>
