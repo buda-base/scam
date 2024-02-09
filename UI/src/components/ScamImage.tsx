@@ -657,7 +657,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
       }
       imageRef.current.getLayer().batchDraw();
     }, 1)  
-  }, [contrast, brighten, loadThumbnails, konvaImg])
+  }, [contrast, brighten, loadThumbnails, konvaImg, dimensions])
 
   //debug("im:",image.thumbnail_path,lastRun,shouldRunAfter,image,scamData)
 
