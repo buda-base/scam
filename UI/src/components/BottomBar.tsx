@@ -1,6 +1,6 @@
-import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, Button, ButtonProps, Popover, FormControlLabel, Checkbox, Popper, Paper } from "@mui/material"
+import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, Button, ButtonProps, Popover, FormControlLabel, Checkbox, Popper, Paper, Stack, Slider } from "@mui/material"
 import { ChangeEvent, ChangeEventHandler, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Settings, Close } from '@mui/icons-material';
+import { Settings, Close, VolumeDown, LightMode, Contrast } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import {
   IconButton,
@@ -618,6 +618,9 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   }
 
   const [loadThumbnails, setLoadThumbnails] = useAtom(state.loadThumbnails)
+  const [brighten, setBrighten] = useAtom(state.brighten)
+  const [contrast, setContrast] = useAtom(state.contrast)
+  const [hideAnno, setHideAnno] = useAtom(state.hideAnno)
 
   return (<nav className="bot">
     <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
@@ -702,8 +705,45 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
       >
         <MenuItem value={0} disabled>{"..."}</MenuItem>
         <hr/>
-        <MenuItem value={"true"} disabled={loadThumbnails} onClick={() => setLoadThumbnails(true)}>load</MenuItem>
-        <MenuItem value={"false"} disabled={!loadThumbnails} onClick={() => setLoadThumbnails(false)}>don't load</MenuItem>
+        <Stack direction="row" alignItems="center" sx={{ mr:1, width: 199, margin:"16px" }} spacing={1.5} title="Brightness">
+          <LightMode sx={{width:18}} />
+          <Slider
+            size="small"
+            value={brighten}
+            aria-label="Small"
+            valueLabelDisplay="auto"
+            min={-100} max={100} step={5} 
+            onChange={(_,n) => setBrighten(n as number)}
+          />
+        </Stack>
+        <Stack direction="row" alignItems="center" sx={{ mr:1, width: 199, margin:"16px"}} spacing={1.5} title="Contrast">
+          <Contrast sx={{width:18}} />
+          <Slider
+            size="small"
+            value={contrast}
+            aria-label="Small"
+            valueLabelDisplay="auto"
+            min={-100} max={100} step={5} 
+            onChange={(_,n) => setContrast(n as number)}
+          />
+        </Stack>
+        <Stack>
+          <FormControlLabel 
+            sx={{margin:"0px 12px 4px 4px"}}
+            label={"hide annotations"} 
+            onChange={() => setHideAnno(!hideAnno)} 
+            control={<Checkbox checked={hideAnno} sx={{padding: "0 8px" }}/>}  
+          />
+        </Stack>
+        <hr/>
+        <Stack>
+          <FormControlLabel 
+            sx={{margin:"4px 12px 4px 4px"}}
+            label={"don't load thumbnails"} 
+            onChange={() => setLoadThumbnails(!loadThumbnails)} 
+            control={<Checkbox checked={!loadThumbnails} sx={{padding: "0 8px" }}/>}  
+          />
+        </Stack>
       </TextField>
     </Box>    
     <div>

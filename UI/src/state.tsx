@@ -97,3 +97,6 @@ export const possibleTags:Record<string,string> = {
 }
 
 export const loadThumbnails = atom(true);
+export const brighten = atom(0)
+export const contrast = atom(0)
+export const hideAnno = atom(false);

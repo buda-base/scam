@@ -637,6 +637,28 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
     }
   }, [config.auth, controller.signal, image.thumbnail_path, konvaImg])
 
+  const imageRef = useRef<any>()
+
+  const [loadThumbnails, setLoadThumbnails] = useAtom(state.loadThumbnails)
+  const [brighten, setBrighten] = useAtom(state.brighten)
+  const [contrast, setContrast] = useAtom(state.contrast)
+  const [hideAnno, setHideAnno] = useAtom(state.hideAnno)
+
+  useEffect(() => {
+    if(typeof konvaImg === 'object' && imageRef.current) setTimeout(() => {
+      imageRef.current.cache();
+      const filters = []
+      if(contrast) filters.push(Konva.Filters.Contrast)
+      if(brighten) filters.push(Konva.Filters.Brighten) 
+      if(filters.length) { 
+        imageRef.current.contrast(contrast) // -100/100
+        imageRef.current.brightness(brighten / 100) // -1.0/1.0
+        imageRef.current.filters(filters);
+      }
+      imageRef.current.getLayer().batchDraw();
+    }, 1)  
+  }, [contrast, brighten, loadThumbnails, konvaImg])
+
   //debug("im:",image.thumbnail_path,lastRun,shouldRunAfter,image,scamData)
 
   const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
@@ -1169,8 +1191,6 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
     setDrafted(false)
   }, [dispatch, image.thumbnail_path, scamData, selectedId])
 
-  const [loadThumbnails, setLoadThumbnails] = useAtom(state.loadThumbnails)
-
   // use options from actual json if previously uploaded? (already working as is)
   const expectedNumAnno = (globalData?.options?.nbPages ?? (checkedRestrict && selected ? scamOptionsSelected.nbPages ?? 0 : scamOptions.nbPages ?? 0) ?? scam_options.nb_pages_expected) ?? 0,
     numAnno = (typeof scamData === "object" ? scamData?.pages?.length ?? 0 : 0),
@@ -1200,8 +1220,10 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
       >
         <Layer>
           {typeof konvaImg === 'object' && loadThumbnails && <>
-            <KImage
+            <KImage              
+              //enhance={1} // -1.0/1.0
               image={konvaImg}
+              ref={imageRef}
               width={dimensions.width}
               height={dimensions.height}
               //x={padding + ([90,180].includes(image.rotation) ? actualW : 0)}
@@ -1225,7 +1247,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
               }}
             />
           </>}
-          {typeof scamData === 'object' &&
+          {typeof scamData === 'object' && !hideAnno && 
             scamData?.rects?.map((rect, i) => (
               <TransformableRect
                 key={i}
