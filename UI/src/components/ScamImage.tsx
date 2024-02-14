@@ -645,7 +645,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
   const [hideAnno, setHideAnno] = useAtom(state.hideAnno)
 
   useEffect(() => {
-    if(typeof konvaImg === 'object' && imageRef.current) setTimeout(() => {
+    if(typeof konvaImg === 'object' && imageRef.current && (contrast || brighten) ) setTimeout(() => {
       imageRef.current.cache();
       const filters = []
       if(contrast) filters.push(Konva.Filters.Contrast)
