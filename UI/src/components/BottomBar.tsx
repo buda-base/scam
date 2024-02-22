@@ -1,6 +1,6 @@
-import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, Button, ButtonProps, Popover, FormControlLabel, Checkbox, Popper, Paper } from "@mui/material"
+import { FormControl, InputLabel, Select, MenuItem, Box, TextField, useTheme, Button, ButtonProps, Popover, FormControlLabel, Checkbox, Popper, Paper, Stack, Slider } from "@mui/material"
 import { ChangeEvent, ChangeEventHandler, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Settings, Close } from '@mui/icons-material';
+import { Settings, Close, VolumeDown, LightMode, Contrast } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import {
   IconButton,
@@ -21,19 +21,19 @@ import * as state from "../state"
 import { ColorButton } from "./theme"
 import { apiUrl, discardDraft, scam_options } from "../App";
 import axios from "axios";
-import { withRotatedHandle, withoutRotatedHandle, recomputeCoords } from "./ScamImage";
+import { withRotatedHandle, withoutRotatedHandle, recomputeCoords, samePage } from "./ScamImage";
 import CircularProgressWithLabel from "./CircularProgressWithLabel"
 
 const debug = debugFactory("scam:bbar")
 
-export const SaveButtons = (props: { folder: string, config: ConfigData, json?:ScamData, selectedItems:string[], checkedRestrict: boolean, progress: number, hasWarning:ScamImageData[],
+export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, folder: string, config: ConfigData, json?:ScamData, selectedItems:string[], checkedRestrict: boolean, progress: number, hasWarning:ScamImageData[],
     setJson?:(s:ScamData)=>void }) => {
-  const { folder, json, config, selectedItems, checkedRestrict, progress, hasWarning, setJson } = props;
+  const { drafts, folder, json, config, selectedItems, checkedRestrict, progress, hasWarning, setJson } = props;
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
 
   const [modified, setModified] = useAtom(state.modified)
-  const [published, setPublished] = useState(false)
+  const [published, setPublished] = useAtom(state.published)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
   const [orient, setOrient] = useAtom(state.orientAtom)
@@ -49,7 +49,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const [cutAtFixed, setCutAtFixed] = useAtom(state.cutAtFixedAtom)
 
   const [popChecked, setPopChecked] = useState(false)
-  const [checked, setChecked] = useState(false)
+  const [checked, setChecked] = useState(true)
   const spanRef = useRef<HTMLSpanElement>(null)
 
   const [ saving, setSaving ] = useState(false)
@@ -100,14 +100,15 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
   const saveDraft = useCallback(async () => {
     const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
     if(!local.drafts) local.drafts = {}
+    const images = local.drafts[folder]?.images ?? {}
     local.drafts[folder] = { 
       ...local.drafts[folder], 
-      images: { ...Object.keys(allScamData).reduce( (acc,a) => {
+      images: { ...images, ...Object.keys(allScamData).reduce( (acc,a) => {
         const val = allScamData[a]
         val.data = { ...val.data }
         // #9 always ungray save buttons after run_ (=> save previous scam run as draft)
         if(["new", "draft", "modified", "uploaded"].includes(val.state)) { 
-          if(val.data.pages) val.data.pages = val.data.pages.map(withoutRotatedHandle) as Page[]
+          if(val.data.pages) val.data.pages = val.data.pages.filter((p,i) => !val.data.pages?.some((q,j) => samePage(p,q) && j > i)).map(withoutRotatedHandle) as Page[]
           return ({ ...acc, [a]: val })
         }
         return acc
@@ -180,7 +181,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
     const toSave = { 
       ...json, 
       files: json?.files.map(j => {
-        const obj = allScamData[j.thumbnail_path] || {}
+        const obj = allScamData[j.thumbnail_path] || drafts && drafts[j.thumbnail_path] || {}
         let currentConfig = !obj.options ? 0 : configs.findIndex(c => _.isEqual(c, obj.options))
         if(obj.options && currentConfig == -1) {
           configs.push(obj.options)
@@ -191,15 +192,20 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
           ...obj.data || {},
           ...currentConfig > 0 ? {options_index: currentConfig} : {}
         }
-        if(data.hidden) delete data.hidden
-        if(data.checked) delete data.checked
-        data = { 
-          ...data,
-          ...obj.visible == false ? { hidden: true }  : {},
-          ...obj.checked ? { checked: true } : {}
-        }
+        
+        let hidden = data.hidden
+        if(obj.visible) hidden = undefined
+        let checked:boolean|undefined = data.checked || obj.checked
+        if(obj.checked === false) checked = undefined
+        
+        if(data.hidden != undefined) delete data.hidden
+        if(data.checked != undefined) delete data.checked        
+        
+        // better fix for #36
+        data = { ...data, hidden, checked }
+
         if(data.rects) delete data.rects
-        if(data.pages) data.pages = data.pages.map(withoutRotatedHandle) as Page[]
+        if(data.pages) data.pages = data.pages.filter((p,i) => !data.pages?.some((q,j) => samePage(p,q) && j > i)).map(withoutRotatedHandle) as Page[]
         return data
       }),
       checked,
@@ -229,7 +235,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       setDrafted(true)
       setConfirmed(false)
 
-      if(typeof json === "object" && setJson) setJson({...json, checked: "local"})
+      if(typeof json === "object" && setJson) setJson({...json, ...checked ? {checked: "local"}:{}})
     })
     .catch(error => {
       debug(error, json);
@@ -272,7 +278,7 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
       <Popper open={popChecked || error != ""} anchorEl={spanRef.current} popperOptions={{ placement: "bottom-end" }}>
         <Paper className={"paper error-"+(error != "" ? true : false)} >
           { !error 
-            ? <FormControlLabel control={<Checkbox checked={checked} onChange={handleChecked}/>} label="ready to be processed" /> 
+            ? <FormControlLabel control={<Checkbox checked={checked} onChange={handleChecked}/>} label="review complete " /> 
             : <>Failed to save<br/>(<i>{error}</i>)</> }
         </Paper>
       </Popper>
@@ -294,9 +300,10 @@ export const SaveButtons = (props: { folder: string, config: ConfigData, json?:S
 
 let unmount = false, go = false, abort = false
 
-export const BottomBar = (props: { folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[], options: ScamOptionsMap,
-    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void, setJson?:(s:ScamData)=>void  }) => {
-  const { folder, config, json, selectedItems, images, options, setSelectedItems, markChecked, markHidden, setOptions, setJson } = props;
+export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, folder:string, config: ConfigData, json?:ScamData, selectedItems:string[], images: ScamImageData[], options: ScamOptionsMap,
+    setSelectedItems:(i:string[]) => void, markChecked:(b:boolean) => void, markHidden:(b:boolean) => void, setOptions:(opt:ScamOptions) => void, setJson?:(s:ScamData)=>void, 
+    batchRotate:(n:number) => void }) => {
+  const { drafts, folder, config, json, selectedItems, images, options, setSelectedItems, markChecked, markHidden, setOptions, setJson, batchRotate } = props;
 
   const [showSettings, setShowSettings] = useAtom(state.showSettings)
 
@@ -316,7 +323,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const [scamOptions, setScamOptions] = useAtom(state.scamOptions)
 
   const [modified, setModified] = useAtom(state.modified)
-  const [published, setPublished] = useState(false)
+  const [published, setPublished] = useAtom(state.published)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
   const handleRun = useCallback(() => { 
@@ -413,14 +420,20 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const [nbPages, setNbPages] = useAtom(state.nbPagesAtom)
 
   const calcHasWarning = useCallback((im:ScamImageData) => { 
-    let image
-    return ((image = allScamData[im.thumbnail_path] ?? im).data ?? image).pages && !image.checked && (!im.hidden || image.visible) && image.visible != false && (
+    let image, numAnno, expectedNumAnno
+    return ((image = allScamData[im.thumbnail_path] ?? im).data ?? image).pages && (!im.hidden || image.visible) && image.visible != false && (
       (image?.data ?? image).pages?.some(p => p.warnings?.length) 
-      || (image?.data ?? image).pages?.length != (
-          image?.options?.nbPages 
-          || !allScamData[im.thumbnail_path] && json?.options_list && json?.options_list[im.options_index ?? 0]?.nbPages 
-          || (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages ?? scam_options.nb_pages_expected))
-    )
+        || (numAnno = (image?.data ?? image).pages?.length) != (expectedNumAnno = (
+            image?.options?.nbPages ?? (
+              (
+                !allScamData[im.thumbnail_path] && json?.options_list 
+                  ? json?.options_list[im.options_index ?? 0]?.nbPages ?? 0
+                  : ((checkedRestrict && selectedItems.includes(im.thumbnail_path) ? scamOptionsSelected.nbPages: scamOptions.nbPages)) ?? (Number(scam_options.nb_pages_expected) ?? 0)
+              )
+            )
+          )
+        )  && (!image.checked || (expectedNumAnno && numAnno ? numAnno > expectedNumAnno : false))
+      )
     }, [allScamData, checkedRestrict, json, scamOptions, scamOptionsSelected])
 
   const selectWithWarnings = useCallback((hasWarn = true) => {
@@ -433,6 +446,12 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
   const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
 
   const hasWarning:ScamImageData[] = (json?.files && Object.values(json.files).filter(im => calcHasWarning(im))) ?? [] 
+
+  const [,setNumWarn] = useAtom(state.numWarn)
+
+  useEffect(() => {
+    setNumWarn(hasWarning.length)
+  }, [hasWarning.length])
 
   const handleScamQueue = useCallback(async () => {    
 
@@ -521,7 +540,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
       chunks.map(handleSlice)      
         
     }
-  }, [allScamData, scamQueue, json, checkedRestrict, checkedRestrictWarning, setScamQueue, selectedItems, folder, options, config.auth, dispatch, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
+  }, [scamQueue.todo?.length, json?.files, checkedRestrict, checkedRestrictWarning, hasWarning, setScamQueue, allScamData, selectedItems, folder, options, config.auth, dispatch, scamOptionsSelected, scamOptions, modified, setModified, drafted, setDrafted, published])
 
   useEffect(() => {
     // not sure we should run without user interaction?
@@ -572,6 +591,37 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
     }
   }, [grid, padding])
 
+  const [random, setRandom] = useAtom(state.random)
+
+  const handleRandom = () => {    
+    if(typeof json == "object") {
+      const n = json?.files.length
+      const p = Math.floor(json?.files.length / 10)
+
+      //const rand = _.orderBy(Array.from({length: p}, () => Math.floor(Math.random() * n)));      
+
+      const arr:number[] = [], quantity = p, max = n
+      while(arr.length < quantity){
+        const candidateInt = Math.floor(Math.random() * max) 
+        if(arr.indexOf(candidateInt) === -1) arr.push(candidateInt)
+      }
+      const randAll = Array.from(json?.files, (_:ScamImageData, i:number) => arr.includes(i))
+
+      debug("rand:", _.orderBy(arr), randAll)
+
+      setRandom(randAll)
+    }
+  }
+
+  const handleRotate = (angle:number) => {
+    batchRotate(angle)
+  }
+
+  const [loadThumbnails, setLoadThumbnails] = useAtom(state.loadThumbnails)
+  const [brighten, setBrighten] = useAtom(state.brighten)
+  const [contrast, setContrast] = useAtom(state.contrast)
+  const [hideAnno, setHideAnno] = useAtom(state.hideAnno)
+
   return (<nav className="bot">
     <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
       { scamQueue.todo && scamQueue.todo.length > 0 && progress < 100 
@@ -597,9 +647,9 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         variant="standard"
         value={filter}
         label="Filter images"
-        onChange={(r) => setFilter(r.target.value)}
+        onChange={(r) => r.target.value != "load" ? setFilter(r.target.value) : null}
       >
-        { ["all", "warning", "unchecked", "random" ].map(f => <MenuItem value={f} disabled={f == "random"}>{f}</MenuItem>) }
+        { ["all", "warning", "unchecked", "random" ].map(f => <MenuItem value={f} {...f === "random" ? {onClick:() => handleRandom()}:{}}>{f}</MenuItem>) }
       </TextField>
       <TextField
         SelectProps={{ 
@@ -612,7 +662,7 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         label="Display grid"
         onChange={(r) => setGrid(r.target.value)}
       >
-        { ["1x1", "2x1", "3x2", "4x3", "mozaic" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+        { ["1x1", "2x1", "3x2", "4x3", "5x3", "mozaic" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
       </TextField>
       <TextField
         SelectProps={{ 
@@ -636,11 +686,68 @@ export const BottomBar = (props: { folder:string, config: ConfigData, json?:Scam
         { (hasVisible || !hasHidden) && <MenuItem value={4} disabled={!hasVisible} onClick={() => markHidden(true)}>{"Mark hidden"}</MenuItem>}
         { hasHidden && <MenuItem value={5} onClick={() => markHidden(false)}>{"Mark visible"}</MenuItem>}
         <hr/>
+        <MenuItem value={41} disabled={!selectedItems.length} onClick={() => handleRotate(90)}>{"Rotate 90°"}</MenuItem>
+        <MenuItem value={42} disabled={!selectedItems.length} onClick={() => handleRotate(180)}>{"Rotate 180°"}</MenuItem>
+        <MenuItem value={43} disabled={!selectedItems.length} onClick={() => handleRotate(270)}>{"Rotate 270°"}</MenuItem>
+        <hr/>
         <MenuItem value={4} disabled={!selectedItems.length} onClick={() => setShowSettings(true)}>{"Run SCAM on selection"}</MenuItem>
+      </TextField>
+      <TextField
+        SelectProps={{ 
+          MenuProps : { disableScrollLock: true }
+        }}
+        sx={{ minWidth: 100, marginLeft: "16px" }}
+        select
+        variant="standard"
+        value={0}
+        label="Thumbnails"
+        onChange={(r) => r.target.value != "load" ? setFilter(r.target.value) : null}
+      >
+        <MenuItem value={0} disabled>{"..."}</MenuItem>
+        <hr/>
+        <Stack direction="row" alignItems="center" sx={{ mr:1, width: 199, margin:"16px" }} spacing={1.5} title="Brightness">
+          <LightMode sx={{width:18}} />
+          <Slider
+            size="small"
+            value={brighten}
+            aria-label="Small"
+            valueLabelDisplay="auto"
+            min={-100} max={100} step={5} 
+            onChange={(_,n) => setBrighten(n as number)}
+          />
+        </Stack>
+        <Stack direction="row" alignItems="center" sx={{ mr:1, width: 199, margin:"16px"}} spacing={1.5} title="Contrast">
+          <Contrast sx={{width:18}} />
+          <Slider
+            size="small"
+            value={contrast}
+            aria-label="Small"
+            valueLabelDisplay="auto"
+            min={-100} max={100} step={5} 
+            onChange={(_,n) => setContrast(n as number)}
+          />
+        </Stack>
+        <Stack>
+          <FormControlLabel 
+            sx={{margin:"0px 12px 4px 4px"}}
+            label={"hide annotations"} 
+            onChange={() => setHideAnno(!hideAnno)} 
+            control={<Checkbox checked={hideAnno} sx={{padding: "0 8px" }}/>}  
+          />
+        </Stack>
+        <hr/>
+        <Stack>
+          <FormControlLabel 
+            sx={{margin:"4px 12px 4px 4px"}}
+            label={"don't load thumbnails"} 
+            onChange={() => setLoadThumbnails(!loadThumbnails)} 
+            control={<Checkbox checked={!loadThumbnails} sx={{padding: "0 8px" }}/>}  
+          />
+        </Stack>
       </TextField>
     </Box>    
     <div>
-      <SaveButtons {...{ progress, folder, config, json, setJson, selectedItems, checkedRestrict, hasWarning }} />
+      <SaveButtons {...{ drafts, progress, folder, config, json, setJson, selectedItems, checkedRestrict, hasWarning }} />
     </div>
     <Dialog open={showSettings} onClose={handleClose} disableScrollLock={true} >
       <DialogTitle>Run SCAM</DialogTitle>

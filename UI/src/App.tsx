@@ -11,7 +11,7 @@ import { useAtom } from 'jotai';
 // tmp data
 //import data from "./assets/scam.json"
 
-import { ScamImageContainer, recomputeCoords, withRotatedHandle } from "./components/ScamImage"
+import { ScamImageContainer, recomputeCoords, rotatePage90, withRotatedHandle, withoutRotatedHandle } from "./components/ScamImage"
 import './App.css'
 import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData, ScamOptions, ScamOptionsMap } from './types';
 import { BottomBar } from './components/BottomBar';
@@ -70,7 +70,7 @@ function App() {
   const [lastSelectedItem, setLastSelectedItem] = useState("")
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
-
+  
   const [showSettings, setShowSettings] = useAtom(state.showSettings)
 
   const handleSelectStart = useCallback((ev: { preventDefault: () => void; }) => {
@@ -241,6 +241,49 @@ function App() {
     setModified(true)
   }, [selectedItems, images])
 
+  const batchRotate = useCallback((angle:number) => {
+    const newImages = [...images]
+    for(const im in newImages) {
+      const image = newImages[im]
+      if(selectedItems.includes(image.thumbnail_path)) {
+
+        let portrait = [90,270].includes(image.rotation)
+        const rotation = (image.rotation + angle + 360) % 360    
+        
+        newImages[im] = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
+        
+        const newData = allScamData[image.thumbnail_path].data
+                
+        let toRotate = angle ;
+        newData.rotation = rotation
+        if(newData.pages) do { 
+          const handleX = portrait ? image.height/2 : image.width/2
+          const handleY = portrait ? image.width/2 : image.height/2
+          newData.pages = newData.pages.map((p) => withRotatedHandle(rotatePage90(withoutRotatedHandle(p) as Page, Math.abs(toRotate) !== 180 ? toRotate : 90, handleX, handleY), newData) as Page)
+          if(newData.rects) delete newData.rects
+          // we rotate +/-90° by +/-90°
+          if(toRotate === 180 || toRotate === -180) {
+            portrait = !portrait
+            toRotate = 90
+          } else {
+            toRotate = 0
+          }
+        } while(toRotate);
+        
+        dispatch({
+          type: 'UPDATE_DATA',
+          payload: {
+            id: image.thumbnail_path,
+            val: { state: "modified", data: newData }
+          }
+        })
+
+      }
+    }
+    setImages(newImages)
+    setModified(true)
+  }, [selectedItems, images, allScamData, dispatch])
+
   useEffect(() => {
     debug("loca?",paramFolder,location)
     if(paramFolder) {
@@ -257,7 +300,7 @@ function App() {
 
   const [ drafts, setDrafts ] = useState({} as  { [str:string] : SavedScamData })
   const [ loadDraft, setLoadDraft ] = useState<boolean|undefined>(false)
-  
+
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
@@ -355,8 +398,8 @@ function App() {
     if(typeof json !== 'object') return
     if(!Array.isArray(data)) data = [ data ]
     for(const d of data) {
-      const idx = json.files.findIndex((im) => im.thumbnail_path === d.thumbnail_path)
-      debug("set:", d, d.thumbnail_path, idx)
+      const idx = json.files.findIndex((im) => im?.thumbnail_path === d?.thumbnail_path)
+      debug("set:", d, d?.thumbnail_path, idx)
       const newJson = { ...json }
       newJson.files[idx] = { ...d }
       setJson(newJson)
@@ -501,14 +544,18 @@ function App() {
     </Dialog>
   ), [drafts, folder, handleClose, loadDraft])
   
+  const [grid] = useAtom(state.grid)
+
+  const [random, setRandom] = useAtom(state.random)
+
   return (
     <ThemeProvider theme={theme}>
       {reloadDialog}
       <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, config, error, json, jsonPath, setFolder }}/></header>
-      <main onClick={checkDeselectMain}>{
-        images.map(image => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
+      <main onClick={checkDeselectMain} className={"main-grid-"+grid}>{
+        images.map((image,i) => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ isRandom:random[i] || false, folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
       }</main>
-      { typeof json == "object" && <footer><BottomBar {...{ folder, config, ...typeof json === 'object'?{json, setJson}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, options, setOptions }}/></footer>}
+      { typeof json == "object" && <footer><BottomBar {...{ ...loadDraft?{drafts}:{}, folder, config, ...typeof json === 'object'?{json, setJson}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, options, setOptions, batchRotate }}/></footer>}
     </ThemeProvider>
   )
 }

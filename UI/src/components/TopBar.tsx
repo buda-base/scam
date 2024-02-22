@@ -25,6 +25,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
 
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
+  const [published, setPublished] = useAtom(state.published)
     
   const theme = useTheme()
   
@@ -82,13 +83,16 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
   }, [jsonPath])
 
   const handleConfirm = useCallback( (leave: boolean) => {
-    if(modified) {
+
+    debug("cf:", leave, modified, drafted, published)
+
+    if(modified && !drafted) {
       setConfirmAct(leave)
     } else {
       if(leave) handleNav()
       else handleDialog()
     }
-  }, [handleDialog, handleNav, modified])
+  }, [handleDialog, handleNav, modified, drafted, published])
   
   const onConfirmed = useCallback(()=> {
     if(confirmAct) handleNav()
@@ -106,7 +110,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
 
   const confirmDialog = useMemo( () => (
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    <Dialog open={folder != "" && modified && confirmAct != undefined && !showDialog} disableScrollLock={true} >
+    <Dialog open={folder != "" && confirmAct != undefined && !showDialog} disableScrollLock={true} >
       <DialogTitle>Folder modified</DialogTitle>
       <DialogContent>
           <IconButton
@@ -126,7 +130,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
         {/* <SaveButtons { ...{ folder, config, onConfirmed }}/> */}
       </DialogActions>
     </Dialog>
-  ), [config, confirmAct, folder, handleClose, modified, onConfirmed, showDialog])
+  ), [config, confirmAct, folder, drafted, published, handleClose, modified, onConfirmed, showDialog])
 
   //debug("tb:",confirmAct, modified, folder, error, showDialog)
 
@@ -153,7 +157,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
   ), [handleNav, json, proceed])
 
   const folderDialog = useMemo(() => (
-    <Dialog open={(!folder || confirmAct == false || !modified) && (folder == "" || error != "" || showDialog)} onClose={handleClose} disableScrollLock={true} hideBackdrop={!showDialog || folder != jsonPath}>
+    <Dialog open={(!folder || confirmAct == false || !modified || drafted) && (folder == "" || error != "" || showDialog)} onClose={handleClose} disableScrollLock={true} hideBackdrop={!showDialog || folder != jsonPath}>
       <DialogTitle>Choose folder</DialogTitle>
       <DialogContent>
         { (showDialog && folder == jsonPath) && 
@@ -198,6 +202,8 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
     e.preventDefault();
     emptyCacheStorage();
   }
+  
+  const [numWarn] = useAtom(state.numWarn)
 
   return <nav className="top">
     {readyDialog}
@@ -219,7 +225,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
           <div>
             <div>{jsonPath}</div>
             {typeof json === "object" && <div style={{color:"#6b6b6b"}}>
-               {json.files?.length} images
+               {json.files?.length} images { !numWarn ? <> | No warning</> : <> | {numWarn} warning{numWarn > 1 ? "s" : ""}</>}
               { json.checked && <span title="already marked as ready to process"><CheckCircle sx={{color:"green", verticalAlign:"-8px", marginLeft:"10px"}} /></span> }
             </div> }
           </div>

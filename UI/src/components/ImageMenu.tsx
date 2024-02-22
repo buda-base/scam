@@ -1,8 +1,8 @@
 
 import { IconButton, Menu, MenuItem, Paper } from '@mui/material';
-import { Rotate90DegreesCw, VisibilityOff, Visibility, DeleteForever, AddBox, TaskAlt, Check, CheckCircle } from '@mui/icons-material';
+import { Rotate90DegreesCw, VisibilityOff, Visibility, DeleteForever, AddBox, TaskAlt, Check, CheckCircle, LocalOffer } from '@mui/icons-material';
 import debugFactory from "debug"
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAtom } from 'jotai';
 
 import { ScamImageData } from '../types';
@@ -11,10 +11,10 @@ import * as state from "../state"
 
 const debug = debugFactory("scam:imenu");
 
-const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:boolean, checked: boolean,
+const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:boolean, checked: boolean, tags?:string[],
     removeId: (n: number) => void, setAddNew: (b:boolean) => void, selectShape:(n:number|null) => void, rotate:(n:number) => void,
-    toggleVisible:() => void, toggleCheck: (b?:boolean) => void }) => {
-  const { selectedId, addNew, visible, checked, removeId, setAddNew, selectShape, rotate, toggleVisible, toggleCheck } = props;
+    toggleVisible:() => void, toggleCheck: (b?:boolean) => void, updateTags:(t:string[]) => void }) => {
+  const { selectedId, addNew, visible, checked, tags, removeId, setAddNew, selectShape, rotate, toggleVisible, toggleCheck, updateTags } = props;
 
   //debug("menu", selectedId)
 
@@ -37,17 +37,46 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
   
   const [deselectAll, setDeselectAll] = useAtom(state.deselectAll)
   const handleClick = useCallback(() => { 
-    if(selectedId == null) setDeselectAll(true)
-  },[selectedId])
+    if(selectedId == null) { 
+      setDeselectAll(true)
+    }
+  },[selectedId, checkedMenu])
 
-  return (<div className="image-menu" onClick={handleClick}>
+  const [tagMenu, setTagMenu] = useState(false) 
+
+
+  useEffect(() => {
+    if(selectedId === null) { 
+      setTagMenu(false)
+      setCheckedMenu(false)
+    }
+  }, [selectedId])
+
+  useEffect(() => {
+    if(checkedMenu) setTagMenu(false)    
+  }, [checkedMenu])
+
+  useEffect(() => {
+    if(tagMenu) setCheckedMenu(false)    
+  }, [tagMenu])
+
+  const handleToggleTag = useCallback((t:string) => {
+    debug("t:", t, tags)
+    if(tags?.includes(t)) updateTags(tags.filter(g => g!=t))
+    else updateTags([...tags??[], t])
+    setTagMenu(false)
+  }, [tags])
+
+  return (
+    <div className="image-menu" onClick={handleClick} style={{justifyContent:"center"}}>
+      <div style={{minWidth:"350px",maxWidth:"100%",display:"flex",justifyContent: "space-around"}}>
     <span>
       <IconButton onClick={() => setCheckedMenu(!checkedMenu)}>
         { checked 
           ? <CheckCircle sx={{color:"green"}} />        
           : <TaskAlt /> }
       </IconButton>
-      { visible && checkedMenu && <Paper sx={{ position: "absolute", bottom:"100%", marginLeft:"0px" }}>
+      { /*visible &&*/ checkedMenu && <Paper sx={{ position: "absolute", bottom:"100%", marginLeft:"0px" }}>
         { checked 
           ? <>
               <MenuItem onClick={() => handleCheck(false)}>Uncheck this image only</MenuItem>
@@ -66,7 +95,6 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
 
     </span>
     <span>
-      
       <IconButton onClick={() => rotate(90)} >
         <Rotate90DegreesCw style={{ transform: "scaleY(-1) rotate(-135deg)" }} />
       </IconButton>
@@ -75,6 +103,14 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
       </IconButton>
     </span>
     <span>
+      <span style={{ position:"relative" }}>
+        <IconButton className="tag" onClick={() => setTagMenu(!tagMenu)} disabled={selectedId === null} ><LocalOffer /></IconButton>
+        { tagMenu && <Paper sx={{ position: "absolute", right:0, bottom:"calc(100% + 24px)" }}>
+          {Object.keys(state.possibleTags).map((t:string) => 
+            <MenuItem title={""} selected={tags?.includes(t)} onClick={() => handleToggleTag(t)}>{state.possibleTags[t][0].toUpperCase()+state.possibleTags[t].substring(1)}</MenuItem>
+          )}
+        </Paper> }
+      </span>
       <IconButton onClick={handleAdd} >
         <AddBox {...addNew?{sx:{color:"black"}}:{}}/>
       </IconButton>
@@ -82,7 +118,7 @@ const ImageMenu = (props: { selectedId: number|null, addNew: boolean, visible:bo
         <DeleteForever />
       </IconButton>
     </span>
-  </div>)
+  </div></div>)
 }
 
 export default ImageMenu ;

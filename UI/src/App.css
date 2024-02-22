@@ -12,8 +12,8 @@
   /* padding: 2rem; */
   text-align: center;
   font-family:"Noto Sans";
-
 }
+
 
 .logo {
   height: 6em;
@@ -54,7 +54,8 @@
 body {
   display:block;
   margin:0;
-  background:#ddd;
+  background:#efefef;
+  min-height:100vh;
 }
 
 main {
@@ -62,10 +63,17 @@ main {
   background:#efefef;
   width:100%; margin:0 auto; max-width:100%;
   padding:60px 0;
-  min-height:100vh;
   display:flex;
   flex-wrap: wrap;
   justify-content: center;
+}
+
+main:not(.main-grid-mozaic) {
+  min-height:100vh;
+}
+
+main:not(.main-grid-1x1) {
+  /* justify-content: flex-start; */
 }
 
 main .select-folder { background-color: white; align-self: center; justify-self: center; padding:16px; box-shadow:0 0 5px 1px rgba(0,0,0,0.125)}
@@ -97,6 +105,10 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 
 .scam-image.grid-4x3 {
   width:calc(100% / 4 - 4px); 
+}
+
+.scam-image.grid-5x3 {
+  width:calc(100% / 5 - 4px); 
 }
 
 .scam-image.grid-mozaic { margin: 1px; }
@@ -134,26 +146,53 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   left:0;
 }
 
+.scam-image.filter-random.random-false:not(.grid-mozaic),
+.scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic),
+.scam-image.filter-warning.warning-false:not(.focus-true):not(.grid-mozaic),
+.scam-image.filter-unchecked.checked-true:not(.grid-mozaic) {
+  height:80px !important;
+}
+
+/*
+.scam-image.filter-random.random-false,
 .scam-image.filter-warning.warning-true.checked-true,
 .scam-image.filter-warning.warning-false:not(.focus-true),
 .scam-image.filter-unchecked.checked-true {
-  height:80px !important; overflow: hidden;
+  overflow: hidden;
 }
+*/
 
-
-.scam-image.filter-warning.warning-true.checked-true > figure > div,
-.scam-image.filter-warning.warning-false:not(.focus-true) > figure > div,
-.scam-image.filter-unchecked.checked-true > figure > div {
+.scam-image.filter-random.random-false:not(.grid-mozaic) > figure > div,
+.scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic) > figure > div,
+.scam-image.filter-warning.warning-false:not(.focus-true):not(.grid-mozaic) > figure > div,
+.scam-image.filter-unchecked.checked-true:not(.grid-mozaic) > figure > div {
   /* display:none;  */
   visibility: hidden; height:45px;
 }
 
+.scam-image.filter-random.random-false.grid-mozaic > figure > div,
+.scam-image.filter-warning.warning-true.checked-true.grid-mozaic > figure > div,
+.scam-image.filter-warning.warning-false:not(.focus-true).grid-mozaic > figure > div,
+.scam-image.filter-unchecked.checked-true.grid-mozaic > figure > div {
+  opacity:0.05;
+  pointer-events: none;
+}
 
+.scam-image.filter-random.random-false > figure figcaption label > span:last-child,
 .scam-image.filter-warning.warning-true.checked-true > figure figcaption label > span:last-child,
 .scam-image.filter-warning.warning-false:not(.focus-true) > figure figcaption label > span:last-child,
 .scam-image.filter-unchecked.checked-true > figure figcaption label > span:last-child {
   margin-top:0; font-style:italic; opacity:0.5; 
 }
+
+
+.scam-image > .visible-false figcaption label > span:last-child {
+  max-width:130px; 
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* .scam-image.filter-random.random-false { display:none; } */
 
 .scam-image.has-warning {
   content:''; display: block; 
@@ -161,13 +200,29 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   background: linear-gradient(0.25turn, #f69d3c 0%, transparent 15%, transparent 85%, #f69d3c 100%);
 }
 
-.scam-image.has-warning.grid-mozaic {
+.scam-image.has-warning.grid-mozaic:not(.filter-random),
+.scam-image.has-warning.grid-mozaic.filter-random:not(.random-false) {
   background: #f69d3c;
 }
 
 .scam-image .visible-false {
   width:100%;
   height:100%;
+}
+
+.scam-image.grid-mozaic::after {
+  content:attr(title);
+  position: absolute;
+  left:0;top:0;
+  width:100%;
+  height:100%;
+  word-break: break-all;
+  padding:8px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .scam-image .visible-false img { opacity: 50%; margin:10px; }
@@ -185,6 +240,23 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   box-sizing: border-box;
   z-index:0;
   cursor: pointer;
+}
+
+.scam-image figcaption .tag {
+  opacity:0;
+  color:black;
+}
+
+.scam-image figcaption > label::after {
+  content:attr(attr-numanno);
+  padding-left:6px;
+  font-style:italic;
+  text-shadow: 0 0 1px black;
+  font-size:14px;
+}
+
+.scam-image:hover figcaption .tag {
+  opacity:0.5;
 }
 
 .scam-image .selected-false figcaption {
@@ -218,20 +290,20 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 }
 
 .scam-image.filter-unchecked.checked-true .image-menu, 
-.scam-image .visible-false .image-menu { top:15px; bottom:auto;}
+.scam-image .visible-false .image-menu { top:15px; bottom:auto; padding-left:20px;}
 
 .scam-image.filter-unchecked.checked-true .image-menu,
 .scam-image .visible-false .image-menu {
   pointer-events: none;
 }
 
-.scam-image.filter-unchecked.checked-true .image-menu > span:first-child,
-.scam-image .visible-false .image-menu > span:first-child {
+.scam-image.filter-unchecked.checked-true .image-menu > div > span:first-child,
+.scam-image .visible-false .image-menu > div > span:first-child {
   pointer-events: auto;
 }
 
-.scam-image.filter-unchecked.checked-true .image-menu > span:not(:first-child),
-.scam-image .visible-false .image-menu > span:not(:first-child) { visibility: hidden;}
+.scam-image.filter-unchecked.checked-true .image-menu > div > span:not(:first-child),
+.scam-image .visible-false .image-menu > div > span:not(:first-child) { visibility: hidden;}
 /* .scam-image .visible-false .image-menu > span:first-child > button:not(.visibility) { display:none; } */
 
 .scam-image .visible-false .mini {

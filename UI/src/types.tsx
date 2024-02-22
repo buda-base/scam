@@ -3,12 +3,13 @@ export type ConfigData = {
   auth: string[];
 }
 
-type MinAreaRect = [number, number, number, number, number];
+export type MinAreaRect = [number, number, number, number, number];
 
 export type Page = {
   minAreaRect: MinAreaRect;
   warnings: string[];
   rotatedHandle?:boolean;
+  tags?:string[];
 };
 
 export type KonvaPage = {
@@ -18,7 +19,7 @@ export type KonvaPage = {
   width:number;
   height:number;
   rotation:number;
-  warning:boolean;
+  warning:boolean|string;
   rotatedHandle?:boolean;
 };
 

@@ -8,18 +8,21 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import Konva from "konva";
 import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
-import { ErrorOutline, Warning, WarningAmber } from "@mui/icons-material";
-import { Checkbox, FormControlLabel } from "@mui/material";
+import { ErrorOutline, Warning, WarningAmber, LocalOffer } from "@mui/icons-material";
+import { Checkbox, FormControlLabel, IconButton, MenuItem, Paper } from "@mui/material";
 import _ from "lodash";
+import useImage from "use-image";
 
-import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap } from "../types";
+import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap, MinAreaRect } from "../types";
 import { apiUrl, scam_options } from "../App";
 import ImageMenu from "./ImageMenu";
 import * as state from "../state"
 
 const debug = debugFactory("scam:img")
 
-const mozaicFactor = 0.65
+const mozaicFactor = 0.65, minThumbWidth = 200
+
+const ICON = "/rotate-option.svg"
 
 const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, addNew: boolean, portrait:boolean, page?: Page,
     onSelect: () => void, onChange: (p: KonvaPage) => void }) => {
@@ -30,13 +33,50 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
   const trRef = useRef<Konva.Transformer>(null)
 
   const [padding, setPadding] = useAtom(state.padding)
+  const [icon] = useImage(ICON);
+  
+  const setRotateIcon = useCallback(() => {
+    const tr = trRef.current, sh = shRef.current;
+    if (!icon || !tr || !sh) return;
 
+    tr.nodes([sh]);    
+    const rot = tr.findOne(".rotater")
+    
+    // generate rotater background
+    const iconCanvas = document.createElement("canvas");
+    iconCanvas.width = 16
+    iconCanvas.height = 16
+
+    const ctx = iconCanvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.fillStyle = "transparent";
+    ctx.fillRect(0, 0, iconCanvas.width, iconCanvas.height);
+    ctx.drawImage(icon, 0, 0, iconCanvas.width, iconCanvas.height);
+
+    tr.update = function () {      
+      Konva.Transformer.prototype.update.call(tr);
+      const rot = this.findOne(".rotater");
+      (rot as any)
+        .fill(null)
+        .fillPatternImage(iconCanvas)
+        .stroke(null)
+        .width(16)
+        .height(16)
+        .offsetX(8)
+        .offsetY(8)
+    };
+    tr.update();
+    tr.getLayer()?.draw();
+  }, [icon]);
+  
   useEffect(() => {
+    setRotateIcon()
     if (isSelected && shRef.current) {
       trRef.current?.nodes([shRef.current]);
       trRef.current?.getLayer()?.batchDraw();
     }
-  }, [isSelected]);
+  }, [isSelected, setRotateIcon]);
 
   const handleX = portrait ? height/2 : width/2
   const handleY = portrait ? width/2 : height/2
@@ -71,8 +111,14 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
     : Math.round(page?.minAreaRect[2] || 0) + " x " + Math.round(page?.minAreaRect[3] || 0)
   ), [page, rotatedHandle])
 
+  const tags = page?.tags?.map(t => state.possibleTags[t]).join(", ") ?? ""
+
   return (
     <>
+      { tags && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
+          text={tags} verticalAlign='top' align='left' fontSize={15} fontStyle="italic bold" padding={4}
+          {...{ x: x + padding + handleX, y: y + padding + handleY, width, height, rotation, offsetX: handleX, offsetY: handleY }}
+        />}
       { isSelected && <Text fill="black" stroke='white' strokeWidth={2} fillAfterStrokeEnabled={true}
           text={res} verticalAlign='middle' align='center' width={150} height={30} fontSize={15}
           {...{ x: x + (portrait ? handleY : handleX) - 75 + padding, y: y + (portrait ? handleX : handleY) - 15 - 15 + padding }} 
@@ -88,8 +134,8 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
       <Rect
         ref={shRef}
         {...{ x: x + padding + handleX, y: y + padding + handleY, width, height, rotation, offsetX: handleX, offsetY: handleY }}
-        {...isSelected ? {} : { stroke: warning ? "orange" : "green" }}
-        fill={"rgba(" + (isSelected ? "0,128,255" : warning ? "128,128,0" : "0,255,0") + ",0.1)"}
+        {...isSelected ? {} : { stroke: warning ? "orange" : page?.tags?.length ? "rgb(128,0,192)" : "green" }}
+        fill={"rgba(" + (isSelected ? "0,128,255,0.1)" : warning ? "128,128,0,0.1)" : page?.tags?.length ? "128,0,192,0.2)" : "0,255,0,0.1)") }
         draggable={!addNew}
         onClick={onSelect}
         onTap={onSelect}
@@ -151,7 +197,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
           }
           return p
         }}
-      />      
+      />
 
       {isSelected && (
         <Transformer
@@ -217,9 +263,9 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 }
 
 
-export const ScamImageContainer = (props: { folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, selected:boolean,
+export const ScamImageContainer = (props: { isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, selected:boolean,
     setImageData: (data:ScamImageData|ScamImageData[]) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
-  const { image, selected, handleSelectItem } = props;
+  const { isRandom, image, selected, handleSelectItem } = props;
 
   const { ref, inView, entry } = useInView({
     triggerOnce: false,
@@ -242,6 +288,7 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
   const figureRef = useRef<HTMLElement>(null)
   
   const [grid, setGrid] = useAtom(state.grid)  
+  const [filter, setFilter] = useAtom(state.filter)  
 
   /*
   useEffect(() => {
@@ -251,21 +298,22 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
 
   if (inView) { 
     
-    return <ScamImage {...props} divRef={ref} {...{visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
+    return <ScamImage {...props} divRef={ref} {...{isRandom, visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
   }
   else {    
-    const w = (grid === "mozaic" ? Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * mozaicFactor : image.thumbnail_info.width )
-    const h = Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1) * image.thumbnail_info.height / image.thumbnail_info.width
+    const w = (grid === "mozaic" ? Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * mozaicFactor : image.thumbnail_info.width )
+    const h = Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1) * image.thumbnail_info.height / image.thumbnail_info.width
+
 
     return (
-      <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid)}
+      <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid) + (" filter-" + filter) + (" random-" + isRandom)}
         style={{ 
           height: h + 2 * padding, 
           maxWidth: w + 2 * padding
         }}
       >
         <figure ref={figureRef} style={{ display: "block" }}>
-          <figcaption>{image.img_path}</figcaption>
+          <figcaption>{image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")}</figcaption>
           {/* 
           // good idea but slows scrolling a lot..
           <figcaption>
@@ -280,8 +328,25 @@ export const ScamImageContainer = (props: { folder: string, image: ScamImageData
 
 let unmount = false
 
+const getMaxArea = (pages?:Page[]): number => {
+  if(pages) {
+    let max = 0
+    for(const p of pages) {
+      max = Math.max(max, p.minAreaRect[2] * p.minAreaRect[3])
+    }
+    return max
+  }
+  return 0
+}
 
-export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: number, H: number) => {
+export const samePage = (p:Page, q:Page) => {
+  for(const i in p.minAreaRect) {
+    if(p.minAreaRect[i] != q.minAreaRect[i]) return false
+  }
+  return true
+}
+
+export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: number, H: number, maxArea?: number, allPages?:Page[]) => {
   const { minAreaRect: rect, rotatedHandle } = r
   const n = i
   const width = rect[2] * w / W
@@ -289,7 +354,7 @@ export const recomputeCoords = (r: Page, i: number, w: number, h: number, W: num
   const x = rect[0] * w / W - width / 2
   const y = rect[1] * h / H - height / 2
   const rotation = rect[4]
-  const warning = r.warnings.length > 0
+  const warning = r.warnings.length > 0 || (allPages?.find((p,j) => j != i && samePage(p,r)) != undefined ? "duplicate" : false)|| (!r.tags?.length && maxArea && rect[2] * rect[3] < maxArea / 100 ? "small" : false)
   return ({ n, x, y, width, height, rotation, warning, rotatedHandle })
 }
 
@@ -313,7 +378,7 @@ export const withRotatedHandle = (r: Page, data: ScamImageData) => {
 }
 
 export const withoutRotatedHandle = (r: Page) => {
-  const { minAreaRect: rect, warnings } = r
+  const { minAreaRect: rect, warnings, tags } = r
   let width = rect[2] 
   let height = rect[3] 
   let rotation = rect[4]
@@ -322,7 +387,30 @@ export const withoutRotatedHandle = (r: Page) => {
     height = rect[2]
     rotation = (rotation - 90) % 360 
   }
-  return ({ warnings, minAreaRect: [ rect[0], rect[1], width, height, rotation ] })
+  return ({ tags, warnings, minAreaRect: [ rect[0], rect[1], width, height, rotation ] })
+}
+
+
+export const rotatePage90 = (p:Page, angle:number, handleX:number, handleY: number): Page => { 
+
+  const rotatePoint = (cx:number, cy:number, x:number, y:number, angle:number) => {
+    const radians = (Math.PI / 180) * angle,
+        cos = Math.cos(radians),
+        sin = Math.sin(radians),
+        nx = (cos * (x - cx)) + (sin * (y - cy)) + cx,
+        ny = (cos * (y - cy)) - (sin * (x - cx)) + cy;
+    return [nx + handleY, ny + handleX];
+  }
+
+  return ({
+    ...p,
+    minAreaRect: [
+      ...rotatePoint(0, 0, p.minAreaRect[0] - handleX, p.minAreaRect[1] - handleY, angle),    
+      p.minAreaRect[3], 
+      p.minAreaRect[2],
+      p.minAreaRect[4]
+    ] as MinAreaRect
+  })
 }
 
 
@@ -346,10 +434,10 @@ function useWindowSize() {
   return windowSize;
 }
 
-const ScamImage = (props: { folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
+const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
     loadDraft: boolean | undefined, checked: boolean, selected:boolean,
     setImageData:(data:ScamImageData|ScamImageData[])=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
-  const { folder, config, image, divRef, draft, loadDraft, visible, checked, selected, setImageData, setVisible, setChecked, handleSelectItem } = props;
+  const { isRandom, folder, config, image, divRef, draft, loadDraft, visible, checked, selected, setImageData, setVisible, setChecked, handleSelectItem } = props;
 
   const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
@@ -364,7 +452,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   let initW
   const [dimensions, setDimensions] = useState({
-    width: (initW = Math.max(300, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1)),
+    width: (initW = Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1)),
     height:  initW * image.height / image.width     
   })
 
@@ -376,11 +464,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   useEffect(() => {    
     //debug("setDim?", image.thumbnail_path)
     if (figureRef.current?.parentElement) { 
-      let w = Math.max(300, (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding)
+      let w = Math.max(minThumbWidth, (figureRef.current?.parentElement?.offsetWidth || 0) - 2 * padding)
       let h = w * image.height / image.width 
       if(portrait) {
         if(w > h) {
-          h = Math.max(300, h)
+          h = Math.max(minThumbWidth, h)
         } else if(h > w) { 
           h = w
         }
@@ -399,18 +487,16 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   }, [grid, figureRef, dimensions, image, windowSize, portrait, padding])
 
 
-  let tmpPages ;
+  let tmpPages: Page[] | undefined, maxArea: number|undefined ;
   const uploadedData = image?.pages ? { 
       ...image, 
       pages: (tmpPages = image.pages.map((p) => withRotatedHandle(p, image)) as Page[]),
-      rects: tmpPages.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, image.width, image.height))
+      rects: tmpPages.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, image.width, image.height, maxArea||(maxArea=getMaxArea(tmpPages)), tmpPages))
     } : null
 
   const [allScamData, dispatch] = useAtom(state.allScamDataAtom)
   const globalData = allScamData[image.thumbnail_path]
 
-
-  const [published, setPublished] = useState(false)
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
 
@@ -483,7 +569,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       const h = dimensions.height
         
       newData.pages = [...scamData.pages]
-      newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))            
+      newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H, maxArea||(maxArea=getMaxArea(newData.pages)), newData.pages)))            
 
       setScamData(newData)
       dispatch({
@@ -531,7 +617,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
       setKonvaImg(true)
 
-      const url = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + image.thumbnail_path
+      const url = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + encodeURIComponent(image.thumbnail_path)
       const conf: AxiosRequestConfig = {
         headers: {
           Authorization: "Basic " + encode(config.auth.join(":"))
@@ -551,6 +637,28 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     }
   }, [config.auth, controller.signal, image.thumbnail_path, konvaImg])
 
+  const imageRef = useRef<any>()
+
+  const [loadThumbnails, setLoadThumbnails] = useAtom(state.loadThumbnails)
+  const [brighten, setBrighten] = useAtom(state.brighten)
+  const [contrast, setContrast] = useAtom(state.contrast)
+  const [hideAnno, setHideAnno] = useAtom(state.hideAnno)
+
+  useEffect(() => {
+    if(typeof konvaImg === 'object' && imageRef.current && (contrast || brighten) ) setTimeout(() => {
+      imageRef.current.cache();
+      const filters = []
+      if(contrast) filters.push(Konva.Filters.Contrast)
+      if(brighten) filters.push(Konva.Filters.Brighten) 
+      if(filters.length) { 
+        imageRef.current.contrast(contrast) // -100/100
+        imageRef.current.brightness(brighten / 100) // -1.0/1.0
+        imageRef.current.filters(filters);
+      }
+      imageRef.current.getLayer().batchDraw();
+    }, 1)  
+  }, [contrast, brighten, loadThumbnails, konvaImg, dimensions])
+
   //debug("im:",image.thumbnail_path,lastRun,shouldRunAfter,image,scamData)
 
   const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
@@ -560,9 +668,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     if(globalData && globalData.data) {  //&& globalData?.time != lastRun) { 
       //debug("gD!",lastRun,image.thumbnail_path,globalData?.time,scamQueue,globalData.data.pages,globalData.data.rects)
       
+      let maxArea:number|undefined
       const newData = { 
         ...globalData.data,
-        rects: globalData.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, globalData.data.width, globalData.data.height))
+        rects: globalData.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, globalData.data.width, globalData.data.height, maxArea||(maxArea=getMaxArea(globalData.data.pages)), globalData.data.pages ))
       }
       setScamData(newData)
       setLastRun(globalData.time)
@@ -585,9 +694,10 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         
         //debug("draft:", draft);
 
+        let maxArea:number|undefined
         const newData = {
           ...draft.data,
-          rects: draft.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, draft.data.width, draft.data.height))
+          rects: draft.data.pages?.map((r, i) => recomputeCoords(r, i, dimensions.width, dimensions.height, draft.data.width, draft.data.height, maxArea||(maxArea=getMaxArea(draft.data.pages)), draft.data.pages))
         }
         setScamData(newData)
         dispatch({
@@ -743,7 +853,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   };
   const checkDeselectDiv: MouseEventHandler<HTMLDivElement> = (e) => {
     //debug("deselec div:", (e.target as HTMLDivElement).nodeName)
-    const clickedOnEmpty = !["CANVAS", "SVG", "PATH", "BUTTON"].includes((e.target as HTMLDivElement).nodeName.toUpperCase())
+    const clickedOnEmpty = !["CANVAS", "SVG", "PATH", "BUTTON", "LI"].includes((e.target as HTMLDivElement).nodeName.toUpperCase())
     if (clickedOnEmpty) {
       selectShape(null);
       setSelectedRatio(0);
@@ -768,21 +878,22 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       const w = dimensions.width
       const h = dimensions.height
         
+      let maxArea:number|undefined
       newData.pages = [...scamData.pages.filter((_im,n) => n !== id)]
-      newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
+      newData.rects = handleZindex(newData.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H, maxArea||(maxArea=getMaxArea(newData.pages)), newData.pages)))
 
       setScamData(newData)
       dispatch({
         type: 'UPDATE_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data: newData, state: 'modified', time: shouldRunAfter, checked:true }
+          val: { data: newData, state: 'modified', time: shouldRunAfter, /*checked:true*/ }
         }
       })        
       if(modified) setDrafted(false) 
       setModified(true)
       selectShape(newData.pages.length ? newData.pages.length - 1 : null)
-      if(!checked) setChecked(true)
+      //if(!checked) setChecked(true)
     }
   }, [checked, dimensions, modified, dispatch, handleZindex, image, scamData, setModified, shouldRunAfter, visible])
 
@@ -809,7 +920,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
     if(data.pages.length <= p.n && data.pages) {
       if(!add) return
-      data.pages.push({ minAreaRect:[0,0,0,0,0], warnings:[] })
+      data.pages.push({ minAreaRect:[0,0,0,0,0], warnings:[], rotatedHandle: p.rotatedHandle })
     }
 
     const W = data?.width
@@ -829,7 +940,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
       data.pages[p.n].minAreaRect[3] = H * p.height / h
       data.pages[p.n].minAreaRect[4] = p.rotation
       data.pages = data.pages.map(p => withRotatedHandle(p, data)) as Page[]
-      data.rects = handleZindex(data.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H)))
+      let maxArea:number|undefined
+      data.rects = handleZindex(data.pages.map((r, i) => recomputeCoords(r, i, w, h, W, H, maxArea||(maxArea=getMaxArea(data.pages)), data.pages)))
 
       debug(W, H, w, h, p) //,scamData.pages[p.n].minAreaRect)
 
@@ -838,12 +950,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         type: 'UPDATE_DATA',
         payload: {
           id: image.thumbnail_path,
-          val: { data, state: 'modified', time: shouldRunAfter, image, visible: true, ...!add?{checked: true}:{} }
+          val: { data, state: 'modified', time: shouldRunAfter, image, visible: true, /*...!add?{checked: true}:{}*/ }
         }
       })
       if(!modified) setModified(true)
       if(drafted) setDrafted(false)
-      if(!checked && !add) setChecked(true)
+      //if(!checked && !add) setChecked(true)
     }
   
   }, [checked, dimensions, modified, dispatch, drafted, handleZindex, image, scamData, setDrafted, setModified, shouldRunAfter, visible])
@@ -966,30 +1078,51 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
     }
   };
 
-  const rotate = useCallback((angle: number) => {
+  const rotate = useCallback((angle: number) => {    
+    
     const rotation = (image.rotation + angle + 360) % 360    
     const newImage = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
-    if(newImage.pages) delete newImage.pages
+    //if(newImage.pages) delete newImage.pages
     setImageData(newImage)    
+    
+    if(typeof scamData === "object") {      
+      const newData = { ...scamData }
+      if(newData.pages) {     
+        const handleX = portrait ? image.height/2 : image.width/2
+        const handleY = portrait ? image.width/2 : image.height/2
+        newData.rotation = rotation
+        newData.pages = newData.pages.map((p) => withRotatedHandle(rotatePage90(withoutRotatedHandle(p) as Page, angle, handleX, handleY), newData) as Page)
+        if(newData.rects) delete newData.rects
+      }
+      dispatch({
+        type: 'UPDATE_DATA',
+        payload: {
+          id: image.thumbnail_path,
+          val: { state: 'modified', data: newData }
+        }
+      })
+    }  
+
     if(modified) setDrafted(false) 
     setModified(true)
     setLastRun(1)
-    if(!checked) setChecked(true)
-  }, [ modified, image, shouldRunAfter ])
+    //if(!checked) setChecked(true)
+    
+  }, [ modified, image, shouldRunAfter, checked, portrait, dimensions, scamData ])
 
   const toggleVisible = useCallback(() => {
     dispatch({
       type: 'UPDATE_DATA',
       payload: {
         id: image.thumbnail_path,
-        val: { state: 'modified', time: shouldRunAfter, visible: !visible, checked: true }
+        val: { state: 'modified', time: shouldRunAfter, visible: !visible /*, checked: true*/ }
       }
     })
     setVisible(!visible)
     if(modified) setDrafted(false) 
     setModified(true)
     setImageData({...image, hidden: visible })    
-    if(!checked) setChecked(true)
+    //if(!checked) setChecked(true)
   }, [checked, dispatch, image, scamData, setModified, setVisible, shouldRunAfter, visible, modified])
 
   const toggleCheck = useCallback((multi?:boolean) => {
@@ -1024,8 +1157,8 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
 
   useEffect( () => {
     if(typeof scamData === 'object') { 
-      const numP = (checkedRestrict ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected
-      if(scamData?.rects?.length != numP || scamData?.rects?.some(r => r.warning)) {
+      const numP = globalData?.options?.nbPages ?? (checkedRestrict && selected ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected
+      if((scamData?.rects?.length ?? 0) - (scamData?.pages?.filter(p => p.tags?.length ?? 0 > 0).length ?? 0) != numP || scamData?.rects?.some(r => r.warning)) {
         setWarning(true)
       } else {
         setWarning(false)
@@ -1040,8 +1173,33 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
   
   const loading = scamData === true || scamQueue.todo?.length && scamQueue.todo?.includes(image.thumbnail_path) && !scamQueue.done?.includes(image.thumbnail_path)
 
-  return (<div ref={divRef} className={"scam-image" + (loading ? " loading" : "") + ( scamData != true && warning && !checked && visible ? " has-warning" : "") 
-      + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path))}
+  const tags = selectedId != null && typeof scamData === "object" && scamData.pages && scamData.pages[selectedId] ? scamData.pages[selectedId].tags : []
+
+  const updateTags = useCallback((newTags: string[]) => {
+    debug("uT:", newTags, selectedId, scamData)
+    if(typeof scamData != "object" || !scamData.pages || selectedId == null || !scamData.pages[selectedId]) return
+    const newData = { ...scamData }
+    if(newData.pages) newData.pages[selectedId].tags = newTags
+    dispatch({
+      type: 'UPDATE_DATA',
+      payload: {
+        id: image.thumbnail_path,
+        val: { state: 'modified', data: newData }
+      }
+    })
+    setModified(true)
+    setDrafted(false)
+  }, [dispatch, image.thumbnail_path, scamData, selectedId])
+
+  // use options from actual json if previously uploaded? (already working as is)
+  const expectedNumAnno = (globalData?.options?.nbPages ?? (checkedRestrict && selected ? scamOptionsSelected.nbPages ?? 0 : scamOptions.nbPages ?? 0) ?? scam_options.nb_pages_expected) ?? 0,
+    numAnno = (typeof scamData === "object" ? scamData?.pages?.length ?? 0 : 0),
+    tagAnno = (typeof scamData === "object" ? scamData?.pages?.filter(p => p.tags?.length).length ?? 0 : 0)
+
+  return (<div title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} ref={divRef} className={"scam-image" + (loading ? " loading" : "") 
+      + ( scamData != true && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && visible ? " has-warning" : "") 
+      + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
+      + (" random-" + isRandom) }
     style={{ 
       height: visible ? actualH + 2 * padding : 80, 
       maxWidth: (grid === "mozaic" ? (portrait ? actualH : actualW) : image.thumbnail_info[portrait ? "height":"width"]) + 2*padding 
@@ -1061,9 +1219,11 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
         onTouchStart={checkDeselect}        
       >
         <Layer>
-          {typeof konvaImg === 'object' && <>
-            <KImage
+          {typeof konvaImg === 'object' && loadThumbnails && <>
+            <KImage              
+              //enhance={1} // -1.0/1.0
               image={konvaImg}
+              ref={imageRef}
               width={dimensions.width}
               height={dimensions.height}
               //x={padding + ([90,180].includes(image.rotation) ? actualW : 0)}
@@ -1087,14 +1247,14 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
               }}
             />
           </>}
-          {typeof scamData === 'object' &&
+          {typeof scamData === 'object' && !hideAnno && 
             scamData?.rects?.map((rect, i) => (
               <TransformableRect
                 key={i}
-                shapeProps={!checked || !rect.warning ? rect : { ...rect, warning: false }}
+                shapeProps={!checked || !rect.warning || ["small","duplicate"].includes(rect.warning as string) ? rect : { ...rect, warning: false }}
                 isSelected={rect.n === selectedId}
                 onSelect={() => onSelect(rect.n)}
-                {...{ onChange, addNew, portrait, ...scamData?.pages && scamData?.pages[i] ? {page: scamData?.pages[i]}: {}   }}
+                {...{ onChange, addNew, portrait, ...scamData?.pages && scamData?.pages[rect.n] ? {page: scamData?.pages[rect.n]}: {}   }}
               />)
             )
           }
@@ -1111,10 +1271,12 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           )}
         </Layer>
       </Stage> }
-      { grid != "mozaic" && <figcaption><FormControlLabel label={image.img_path} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} control={<Checkbox checked={selected} sx={{padding: "0 8px" }}/>}  />
-        { scamData != true && visible && warning && !checked && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "4px" }} /> }
-        {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
-        { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
+      { grid != "mozaic" && <figcaption><FormControlLabel attr-numanno={ (tagAnno ? tagAnno+"+" : "" ) + (numAnno - tagAnno) + "/" + expectedNumAnno } label={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} 
+          control={<Checkbox checked={selected} sx={{padding: "0 8px"}}/>} 
+        />          
+          { scamData != true && visible && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "2px" }} /> }
+          {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
+          { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
       </figcaption> }
       {showDebug && visible && typeof scamData === 'object' &&
         <div className="debug">
@@ -1123,7 +1285,7 @@ const ScamImage = (props: { folder: string, image: ScamImageData, config: Config
           </div>
         </div>
       }
-      { grid != "mozaic" && <ImageMenu {...{ selectedId, addNew, visible, checked, removeId, setAddNew, selectShape, rotate, toggleVisible, toggleCheck }}/> }
+      { grid != "mozaic" && <ImageMenu {...{ selectedId, addNew, visible, checked, removeId, tags, updateTags, setAddNew, selectShape, rotate, toggleVisible, toggleCheck }}/> }
     </figure>
   </div>
   );

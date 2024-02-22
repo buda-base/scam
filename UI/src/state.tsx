@@ -9,8 +9,8 @@ const debug = debugFactory("scam:state")
 const hasCustomOptions:ScamOptions|undefined = (JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).options
 
 // global settings
-export const orientAtom = atom<Orientation>("horizontal") 
-export const direcAtom = atom<Direction>("horizontal") 
+export const orientAtom = atom<Orientation>(hasCustomOptions?.orient || "horizontal") 
+export const direcAtom = atom<Direction>(hasCustomOptions?.direc || "horizontal") 
 export const minRatioAtom = atom(hasCustomOptions?.minRatio || 0.145)
 export const maxRatioAtom = atom(hasCustomOptions?.maxRatio || 0.5)
 export const nbPagesAtom = atom(hasCustomOptions?.nbPages || 2)
@@ -50,7 +50,8 @@ export const scamDataReducer = (state: any, action: { type: string; payload: { i
 export const allScamDataAtom = atomWithReducer<SavedScamDataMap, any>({}, scamDataReducer)
 
 export const modified = atom(false)
-export const drafted = atom(false)
+export const drafted = atom(true)
+export const published = atom(true)
 
 export const filter = atom('all')
 export const grid = atom('3x2') 
@@ -82,3 +83,20 @@ export const clipboard = atom<KonvaPage|null>(null)
 
 export const defaultPadding = 56
 export const padding = atom<number>(defaultPadding)
+
+export const random = atom<boolean[]>([])
+
+export const numWarn = atom(0)
+
+export const possibleTags:Record<string,string> = { 
+  "T1":"white patch", 
+  "T2":"color card",
+  "T3":"detail",
+  "T4":"catalog card",
+  "T5":"missing page card"
+}
+
+export const loadThumbnails = atom(true);
+export const brighten = atom(0)
+export const contrast = atom(0)
+export const hideAnno = atom(false);
