@@ -42,7 +42,7 @@ def get_pil_img(folder_path, img_path):
     global RAW_OPENER_REGISTERED
     blob = gets3blob(folder_path+img_path)
     if blob is None:
-        logging.error("cannot find %s" % (folder_path+img_path))
+        logging.error("cannot find %s", (folder_path+img_path))
     if not RAW_OPENER_REGISTERED and img_path[-4:].lower() in [".nef", ".cr2", ".dng", ".arw"]:
         register_raw_opener()
         RAW_OPENER_REGISTERED = True
@@ -96,7 +96,7 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
             pil_img = get_pil_img(folder_path, img_path)
         except Exception as e:
             logging.error("error on %s/%s" % (folder_path, img_path), e)
-            return
+            continue
         if preprocess_options["use_exif_rotation"]:
             pil_img = apply_exif_rotation(img)
         sam_res = run_sam(pil_img, preprocess_options)
