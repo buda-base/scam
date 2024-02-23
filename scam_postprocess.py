@@ -9,7 +9,7 @@ from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3
 from raw_opener import register_raw_opener
-import natsort
+from natsort import natsorted
 
 
 DEFAULT_POSTPROCESS_OPTIONS = {
@@ -20,6 +20,8 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "skip_folder_local_input": True, # 
     "local_src_folder": "./",
     "local_dst_folder": "./scam_cropped/",
+    "add_prefix": "auto" # controls adding an image sequence prefix to the file name, can be True, False or "auto" to do it only if resequencing happens
+    "resequence": "auto" # in the case where a prefix can be added, resequence images assuming that one image is all rectos and the next is all versos. "auto" will do that on all images if it can find a pair of consecutive images with 3 pages
 }
 
 # pages are 
@@ -29,6 +31,83 @@ DEFAULT_POSTPROCESS_OPTIONS = {
 #   }
 # ]
 
+def get_sequence_info(scam_json, apply_resequence=True):
+    """
+    returns two values, first:
+
+    {
+       "path/to/file/1": [sequence_num_of_page_1, "sequence_num_of_page_2"], etc.
+    }
+
+    second
+
+    True if resequencing has happened in auto mode, False if not
+    """
+    img_path_to_nb_output_pages = {}
+    max_nb_pages = 0
+    res = {}
+    for file_info in scam_json["files"]:
+        img_path = file_info["img_path"]
+        pages = get_output_pages(file_info)
+        if pages is None:
+            continue
+        nb_pages = max(1, len(pages)) # 0 counts for 1
+        img_path_to_nb_output_pages[img_path] = nb_pages
+        max_nb_pages = max(max_nb_pages, nb_pages)
+    sorted_img_paths = natsorted(list(img_path_to_nb_output_pages.keys()))
+    if apply_resequence == "auto":
+        if max_nb_pages < 3:
+            apply_resequence = False
+        else:
+            # check if we can find at least two consecutive images with the same number of pages > 3:
+            previous_nb_pages = 0
+            for img_path in sorted_img_paths:
+                nb_pages = img_path_to_nb_output_pages[img_path]
+                if nb_pages > 2 and nb_pages == previous_nb_pages:
+                    apply_resequence = True
+                    break
+    if not apply_resequence:
+        cur_seq = 1
+        for img_path in sorted_img_paths:
+            seqs = []
+            res[img_path] = seqs
+            for i in range(img_path_to_nb_output_pages[img_path]):
+                seqs.append(cur_seq)
+                cur_seq += 1
+    else:
+        cur_seq = 1
+        recto_img_path = None
+        for img_path in sorted_img_paths:
+            nb_pages = img_path_to_nb_output_pages[img_path]
+            if not recto_img_path and nb_pages > 1:
+                recto_img_path = img_path
+                continue
+            if not recto_img_path and nb_pages < 2:
+                res[img_path] = [cur_seq]
+                cur_seq += 1
+                continue
+            nb_pages_recto = img_path_to_nb_output_pages[recto_img_path]
+            if nb_pages_recto < nb_pages:
+                # we assume that there are always more rectos than versos. If we encounter the opposite, we just
+                # sequence normally and output a warning
+                res[recto_img_path] = []
+                for i in range(nb_pages_recto):
+                    res[recto_img_path].append(cur_seq)
+                    cur_seq += 1
+                recto_img_path = img_path
+                continue
+            # assume we're on a verso
+            res[recto_img_path] = []
+            res[img_path] = []
+            for i in range(max(nb_pages, nb_pages_recto)):
+                if i < nb_pages_recto:
+                    res[recto_img_path].append(cur_seq)
+                    cur_seq += 1
+                if i < nb_pages:
+                    res[img_path].append(cur_seq)
+                    cur_seq += 1
+            recto_img_path = None
+    return res, apply_resequence
 
 def get_direction(pages):
     """
@@ -172,7 +251,10 @@ def postprocess_csv():
             folder = row[0]
             if not folder.endswith('/'):
                 folder += "/"
-            postprocess_folder(folder)
+            postprocess_options=DEFAULT_POSTPROCESS_OPTIONS.copy()
+            if "keep in order" in row[1]:
+                postprocess_options["resequence"] = False
+            postprocess_folder(folder, postprocess_options)
 
 if __name__ == '__main__':
     postprocess_csv()
