@@ -8,6 +8,8 @@ from img_utils import encode_img_uncompressed, rotate_warp_affine
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3
+from raw_opener import register_raw_opener
+import natsort
 
 
 DEFAULT_POSTPROCESS_OPTIONS = {
@@ -46,6 +48,45 @@ def get_direction(pages):
     #print("var_x = %d, var_y = %d" % (var_x, var_y))
     return "x" if var_x > var_y else "y"
 
+def get_output_pages(file_info):
+    """
+    returns the pages that actually need to be extracted, after a bit of cleanup
+    returns [] if the entire page needs to be output
+    returns None if the page has just one white patch annotation
+    """
+    largest_area = 0
+    previous_minAreaRect = []
+    should_output = False
+    if "hidden" in file_info:
+        return None
+    if "pages" not in file_info or len(file_info["pages"]) < 1:
+        return []
+    pages = order_pages(file_info["pages"])
+    to_delete_idx = []
+    for i, p in enumerate(pages):
+        # first remove duplicates (which should be in sequence now)
+        if p["minAreaRect"] == previous_minAreaRect:
+            to_delete_idx.append(i)
+            continue
+        previous_minAreaRect = p["minAreaRect"]
+        # compute largest_area
+        largest_area = max(largest_area, p["minAreaRect"][2]*p["minAreaRect"][3])
+        # ignore annotations with some labels:
+        if "tags" in p and "T1" in p["tags"]:
+            to_delete_idx.apend(i)
+        else:
+            should_output = True
+    # remove small noisy annotations from the UI:
+    for i, p in enumerate(pages):
+        if p["minAreaRect"][2]*p["minAreaRect"][3] < 0.05*largest_area:
+            to_delete_idx.append(i)
+    res = pages.copy()
+    for i, p in enumerate(pages):
+        if i in to_delete_idx:
+            continue
+        res.append(p)
+    return res
+
 def order_pages(pages):
     if len(pages) < 2:
         return pages
@@ -56,8 +97,9 @@ def order_pages(pages):
         return sorted(pages, key=(lambda x: x["minAreaRect"][1]))
 
 def derive_from_file(scam_json, file_info, postprocess_options):
-    if "hidden" in file_info and file_info["hidden"]:
-        logging.info("do not derive hidden image %s" % file_info["img_path"])
+    pages = get_output_pages(file_info["pages"])
+    if pages is None:
+        logging.info("do not derive from hidden image %s" % file_info["img_path"])
         return
     pil_img = None
     if postprocess_options["src_storage"] == "s3":
@@ -75,13 +117,9 @@ def derive_from_file(scam_json, file_info, postprocess_options):
         return
     if file_info["rotation"] != 0:
         pil_img = pil_img.rotate(file_info["rotation"], expand=True)
-    if "pages" not in file_info or len(file_info["pages"]) == 0:
+    if len(pages) == 0:
         derive_from_page(scam_json, file_info, pil_img, None, 1, postprocess_options)
         return
-    pages = file_info["pages"]
-    # reorder pages if scam_json["pages_order"] is false
-    if "pages_order" not in scam_json or not scam_json["pages_order"]:
-        pages = order_pages(pages)
     for i, page in enumerate(pages):
         derive_from_page(scam_json, file_info, pil_img, page, i+1, postprocess_options)
 
