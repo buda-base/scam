@@ -7,9 +7,6 @@ import gzip
 import numpy as np
 import math
 import logging
-from raw_opener import register_raw_opener
-
-#register_raw_opener()
 
 def rotate_warp_perspective(pil_img, rect):
     """
@@ -34,6 +31,13 @@ def rotate_warp_perspective(pil_img, rect):
     # directly warp the rotated rectangle to get the straightened rectangle
     warped = cv2.warpPerspective(opencv_img, M, (int(width), int(height)), cv2.INTER_LANCZOS4)
     return Image.fromarray(warped)
+
+def sanitize_for_postprocessing(pil_img):
+    if pil_img.mode in ["1", "L", "RGB"]:
+        return pil_img
+    # opencv rotation can only happen on one or 3 channels, so everything else gets converted
+    pil_img = apply_icc(pil_img)
+    return pil_img.convert('RGB')
 
 def rotate_warp_affine(pil_img, rect):
     """
@@ -143,7 +147,7 @@ def apply_icc(img):
     Convert PIL image to sRGB color space (if possible)
     """
     icc = img.info.get('icc_profile', '')
-    if icc and img.mode == "RGB":
+    if icc:
         io_handle = io.BytesIO(icc)     # virtual file
         src_profile = ImageCms.ImageCmsProfile(io_handle)
         dst_profile = ImageCms.createProfile('sRGB')

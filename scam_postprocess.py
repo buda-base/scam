@@ -4,7 +4,7 @@ import os
 import logging
 from PIL import Image
 from tqdm import tqdm
-from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box
+from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3
@@ -201,9 +201,11 @@ def derive_from_file(scam_json, file_info, postprocess_options, prefixes):
         if not postprocess_options["dryrun"]:
             pil_img = Image.open(local_path)
     # check height and width
-    if not postprocess_options["dryrun"] and (pil_img.height != file_info["height"] or pil_img.width != file_info["width"]):
-        logging.error("got image with different width or height from the original: %s" % file_info["img_path"])
-        return
+    if not postprocess_options["dryrun"]:
+        if pil_img.height != file_info["height"] or pil_img.width != file_info["width"]:
+            logging.error("got image with different width or height from the original: %s" % file_info["img_path"])
+            return
+        pil_img = sanitize_for_postprocessing(pil_img)
     if file_info["rotation"] != 0:
         logging.info("rotate %s by %d", file_info["img_path"], file_info["rotation"])
         if not postprocess_options["dryrun"]:
@@ -280,7 +282,7 @@ def postprocess_folder(folder_path, postprocess_options):
         else:
             add_prefix = True
     for file_info in tqdm(scam_json["files"]):
-        if sequence_info is None:
+        if not add_prefix:
             derive_from_file(scam_json, file_info, postprocess_options, None)
         elif file_info["img_path"] in sequence_info:
             derive_from_file(scam_json, file_info, postprocess_options, sequence_info[file_info["img_path"]])
