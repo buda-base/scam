@@ -4,13 +4,14 @@ import os
 import logging
 from PIL import Image
 from tqdm import tqdm
-from img_utils import encode_img_uncompressed, rotate_warp_affine
+from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3
 from raw_opener import register_raw_opener
 from natsort import natsorted
 
+#logging.basicConfig(level=logging.INFO)
 
 DEFAULT_POSTPROCESS_OPTIONS = {
     "rotation_in_derivation": True, # derive tiffs with the small rotation
@@ -20,8 +21,9 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "skip_folder_local_input": True, # 
     "local_src_folder": "./",
     "local_dst_folder": "./scam_cropped/",
-    "add_prefix": "auto" # controls adding an image sequence prefix to the file name, can be True, False or "auto" to do it only if resequencing happens
-    "resequence": "auto" # in the case where a prefix can be added, resequence images assuming that one image is all rectos and the next is all versos. "auto" will do that on all images if it can find a pair of consecutive images with 3 pages
+    "add_prefix": "auto", # controls adding an image sequence prefix to the file name, can be True, False or "auto" to do it only if resequencing happens
+    "resequence": "auto", # in the case where a prefix can be added, resequence images assuming that one image is all rectos and the next is all versos. "auto" will do that on all images if it can find a pair of consecutive images with 3 pages
+    "dryrun": False
 }
 
 # pages are 
@@ -58,14 +60,18 @@ def get_sequence_info(scam_json, apply_resequence=True):
     if apply_resequence == "auto":
         if max_nb_pages < 3:
             apply_resequence = False
+            logging.info("no image has more than 3 pages, no need to apply resequencing")
         else:
             # check if we can find at least two consecutive images with the same number of pages > 3:
             previous_nb_pages = 0
             for img_path in sorted_img_paths:
                 nb_pages = img_path_to_nb_output_pages[img_path]
                 if nb_pages > 2 and nb_pages == previous_nb_pages:
+                    logging.info("applying resequencing because of same number of images %d > 2 for %s and previous one", nb_pages, img_path)
                     apply_resequence = True
                     break
+                previous_nb_pages = nb_pages
+            logging.info("not applying resequencing")
     if not apply_resequence:
         cur_seq = 1
         for img_path in sorted_img_paths:
@@ -131,7 +137,7 @@ def get_output_pages(file_info):
     """
     returns the pages that actually need to be extracted, after a bit of cleanup
     returns [] if the entire page needs to be output
-    returns None if the page has just one white patch annotation
+    returns None if the image has no output page
     """
     largest_area = 0
     previous_minAreaRect = []
@@ -146,24 +152,27 @@ def get_output_pages(file_info):
         # first remove duplicates (which should be in sequence now)
         if p["minAreaRect"] == previous_minAreaRect:
             to_delete_idx.append(i)
+            logging.info("ignore duplicate page annotation")
             continue
         previous_minAreaRect = p["minAreaRect"]
-        # compute largest_area
-        largest_area = max(largest_area, p["minAreaRect"][2]*p["minAreaRect"][3])
         # ignore annotations with some labels:
         if "tags" in p and "T1" in p["tags"]:
             to_delete_idx.apend(i)
-        else:
-            should_output = True
+            continue
+        # compute largest_area
+        largest_area = max(largest_area, p["minAreaRect"][2]*p["minAreaRect"][3])
     # remove small noisy annotations from the UI:
     for i, p in enumerate(pages):
         if p["minAreaRect"][2]*p["minAreaRect"][3] < 0.05*largest_area:
             to_delete_idx.append(i)
-    res = pages.copy()
+            logging.info("ignore small page annotation")
+    res = []
     for i, p in enumerate(pages):
         if i in to_delete_idx:
             continue
         res.append(p)
+    if len(res) == 0:
+        return None
     return res
 
 def order_pages(pages):
@@ -175,34 +184,40 @@ def order_pages(pages):
     else:
         return sorted(pages, key=(lambda x: x["minAreaRect"][1]))
 
-def derive_from_file(scam_json, file_info, postprocess_options):
-    pages = get_output_pages(file_info["pages"])
+def derive_from_file(scam_json, file_info, postprocess_options, prefixes):
+    pages = get_output_pages(file_info)
     if pages is None:
         logging.info("do not derive from hidden image %s" % file_info["img_path"])
         return
     pil_img = None
     if postprocess_options["src_storage"] == "s3":
-        pil_img = get_pil_img(scam_json["folder_path"], file_info["img_path"])
+        if not postprocess_options["dryrun"]:
+            pil_img = get_pil_img(scam_json["folder_path"], file_info["img_path"])
     else:
         local_path = postprocess_options["local_src_folder"]
         if not postprocess_options["skip_folder_local_input"]:
             local_path += scam_json["folder_path"]
         local_path += file_info["img_path"]
-        pil_img = Image.open(local_path)
-
+        if not postprocess_options["dryrun"]:
+            pil_img = Image.open(local_path)
     # check height and width
-    if pil_img.height != file_info["height"] or pil_img.width != file_info["width"]:
+    if not postprocess_options["dryrun"] and (pil_img.height != file_info["height"] or pil_img.width != file_info["width"]):
         logging.error("got image with different width or height from the original: %s" % file_info["img_path"])
         return
     if file_info["rotation"] != 0:
-        pil_img = pil_img.rotate(file_info["rotation"], expand=True)
+        logging.info("rotate %s by %d", file_info["img_path"], file_info["rotation"])
+        if not postprocess_options["dryrun"]:
+            pil_img = pil_img.rotate(file_info["rotation"], expand=True)
+    if prefixes is not None and len(pages) != len(prefixes):
+        logging.error("len(pages) != len(prefixes):  %d != %d for %s", len(pages), len(prefixes), file_info["img_path"])
+        return
     if len(pages) == 0:
-        derive_from_page(scam_json, file_info, pil_img, None, 1, postprocess_options)
+        derive_from_page(scam_json, file_info, pil_img, None, 1, postprocess_options, None if prefixes is None else prefixes[0])
         return
     for i, page in enumerate(pages):
-        derive_from_page(scam_json, file_info, pil_img, page, i+1, postprocess_options)
+        derive_from_page(scam_json, file_info, pil_img, page, i+1, postprocess_options, None if prefixes is None else prefixes[i])
 
-def derive_from_page(scam_json, file_info, pil_img, page_info, page_position, postprocess_options):
+def derive_from_page(scam_json, file_info, pil_img, page_info, page_position, postprocess_options, prefix=None):
     # page_info is None means we take the whole image
     # page_position starts at 1
     suffix_letter = chr(96+page_position)
@@ -211,24 +226,40 @@ def derive_from_page(scam_json, file_info, pil_img, page_info, page_position, po
         minAreaRect = page_info["minAreaRect"]
         if not postprocess_options["rotation_in_derivation"]:
             bbox = get_bounding_box(page_info["minAreaRect"], pil_img.width, pil_img.height)
-            extract = pil_img.crop((bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]))
+            logging.info("  extract with no rotation (%d, %d, %d, %d)", bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3])
+            if not postprocess_options["dryrun"]:
+                extract = pil_img.crop((bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]))
         else:
             mar = page_info["minAreaRect"]
-            extract = rotate_warp_affine(pil_img, ((mar[0], mar[1]), (mar[2], mar[3]), mar[4]))
+            logging.info("  extract with rotation (%f, %f), (%f, %f), %f)", mar[0], mar[1], mar[2], mar[3], mar[4])
+            if not postprocess_options["dryrun"]:
+                extract = rotate_warp_affine(pil_img, ((mar[0], mar[1]), (mar[2], mar[3]), mar[4]))
     if postprocess_options["dst_storage"] == "s3":
         s3key = "scam_cropped/"+scam_json["folder_path"]
-        s3key += os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
-        b, ext = encode_img_uncompressed(extract)
-        upload_to_s3(b, s3key)
+        if prefix is None:
+            s3key += os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
+        else:
+            base = ("%04d_" % prefix) + file_info["img_path"].replace("/", "_")
+            s3key += os.path.splitext(base)[0]+suffix_letter+".tiff"
+        logging.info("  write to s3 key %s", s3key)
+        if not postprocess_options["dryrun"]:
+            b, ext = encode_img_uncompressed(extract)
+            upload_to_s3(b, s3key)
     else:
         local_path = postprocess_options["local_dst_folder"]
         if not postprocess_options["skip_folder_local_output"]:
             local_path += scam_json["folder_path"]
-        local_path += os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
-        os.makedirs(os.path.dirname(local_path), exist_ok=True)
-        pil_img.save(local_path, icc_profile=extract.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
+        if prefix is None:
+            local_path += os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
+        else:
+            base = ("%04d_" % prefix) + file_info["img_path"].replace("/", "_")
+            local_path += os.path.splitext(base)[0]+suffix_letter+".tiff"
+        logging.info("  write to local file %s", local_path)
+        if not postprocess_options["dryrun"]:
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            pil_img.save(local_path, icc_profile=extract.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
 
-def postprocess_folder(folder_path, postprocess_options=DEFAULT_POSTPROCESS_OPTIONS):
+def postprocess_folder(folder_path, postprocess_options):
     """
     post-processes a folder for use with the API
 
@@ -238,8 +269,21 @@ def postprocess_folder(folder_path, postprocess_options=DEFAULT_POSTPROCESS_OPTI
     scam_json = get_scam_json(folder_path)
     if not scam_json["checked"]:
         logging.warning("warning: processing unchecked json %s" % folder_path)
+    add_prefix = postprocess_options["add_prefix"]
+    sequence_info = None
+    if add_prefix == "auto" and not postprocess_options["resequence"]:
+        add_prefix = False
+    if add_prefix: # "auto" or True
+        sequence_info, resequenced = get_sequence_info(scam_json, postprocess_options["resequence"])
+        if postprocess_options["resequence"] == "auto" and not resequenced and add_prefix == "auto":
+            add_prefix = False
+        else:
+            add_prefix = True
     for file_info in tqdm(scam_json["files"]):
-        derive_from_file(scam_json, file_info, postprocess_options)
+        if sequence_info is None:
+            derive_from_file(scam_json, file_info, postprocess_options, None)
+        elif file_info["img_path"] in sequence_info:
+            derive_from_file(scam_json, file_info, postprocess_options, sequence_info[file_info["img_path"]])
 
 def postprocess_csv():
     if len(sys.argv) <= 1:
@@ -252,7 +296,7 @@ def postprocess_csv():
             if not folder.endswith('/'):
                 folder += "/"
             postprocess_options=DEFAULT_POSTPROCESS_OPTIONS.copy()
-            if "keep in order" in row[1]:
+            if len(row) > 1 and "keep in order" in row[1]:
                 postprocess_options["resequence"] = False
             postprocess_folder(folder, postprocess_options)
 
