@@ -208,8 +208,8 @@ def derive_from_file(scam_json, file_info, postprocess_options, prefixes):
         logging.info("rotate %s by %d", file_info["img_path"], file_info["rotation"])
         if not postprocess_options["dryrun"]:
             pil_img = pil_img.rotate(file_info["rotation"], expand=True)
-    if prefixes is not None and len(pages) != len(prefixes):
-        logging.error("len(pages) != len(prefixes):  %d != %d for %s", len(pages), len(prefixes), file_info["img_path"])
+    if prefixes is not None and max(1, len(pages)) != len(prefixes):
+        logging.error("len(pages) != len(prefixes):  %d != %d for %s", max(1, len(pages)), len(prefixes), file_info["img_path"])
         return
     if len(pages) == 0:
         derive_from_page(scam_json, file_info, pil_img, None, 1, postprocess_options, None if prefixes is None else prefixes[0])
