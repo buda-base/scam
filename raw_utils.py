@@ -106,9 +106,8 @@ class RawDecoder(ImageFile.PyDecoder):
         raw_decoder.setimage(self.im)
         return raw_decoder.decode(data)
 
-def register_raw_opener(params="post"):
+def register_raw_opener():
     print("register raw opener")
-    set_raw_params(params)
     Image.register_open('RAW', RawImageFile)
     Image.register_decoder('RAW', RawDecoder)
     Image.register_extensions(RawImageFile.format, ['nef', 'cr2', 'dng', 'arw'])

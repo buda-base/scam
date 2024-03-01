@@ -8,7 +8,7 @@ from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3
-from raw_opener import register_raw_opener
+from raw_utils import register_raw_opener
 from natsort import natsorted
 
 #logging.basicConfig(level=logging.INFO)
@@ -117,7 +117,8 @@ def get_sequence_info(scam_json, apply_resequence=True):
 
 def get_direction(pages):
     """
-    returns "x" or "y" depending on the axis of the annotations
+    returns "x" or "y" depending on the axis of the annotations.
+    The result pertains to the rotated image, not the original.
     """
     # we need to order the annotations in the page order, sometimes left to right, sometimes top to bottom
     # we get the annotation centers:
