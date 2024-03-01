@@ -17,9 +17,9 @@ def get_cv2_from_raw(fp, params):
     - "base" to get the untouched matrix (resulting in 16 bit images, not currently handled by Pillow)
     - a set of two values: a list of 4 floats (channel correction factors) and an int (bps)
     """
+    array = None
     try:
-        raw = rawpy.imread(self.fp)
-        array = None
+        raw = rawpy.imread(fp)
         if params == "pre":
             # for the pre processing params we use very automatic settings and an 8-bit output:
             array = raw.postprocess(output_bps=8, use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB)
@@ -60,7 +60,7 @@ def get_cv2_from_raw(fp, params):
                 )
     except:
         raise TypeError("Not a RAW file")
-    return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    return cv2.cvtColor(array, cv2.COLOR_RGB2BGR)
 
 
 class RawImageFile(ImageFile.ImageFile):

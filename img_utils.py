@@ -32,12 +32,14 @@ def rotate_warp_perspective(pil_img, rect):
     warped = cv2.warpPerspective(opencv_img, M, (int(width), int(height)), cv2.INTER_LANCZOS4)
     return Image.fromarray(warped)
 
-def sanitize_for_postprocessing(pil_img):
+def sanitize_for_postprocessing(pil_img, force_apply_icc=False):
     if pil_img.mode in ["1", "L", "RGB"]:
-        return pil_img
+        if force_apply_icc:
+            return apply_icc(pil_img), True
+        return pil_img, False
     # opencv rotation can only happen on one or 3 channels, so everything else gets converted
     pil_img = apply_icc(pil_img)
-    return pil_img.convert('RGB')
+    return pil_img.convert('RGB'), True
 
 def rotate_warp_affine(pil_img, rect):
     """
@@ -71,7 +73,7 @@ def rotate_warp_affine_cv2(opencv_img, rect):
         res = res.astype(bool)
     return res
 
-def apply_scale_factors(cv2_img, scale_factors, output_bps=8):
+def apply_scale_factors_cv2(cv2_img, scale_factors, output_bps=8):
     """
     Applies scale factors to a cv2_img, and casts the result to the target bps
     """
@@ -87,6 +89,14 @@ def apply_scale_factors(cv2_img, scale_factors, output_bps=8):
     else:
         corrected_img_np = np.clip(corrected_img_np, 0, 255).astype(np.uint8)
     return corrected_img_np
+
+def apply_scale_factors_pil(pil_img, scale_factors):
+    if pil_img.mode != "RGB":
+        return pil_img
+    matrix = ( scale_factors[0], 0,  0, 0, 
+                 0,   scale_factors[1],  0, 0, 
+                 0,   0,  scale_factors[2], 0)
+    return pil_img.convert("RGB", matrix) 
 
 def get_bounding_box(min_area_rect, width, height):
     """
