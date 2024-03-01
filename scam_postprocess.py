@@ -4,12 +4,14 @@ import os
 import logging
 from PIL import Image
 from tqdm import tqdm
-from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing
+from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
-from utils import upload_to_s3
-from raw_utils import register_raw_opener
+from utils import upload_to_s3, gets3blob
+from raw_utils import register_raw_opener, is_likely_raw, get_cv2_from_raw
 from natsort import natsorted
+import numpy as np
+import cv2
 
 #logging.basicConfig(level=logging.INFO)
 
@@ -23,7 +25,10 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "local_dst_folder": "./scam_cropped/",
     "add_prefix": "auto", # controls adding an image sequence prefix to the file name, can be True, False or "auto" to do it only if resequencing happens
     "resequence": "auto", # in the case where a prefix can be added, resequence images assuming that one image is all rectos and the next is all versos. "auto" will do that on all images if it can find a pair of consecutive images with 3 pages
-    "dryrun": False
+    "dryrun": False,
+    "output_bps": "auto", # can be 8, 16 or "auto" (16 bits if raw with no correction, 8 bits otherwise)
+    "wb_correction": "auto", # can be a list of 4 floats, "auto" to check for white patch annotations in the folders, or None for no auto_correction
+    "wb_patch_rgb_target": [243, 243, 242] # the target RGB values given on 8-bit per channel, corresponding to the white patch of the color card. These usually are aroun 240, 240, 240
 }
 
 # pages are 
@@ -117,8 +122,7 @@ def get_sequence_info(scam_json, apply_resequence=True):
 
 def get_direction(pages):
     """
-    returns "x" or "y" depending on the axis of the annotations.
-    The result pertains to the rotated image, not the original.
+    returns "x" or "y" depending on the axis of the annotations
     """
     # we need to order the annotations in the page order, sometimes left to right, sometimes top to bottom
     # we get the annotation centers:
@@ -270,6 +274,7 @@ def postprocess_folder(folder_path, postprocess_options):
     """
     logging.info("preprocess %s" % folder_path)
     scam_json = get_scam_json(folder_path)
+    corrs = get_white_patch_corrections(scam_json, postprocess_options))
     if not scam_json["checked"]:
         logging.warning("warning: processing unchecked json %s" % folder_path)
     add_prefix = postprocess_options["add_prefix"]
@@ -288,6 +293,77 @@ def postprocess_folder(folder_path, postprocess_options):
         elif file_info["img_path"] in sequence_info:
             derive_from_file(scam_json, file_info, postprocess_options, sequence_info[file_info["img_path"]])
 
+def get_cv2_img(folder_path, img_path):
+    global RAW_OPENER_REGISTERED
+    blob = gets3blob(folder_path+img_path)
+    if blob is None:
+        logging.error("cannot find %s", (folder_path+img_path))
+    blob.seek(0)
+    if is_likely_raw(img_path):
+        return get_cv2_from_raw(blob, "base")
+    else:
+        np_1d_array = np.asarray(blob.read(), dtype="uint8")
+        return cv2.imdecode(np_1d_array, cv2.IMREAD_COLOR)
+
+ROTATION_TO_CV2 = {
+    -90: cv2.ROTATE_90_CLOCKWISE,
+    270: cv2.ROTATE_90_CLOCKWISE,
+    90: cv2.ROTATE_90_COUNTERCLOCKWISE,
+    -270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+    180: cv2.ROTATE_180,
+    -180: cv2.ROTATE_180
+}
+
+def get_scaled_mar(file_info, page_info, img_w, img_h):
+    """
+    returns a scaled version of page_info["minAreaRect"] that is scaled in case
+    the file_info is smaller than the actual image (which can happens if preprocessing of raw files was deficient)
+    img_w, img_h need to be pre-rotation
+    returns the minAreaRect in the cv2 format ((cx, cy), (w, h), a)
+    """
+    if img_w == file_info["width"] and img_h == file_info["height"]:
+        return page_info["minAreaRect"]
+    scale_factor_x = img_w / file_info["width"]
+    scale_factor_y = img_h / file_info["height"]
+    c_x, c_y, w, h, a = page_info["minAreaRect"]
+    return ((c_x*scale_factor_x, c_y*scale_factor_y), (w*scale_factor_x, h*scale_factor_y), a)
+
+def get_white_patch_corrections(scam_json, postprocess_options):
+    """
+    returns an object with the keys being file paths and values being wb correction factors
+            derived from white patch annotations
+    """
+    res = {}
+    for file_info in scam_json["files"]:
+        if "pages" not in file_info or len(file_info["pages"]) < 1:
+            continue
+        img_path = file_info["img_path"]
+        for p in file_info["pages"]:
+            if "tags" in p and "T1" in p["tags"]:
+                img = get_cv2_img(scam_json["folder_path"], file_info["img_path"])
+                img_h, img_w, _ = img.shape
+                mar = get_scaled_mar(file_info, p, img_w, img_h)
+                # first, rotate
+                if file_info["rotation"] != 0:
+                    img = cv2.rotate(img, ROTATION_TO_CV2[file_info["rotation"]])
+                bbox = get_bounding_box(mar, img_w, img_h)
+                x_start, y_start, bbox_w, bbox_h = bbox
+                white_patch = img[y_start:(y_start+bbox_h), x_start:(x_start+bbox_w)]
+                #cv2.imwrite("/tmp/wp.tif", white_patch)
+                median_rgb = np.median(white_patch.reshape(-1, 3), axis=0)
+                target_rgb = np.array(postprocess_options["wb_patch_rgb_target"])
+                if img.dtype.itemsize == 2: # 16 bits
+                    target_rgb *= 255
+                scale_factors = target_rgb / median_rgb
+                # just for debugging:
+                #img = apply_scale_factors(img, scale_factors, 8)
+                #wp2 = apply_scale_factors(white_patch, scale_factors, 8)
+                #cv2.imwrite("/tmp/res.jpg", img)
+                #cv2.imwrite("/tmp/res-wp.jpg", wp2)
+                res[img_path] = list(scale_factors)
+                break
+    return res
+
 def postprocess_csv():
     if len(sys.argv) <= 1:
         print("nothing to do, please pass the path to a csv file")
@@ -305,3 +381,4 @@ def postprocess_csv():
 
 if __name__ == '__main__':
     postprocess_csv()
+    #postprocess_folder("NLM1/W2KG208159/sources/W2KG208159-I2KG208409/", DEFAULT_POSTPROCESS_OPTIONS)

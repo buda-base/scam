@@ -46,6 +46,15 @@ def rotate_warp_affine(pil_img, rect):
     returns acceptable results
     """
     opencv_img = np.array(pil_img)
+    res = rotate_warp_affine_cv2(opencv_img, rect)
+    return Image.fromarray(res)
+
+def rotate_warp_affine_cv2(opencv_img, rect):
+    """
+    rotate function based on warpAffine
+
+    returns acceptable results
+    """
     binary = opencv_img.dtype == bool
     if binary:
         # for some reason warp affine doesn't work on boolean so we convert the matrix to integers
@@ -60,13 +69,30 @@ def rotate_warp_affine(pil_img, rect):
     res = cv2.getRectSubPix(res, (int(width), int(height)), center)
     if binary:
         res = res.astype(bool)
-    return Image.fromarray(res)
+    return res
+
+def apply_scale_factors(cv2_img, scale_factors, output_bps=8):
+    """
+    Applies scale factors to a cv2_img, and casts the result to the target bps
+    """
+    # Apply scale factors to the entire image
+    corrected_img_np = cv2_img.astype(np.float32)  # Convert to float to prevent clipping during multiplication
+    for i in range(3):  # Apply the scale factor for each channel
+        if cv2_img.dtype.itemsize == 2 and output_bps == 8: # 16 bps -> 8 bps
+            corrected_img_np[:, :, i] *= (scale_factors[i] / 255)
+        else:
+            corrected_img_np[:, :, i] *= scale_factors[i]
+    if output_bps == 16:
+        corrected_img_np = np.clip(corrected_img_np, 0, 255*255).astype(np.uint16)
+    else:
+        corrected_img_np = np.clip(corrected_img_np, 0, 255).astype(np.uint8)
+    return corrected_img_np
 
 def get_bounding_box(min_area_rect, width, height):
     """
     Returns the smallest bounding box containing the minAreaRect.
     :param min_area_rect: Tuple with center, size, and angle (e.g., ((x,y),(w,h),angle))
-    :return: List of top-left and bottom-right corner points [(x1, y1), (x2, y2)]
+    :returns [x, y, w, h]
 
     Thank you ChatGPT
     """
