@@ -230,17 +230,16 @@ def derive_from_page(scam_json, file_info, pil_img, page_info, page_position, po
     suffix_letter = chr(96+page_position)
     extract = pil_img
     if page_info is not None:
-        minAreaRect = page_info["minAreaRect"]
+        mar = get_scaled_mar(file_info, page_info, pil_img.width, pil_img.height)
         if not postprocess_options["rotation_in_derivation"]:
-            bbox = get_bounding_box(page_info["minAreaRect"], pil_img.width, pil_img.height)
+            bbox = get_bounding_box(mar, pil_img.width, pil_img.height)
             logging.info("  extract with no rotation (%d, %d, %d, %d)", bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3])
             if not postprocess_options["dryrun"]:
                 extract = pil_img.crop((bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]))
         else:
-            mar = page_info["minAreaRect"]
-            logging.info("  extract with rotation (%f, %f), (%f, %f), %f)", mar[0], mar[1], mar[2], mar[3], mar[4])
+            logging.info("  extract with rotation ((%f, %f), (%f, %f), %f)", mar[0][0], mar[0][1], mar[1][0], mar[1][1], mar[2])
             if not postprocess_options["dryrun"]:
-                extract = rotate_warp_affine(pil_img, ((mar[0], mar[1]), (mar[2], mar[3]), mar[4]))
+                extract = rotate_warp_affine(pil_img, mar)
     if postprocess_options["dst_storage"] == "s3":
         s3key = "scam_cropped/"+scam_json["folder_path"]
         if prefix is None:
@@ -274,7 +273,7 @@ def postprocess_folder(folder_path, postprocess_options):
     """
     logging.info("preprocess %s" % folder_path)
     scam_json = get_scam_json(folder_path)
-    corrs = get_white_patch_corrections(scam_json, postprocess_options))
+    corrs = get_white_patch_corrections(scam_json, postprocess_options)
     if not scam_json["checked"]:
         logging.warning("warning: processing unchecked json %s" % folder_path)
     add_prefix = postprocess_options["add_prefix"]
