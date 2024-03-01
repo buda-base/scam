@@ -252,7 +252,10 @@ function App() {
         
         newImages[im] = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
         
-        const newData = allScamData[image.thumbnail_path].data
+        // #55
+        const newData = allScamData[image.thumbnail_path]?.data 
+          ?? (typeof json === "object" && json.files.find((im) => im?.thumbnail_path === image.thumbnail_path))
+          ?? {}
                 
         let toRotate = angle ;
         newData.rotation = rotation
