@@ -8,7 +8,8 @@ from PIL import Image
 from cal_sam_pickles import get_sam_output
 from img_utils import apply_exif_rotation, encode_img, get_best_mode
 from tqdm import tqdm
-from raw_opener import register_raw_opener
+from raw_utils import register_raw_opener
+from natsort import natsorted
 
 DEFAULT_PREPROCESS_OPTIONS = {
     "pps": 8,
@@ -31,7 +32,7 @@ def get_pickle_path(folder_path, img_path):
 
 def get_all_img_paths(folder_path):
     img_keys = []
-    for img_full_key in sorted(list_img_keys(folder_path)):
+    for img_full_key in natsorted(list_img_keys(folder_path)):
         if "_cropped_uncompressed/" in img_full_key:
             continue
         img_keys.append(img_full_key[len(folder_path):])
