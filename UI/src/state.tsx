@@ -85,6 +85,7 @@ export const defaultPadding = 56
 export const padding = atom<number>(defaultPadding)
 
 export const random = atom<boolean[]>([])
+export const outliar = atom<boolean[]>([])
 
 export const numWarn = atom(0)
 

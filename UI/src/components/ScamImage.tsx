@@ -263,9 +263,9 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 }
 
 
-export const ScamImageContainer = (props: { isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, selected:boolean,
+export const ScamImageContainer = (props: { isOutliar:boolean, isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, selected:boolean,
     setImageData: (data:ScamImageData|ScamImageData[]) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
-  const { isRandom, image, selected, handleSelectItem } = props;
+  const { isOutliar, isRandom, image, selected, handleSelectItem } = props;
 
   const { ref, inView, entry } = useInView({
     triggerOnce: false,
@@ -298,7 +298,7 @@ export const ScamImageContainer = (props: { isRandom:boolean, folder: string, im
 
   if (inView) { 
     
-    return <ScamImage {...props} divRef={ref} {...{isRandom, visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
+    return <ScamImage {...props} divRef={ref} {...{isRandom, isOutliar, visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
   }
   else {    
     const w = (grid === "mozaic" ? Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * mozaicFactor : image.thumbnail_info.width )
@@ -306,7 +306,7 @@ export const ScamImageContainer = (props: { isRandom:boolean, folder: string, im
 
 
     return (
-      <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid) + (" filter-" + filter) + (" random-" + isRandom)}
+      <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid) + (" filter-" + filter) + (" random-" + isRandom) + (" outliar-" + isOutliar) }
         style={{ 
           height: h + 2 * padding, 
           maxWidth: w + 2 * padding
@@ -434,10 +434,10 @@ function useWindowSize() {
   return windowSize;
 }
 
-const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
+const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
     loadDraft: boolean | undefined, checked: boolean, selected:boolean,
     setImageData:(data:ScamImageData|ScamImageData[])=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
-  const { isRandom, folder, config, image, divRef, draft, loadDraft, visible, checked, selected, setImageData, setVisible, setChecked, handleSelectItem } = props;
+  const { isOutliar, isRandom, folder, config, image, divRef, draft, loadDraft, visible, checked, selected, setImageData, setVisible, setChecked, handleSelectItem } = props;
 
   const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
@@ -1199,7 +1199,7 @@ const ScamImage = (props: { isRandom:boolean, folder: string, image: ScamImageDa
   return (<div title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} ref={divRef} className={"scam-image" + (loading ? " loading" : "") 
       + ( scamData != true && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
-      + (" random-" + isRandom) }
+      + (" random-" + isRandom) + (" outliar-" + isOutliar) }
     style={{ 
       height: visible ? actualH + 2 * padding : 80, 
       maxWidth: (grid === "mozaic" ? (portrait ? actualH : actualW) : image.thumbnail_info[portrait ? "height":"width"]) + 2*padding 

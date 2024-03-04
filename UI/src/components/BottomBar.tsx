@@ -592,8 +592,9 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   }, [grid, padding])
 
   const [random, setRandom] = useAtom(state.random)
+  const [outliar, setOutliar] = useAtom(state.outliar)
 
-  const handleRandom = () => {    
+  const handleRandom = useCallback(() => {    
     if(typeof json == "object") {
       const n = json?.files.length
       const p = Math.floor(json?.files.length / 10)
@@ -611,16 +612,57 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
 
       setRandom(randAll)
     }
-  }
+  }, [json, setRandom])
 
   const handleRotate = (angle:number) => {
     batchRotate(angle)
   }
 
+  const handleOutliar = useCallback(() => {    
+    const newOutliar = []
+    let total = 0, n = 0
+    for(let im of json?.files ?? []) {      
+      if(allScamData[im.thumbnail_path]) im = allScamData[im.thumbnail_path].data 
+      if(im?.pages) { 
+        for(const p of im.pages) {
+          if(!p.tags?.length) {
+            total += p.minAreaRect[2] * p.minAreaRect[3]
+            n++
+          }
+        }
+      }
+    }
+    const med = total / n, maxMed = 1.5 * med, minMed = 0.75 * med
+    let found 
+    for(let im of json?.files ?? []) {      
+      found = false
+      if(allScamData[im.thumbnail_path]) im = allScamData[im.thumbnail_path].data 
+      if(im?.pages) { 
+        for(const p of im.pages) {
+          if(!p.tags?.length) {
+            const area = p.minAreaRect[2] * p.minAreaRect[3]
+            if(area < minMed || area > maxMed) {
+              newOutliar.push(true)
+              found = true
+              break
+            }
+          }
+        }
+      } 
+      if(!found) newOutliar.push(false)
+    } 
+    setOutliar(newOutliar)
+  }, [allScamData, json, setOutliar])
+
   const [loadThumbnails, setLoadThumbnails] = useAtom(state.loadThumbnails)
   const [brighten, setBrighten] = useAtom(state.brighten)
   const [contrast, setContrast] = useAtom(state.contrast)
   const [hideAnno, setHideAnno] = useAtom(state.hideAnno)
+
+  const funcs:Record<string,()=>void> = useMemo(() => ({
+    random:handleRandom,
+    outliar:handleOutliar
+  }), [handleRandom, handleOutliar])
 
   return (<nav className="bot">
     <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
@@ -649,7 +691,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         label="Filter images"
         onChange={(r) => r.target.value != "load" ? setFilter(r.target.value) : null}
       >
-        { ["all", "warning", "unchecked", "random" ].map(f => <MenuItem value={f} {...f === "random" ? {onClick:() => handleRandom()}:{}}>{f}</MenuItem>) }
+        { ["all", "warning", "unchecked", "random", "outliar" ].map(f => <MenuItem value={f} {...funcs[f] ? {onClick:() => (funcs[f])()}:{}}>{f}</MenuItem>) }
       </TextField>
       <TextField
         SelectProps={{ 
