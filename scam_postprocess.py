@@ -4,12 +4,14 @@ import os
 import logging
 from PIL import Image
 from tqdm import tqdm
-from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing
+from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_cv2, apply_scale_factors_pil
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
-from utils import upload_to_s3
-from raw_opener import register_raw_opener
+from utils import upload_to_s3, gets3blob
+from raw_utils import register_raw_opener, is_likely_raw, get_cv2_from_raw
 from natsort import natsorted
+import numpy as np
+import cv2
 
 #logging.basicConfig(level=logging.INFO)
 
@@ -23,7 +25,11 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "local_dst_folder": "./scam_cropped/",
     "add_prefix": "auto", # controls adding an image sequence prefix to the file name, can be True, False or "auto" to do it only if resequencing happens
     "resequence": "auto", # in the case where a prefix can be added, resequence images assuming that one image is all rectos and the next is all versos. "auto" will do that on all images if it can find a pair of consecutive images with 3 pages
-    "dryrun": False
+    "dryrun": False,
+    "output_bps": 8, # can be 8, 16 or "auto" (16 bits if raw with no correction, 8 bits otherwise). Actually 16 and "auto" can't work with PIL
+    "wb_correction": "auto", # can be a list of 4 floats, "auto" to check for white patch annotations in the folders, or None for no auto_correction
+    "wb_patch_rgb_target": [243, 243, 242], # the target RGB values given on 8-bit per channel, corresponding to the white patch of the color card. These usually are aroun 240, 240, 240
+    "force_apply_icc": False # when False, icc is kept when possible in the output files, if not it is applied
 }
 
 # pages are 
@@ -157,7 +163,7 @@ def get_output_pages(file_info):
         previous_minAreaRect = p["minAreaRect"]
         # ignore annotations with some labels:
         if "tags" in p and "T1" in p["tags"]:
-            to_delete_idx.apend(i)
+            to_delete_idx.append(i)
             continue
         # compute largest_area
         largest_area = max(largest_area, p["minAreaRect"][2]*p["minAreaRect"][3])
@@ -184,7 +190,7 @@ def order_pages(pages):
     else:
         return sorted(pages, key=(lambda x: x["minAreaRect"][1]))
 
-def derive_from_file(scam_json, file_info, postprocess_options, prefixes):
+def derive_from_file(scam_json, file_info, postprocess_options, prefixes, wb_correction):
     pages = get_output_pages(file_info)
     if pages is None:
         logging.info("do not derive from hidden image %s" % file_info["img_path"])
@@ -192,7 +198,7 @@ def derive_from_file(scam_json, file_info, postprocess_options, prefixes):
     pil_img = None
     if postprocess_options["src_storage"] == "s3":
         if not postprocess_options["dryrun"]:
-            pil_img = get_pil_img(scam_json["folder_path"], file_info["img_path"])
+            pil_img = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], wb_correction, postprocess_options["output_bps"])
     else:
         local_path = postprocess_options["local_src_folder"]
         if not postprocess_options["skip_folder_local_input"]:
@@ -200,12 +206,6 @@ def derive_from_file(scam_json, file_info, postprocess_options, prefixes):
         local_path += file_info["img_path"]
         if not postprocess_options["dryrun"]:
             pil_img = Image.open(local_path)
-    # check height and width
-    if not postprocess_options["dryrun"]:
-        if pil_img.height != file_info["height"] or pil_img.width != file_info["width"]:
-            logging.error("got image with different width or height from the original: %s" % file_info["img_path"])
-            return
-        pil_img = sanitize_for_postprocessing(pil_img)
     if file_info["rotation"] != 0:
         logging.info("rotate %s by %d", file_info["img_path"], file_info["rotation"])
         if not postprocess_options["dryrun"]:
@@ -225,17 +225,18 @@ def derive_from_page(scam_json, file_info, pil_img, page_info, page_position, po
     suffix_letter = chr(96+page_position)
     extract = pil_img
     if page_info is not None:
-        minAreaRect = page_info["minAreaRect"]
+        original_img_w = pil_img.height if file_info["rotation"] in ["-90", "90", "-270", "270"] else pil_img.width
+        original_img_h = pil_img.width if file_info["rotation"] in ["-90", "90", "-270", "270"] else pil_img.height
+        mar = get_scaled_mar(file_info, page_info, original_img_w, original_img_h)
         if not postprocess_options["rotation_in_derivation"]:
-            bbox = get_bounding_box(page_info["minAreaRect"], pil_img.width, pil_img.height)
+            bbox = get_bounding_box(mar, pil_img.width, pil_img.height)
             logging.info("  extract with no rotation (%d, %d, %d, %d)", bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3])
             if not postprocess_options["dryrun"]:
                 extract = pil_img.crop((bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]))
         else:
-            mar = page_info["minAreaRect"]
-            logging.info("  extract with rotation (%f, %f), (%f, %f), %f)", mar[0], mar[1], mar[2], mar[3], mar[4])
+            logging.info("  extract with rotation ((%f, %f), (%f, %f), %f)", mar[0][0], mar[0][1], mar[1][0], mar[1][1], mar[2])
             if not postprocess_options["dryrun"]:
-                extract = rotate_warp_affine(pil_img, ((mar[0], mar[1]), (mar[2], mar[3]), mar[4]))
+                extract = rotate_warp_affine(pil_img, mar)
     if postprocess_options["dst_storage"] == "s3":
         s3key = "scam_cropped/"+scam_json["folder_path"]
         if prefix is None:
@@ -269,6 +270,28 @@ def postprocess_folder(folder_path, postprocess_options):
     """
     logging.info("preprocess %s" % folder_path)
     scam_json = get_scam_json(folder_path)
+    img_path_to_wb_corr = {}
+    img_paths = [file_info["img_path"] for file_info in scam_json["files"]]
+    img_paths = natsorted(img_paths)
+    if postprocess_options["wb_correction"] == "auto":
+        corrs = get_white_patch_corrections(scam_json, postprocess_options)
+        if len(corrs) > 0:
+            # we potentially use the first correction for images that are
+            # before the first image with a color card
+            curr_corr = None
+            # just looking for the first color card
+            for img_path in img_paths:
+                if img_path in corrs:
+                    cur_corr = corrs[img_path]
+                    break
+            # then actually fill the corrections
+            for img_path in img_paths:
+                if img_path in corrs:
+                    cur_corr = corrs[img_path]
+                img_path_to_wb_corr[img_path] = cur_corr
+    else:
+        for img_path in img_paths:
+            img_path_to_wb_corr[img_path] = postprocess_options["wb_correction"]
     if not scam_json["checked"]:
         logging.warning("warning: processing unchecked json %s" % folder_path)
     add_prefix = postprocess_options["add_prefix"]
@@ -283,9 +306,101 @@ def postprocess_folder(folder_path, postprocess_options):
             add_prefix = True
     for file_info in tqdm(scam_json["files"]):
         if not add_prefix:
-            derive_from_file(scam_json, file_info, postprocess_options, None)
+            derive_from_file(scam_json, file_info, postprocess_options, None, img_path_to_wb_corr[file_info["img_path"]])
         elif file_info["img_path"] in sequence_info:
-            derive_from_file(scam_json, file_info, postprocess_options, sequence_info[file_info["img_path"]])
+            derive_from_file(scam_json, file_info, postprocess_options, sequence_info[file_info["img_path"]], img_path_to_wb_corr[file_info["img_path"]])
+
+def get_cv2_img(folder_path, img_path):
+    blob = gets3blob(folder_path+img_path)
+    if blob is None:
+        logging.error("cannot find %s", (folder_path+img_path))
+    blob.seek(0)
+    if is_likely_raw(img_path):
+        return get_cv2_from_raw(blob, "base")
+    else:
+        pil_img = Image.open(blob)
+        pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=True)
+        if pil_img.mode == "RGB":
+            return cv2.cvtColor(np.asarray(im_pil), cv2.COLOR_RGB2BGR)
+        return np.asarray(im_pil)
+
+def get_postprocess_pil_img(folder_path, img_path, wb_correction, postprocess_options):
+    blob = gets3blob(folder_path+img_path)
+    if blob is None:
+        logging.error("cannot find %s", (folder_path+img_path))
+    blob.seek(0)
+    if is_likely_raw(img_path):
+        cv2_img = get_cv2_from_raw(blob, "base")
+        if wb_correction is not None:
+            cv2_img = apply_scale_factors_cv2(cv2_img, wb_correction, 8)
+        return Image.fromarray(cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB))
+    else:
+        pil_img = Image.open(blob)
+        pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=postprocess_options["force_apply_icc"])
+        if wb_correction is not None:
+            if not icc_applied:
+                pil_img = apply_icc(pil_img)
+            pil_img = apply_scale_factors_pil(pil_img)
+        return pil_img
+
+ROTATION_TO_CV2 = {
+    -90: cv2.ROTATE_90_CLOCKWISE,
+    270: cv2.ROTATE_90_CLOCKWISE,
+    90: cv2.ROTATE_90_COUNTERCLOCKWISE,
+    -270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+    180: cv2.ROTATE_180,
+    -180: cv2.ROTATE_180
+}
+
+def get_scaled_mar(file_info, page_info, img_w, img_h):
+    """
+    returns a scaled version of page_info["minAreaRect"] that is scaled in case
+    the file_info is smaller than the actual image (which can happens if preprocessing of raw files was deficient)
+    img_w, img_h need to be pre-rotation
+    returns the minAreaRect in the cv2 format ((cx, cy), (w, h), a)
+    """
+    if img_w == file_info["width"] and img_h == file_info["height"]:
+        return page_info["minAreaRect"]
+    scale_factor_x = img_w / file_info["width"]
+    scale_factor_y = img_h / file_info["height"]
+    c_x, c_y, w, h, a = page_info["minAreaRect"]
+    return ((c_x*scale_factor_x, c_y*scale_factor_y), (w*scale_factor_x, h*scale_factor_y), a)
+
+def get_white_patch_corrections(scam_json, postprocess_options):
+    """
+    returns an object with the keys being file paths and values being wb correction factors
+            derived from white patch annotations
+    """
+    res = {}
+    for file_info in scam_json["files"]:
+        if "pages" not in file_info or len(file_info["pages"]) < 1:
+            continue
+        img_path = file_info["img_path"]
+        for p in file_info["pages"]:
+            if "tags" in p and "T1" in p["tags"]:
+                img = get_cv2_img(scam_json["folder_path"], file_info["img_path"])
+                img_h, img_w, _ = img.shape
+                mar = get_scaled_mar(file_info, p, img_w, img_h)
+                # first, rotate
+                if file_info["rotation"] != 0:
+                    img = cv2.rotate(img, ROTATION_TO_CV2[file_info["rotation"]])
+                bbox = get_bounding_box(mar, img_w, img_h)
+                x_start, y_start, bbox_w, bbox_h = bbox
+                white_patch = img[y_start:(y_start+bbox_h), x_start:(x_start+bbox_w)]
+                #cv2.imwrite("/tmp/wp.tif", white_patch)
+                median_rgb = np.median(white_patch.reshape(-1, 3), axis=0)
+                target_rgb = np.array(postprocess_options["wb_patch_rgb_target"])
+                if img.dtype.itemsize == 2: # 16 bits
+                    target_rgb *= 255
+                scale_factors = target_rgb / median_rgb
+                # just for debugging:
+                #img = apply_scale_factors(img, scale_factors, 8)
+                #wp2 = apply_scale_factors(white_patch, scale_factors, 8)
+                #cv2.imwrite("/tmp/res.jpg", img)
+                #cv2.imwrite("/tmp/res-wp.jpg", wp2)
+                res[img_path] = list(scale_factors)
+                break
+    return res
 
 def postprocess_csv():
     if len(sys.argv) <= 1:
@@ -304,3 +419,4 @@ def postprocess_csv():
 
 if __name__ == '__main__':
     postprocess_csv()
+    #postprocess_folder("NLM1/W2KG208159/sources/W2KG208159-I2KG208409/", DEFAULT_POSTPROCESS_OPTIONS)
