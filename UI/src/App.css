@@ -196,6 +196,22 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   text-overflow: ellipsis;
 }
 
+
+.scam-image figcaption label > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+
+.scam-image.grid-2x1 figcaption label > span:last-child { max-width:calc(50vw - 130px); }
+.scam-image.grid-3x2 figcaption label > span:last-child { max-width:calc(33vw - 130px); }
+.scam-image.grid-4x3 figcaption label > span:last-child { max-width:calc(25vw - 130px); }
+.scam-image.grid-5x3 figcaption label > span:last-child { max-width:calc(20vw - 130px); }
+
 /* .scam-image.filter-random.random-false { display:none; } */
 
 .scam-image.has-warning {

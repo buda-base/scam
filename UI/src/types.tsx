@@ -116,7 +116,8 @@ export type ScamOptions = {
   minSquarish?: number,
   fixedWidth?: number,
   fixedHeight?: number,
-  cutAtFixed?: boolean
+  cutAtFixed?: boolean,
+  expandToFixed?: boolean
 }
 
 export type Filter = 'all' | 'warning' | 'unchecked'

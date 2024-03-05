@@ -47,6 +47,7 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
   const [fixedWidth, setFixedWidth] = useAtom(state.fixedWidthAtom)
   const [fixedHeight, setFixedHeight] = useAtom(state.fixedHeightAtom)
   const [cutAtFixed, setCutAtFixed] = useAtom(state.cutAtFixedAtom)
+  const [expandToFixed, setExpandToFixed] = useAtom(state.expandToFixedAtom)
 
   const [popChecked, setPopChecked] = useState(false)
   const [checked, setChecked] = useState(true)
@@ -70,22 +71,22 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
 
   const updateOptions = useCallback(async () => {
-    const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed }:{} }
+    const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, expandToFixed }:{} }
     //debug("opts!", opts, selectedItems.length, globalScamOptionsUpdate, checkedRestrict)
     if(selectedItems.length > 0 && !checkedRestrict || !selectedItems.length || globalScamOptionsUpdate) setScamOptions(opts)
     else setScamOptionsSelected(opts)    
     if(globalScamOptionsUpdate != false) setGlobalScamOptionsUpdate(false)
 
     const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
-    local.options = { orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed }
+    local.options = { orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, expandToFixed }
     localStorage.setItem("scamUI", JSON.stringify(local))
 
-  }, [orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, selectedItems.length, checkedRestrict, globalScamOptionsUpdate, 
+  }, [orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, expandToFixed, selectedItems.length, checkedRestrict, globalScamOptionsUpdate, 
       setScamOptions, setScamOptionsSelected, setGlobalScamOptionsUpdate])   
     
   useEffect(() => {
     updateOptions()
-  },[ orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, selectedItems, globalScamOptionsUpdate])
+  },[ orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, expandToFixed, selectedItems, globalScamOptionsUpdate])
 
   /*  
   useEffect(() =>  {

@@ -318,6 +318,7 @@ function App() {
   const [fixedWidth, setFixedWidth] = useAtom(state.fixedWidthAtom)
   const [fixedHeight, setFixedHeight] = useAtom(state.fixedHeightAtom)
   const [cutAtFixed, setCutAtFixed] = useAtom(state.cutAtFixedAtom)
+  const [expandToFixed, setExpandToFixed] = useAtom(state.expandToFixedAtom)
   const [configReady, setConfigReady] = useAtom(state.configReady)
 
   const [configs, setConfigs] = useAtom(state.configs)
@@ -461,6 +462,7 @@ function App() {
     if(options.fixedWidth) setFixedWidth(options.fixedWidth)
     if(options.fixedHeight) setFixedHeight(options.fixedHeight)
     if(options.cutAtFixed) setCutAtFixed(options.cutAtFixed)
+    if(options.expandToFixed) setExpandToFixed(options.expandToFixed)
   }
 
   const options= {
@@ -486,6 +488,9 @@ function App() {
     "cut_at_fixed": orient == "custom" 
       ? cutAtFixed
       : false,
+    "expand_to_fixed": orient == "custom" 
+        ? expandToFixed
+        : false,
     "fixed_width": orient == "custom" 
       ? fixedWidth
       : -1,

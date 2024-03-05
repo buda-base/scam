@@ -88,7 +88,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 
   const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
   const [selectedAreaRatio, setSelectedAreaRatio ] = useAtom(state.selectedAreaRatio) 
-  const [selectedCutAtFixed, setSelectedCutAtFixed ] = useAtom(state.selectedCutAtFixed) 
+  const [selectedFixed, setSelectedFixed ] = useAtom(state.selectedFixed) 
   useEffect(() => {
     if(isSelected && shRef.current) {
       const stage = shRef.current.getStage()
@@ -99,8 +99,8 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
         setSelectedRatio(ratio)
         setSelectedAreaRatio(areaRatio)
 
-        if(rotatedHandle) setSelectedCutAtFixed([page?.minAreaRect[3] || 0, page?.minAreaRect[2] || 0])
-        else setSelectedCutAtFixed([page?.minAreaRect[2] || 0, page?.minAreaRect[3] || 0])
+        if(rotatedHandle) setSelectedFixed([page?.minAreaRect[3] || 0, page?.minAreaRect[2] || 0])
+        else setSelectedFixed([page?.minAreaRect[2] || 0, page?.minAreaRect[3] || 0])
       }
     }
   }, [isSelected, ratio, rotatedHandle, padding])
@@ -541,7 +541,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
   
   const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
   const [selectedAreaRatio, setSelectedAreaRatio ] = useAtom(state.selectedAreaRatio) 
-  const [selectedCutAtFixed, setSelectedCutAtFixed ] = useAtom(state.selectedCutAtFixed) 
+  const [selectedFixed, setSelectedFixed ] = useAtom(state.selectedFixed) 
 
   useEffect(() => {
     //debug("des:", image.thumbnail_path, deselectAll)
@@ -848,7 +848,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
       selectShape(null);
       setSelectedRatio(0);
       setSelectedAreaRatio(0);
-      setSelectedCutAtFixed([]);
+      setSelectedFixed([]);
     }
   };
   const checkDeselectDiv: MouseEventHandler<HTMLDivElement> = (e) => {
@@ -858,7 +858,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
       selectShape(null);
       setSelectedRatio(0);
       setSelectedAreaRatio(0);
-      setSelectedCutAtFixed([]);
+      setSelectedFixed([]);
     }
   };
 
