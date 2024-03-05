@@ -269,6 +269,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   box-sizing: border-box;
   z-index:0;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .scam-image figcaption .tag {
