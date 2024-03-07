@@ -24,16 +24,18 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
   const [fixedWidth, setFixedWidth] = useAtom(state.fixedWidthAtom)
   const [fixedHeight, setFixedHeight] = useAtom(state.fixedHeightAtom)
   const [cutAtFixed, setCutAtFixed] = useAtom(state.cutAtFixedAtom)
+  const [expandToFixed, setExpandToFixed] = useAtom(state.expandToFixedAtom)
   
   //const [modified, setModified] = useAtom(state.modified)
 
   const [editRatio, setEditRatio] = useState(false)
   const [editAreaRatio, setEditAreaRatio] = useState(false)
   const [editCutAtFixed, setEditCutAtFixed] = useState(false)
+  const [editExpandToFixed, setEditExpandToFixed] = useState(false)
 
   const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
   const [selectedAreaRatio, setSelectedAreaRatio ] = useAtom(state.selectedAreaRatio) 
-  const [selectedCutAtFixed, setSelectedCutAtFixed ] = useAtom(state.selectedCutAtFixed) 
+  const [selectedFixed, setSelectedFixed ] = useAtom(state.selectedFixed) 
 
   /* // better show a warning
   useEffect(() => {
@@ -204,7 +206,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
             </InputLabel>
             <Checkbox checked={cutAtFixed} sx={{ marginLeft:"-12px", marginTop:"-6px"}} onChange={(ev) => setCutAtFixed(ev.target.checked)} />
             <span style={{ position:"relative" }}>
-              <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedWidth(Math.round(selectedCutAtFixed[0])) }
+              <IconButton disabled={!cutAtFixed || !selectedFixed.length}  onClick={() => setFixedWidth(Math.round(selectedFixed[0])) }
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
               </IconButton>
@@ -222,7 +224,7 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
             </span>
             <span style={{ fontSize: "16px", lineHeight: "30px" }}> : </span>
             <span style={{ position:"relative" }}>
-              <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length}  onClick={() => setFixedHeight(Math.round(selectedCutAtFixed[1])) }
+              <IconButton disabled={!cutAtFixed || !selectedFixed.length}  onClick={() => setFixedHeight(Math.round(selectedFixed[1])) }
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
               </IconButton>
@@ -238,7 +240,52 @@ const SettingsMenu = (/*props: { folder:string, image: ScamImageData, config: Co
                 onBlur={() => setEditCutAtFixed(false)}
                 />
             </span>
-              {/* <IconButton disabled={!cutAtFixed || !selectedCutAtFixed.length} onClick={() => { setFixedWidth(selectedCutAtFixed[0]); setFixedHeight(selectedCutAtFixed[1]); }}
+              {/* <IconButton disabled={!cutAtFixed || !selectedFixed.length} onClick={() => { setFixedWidth(selectedFixed[0]); setFixedHeight(selectedFixed[1]); }}
+                  sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", marginLeft:"5px", marginTop:"-5px", zIndex:1}}>
+                <SystemUpdateAlt sx={{height:16}} />
+              </IconButton> */}
+          </Box>
+          <Box sx={{ marginRight:"16px", marginTop:"16px", alignItems: "baseline" }}>
+            <InputLabel shrink={false} id="custom-label" style={{ fontSize:12, lineHeight: "14px", height:16, color: editExpandToFixed ? theme.palette.primary.main : theme.palette.text.secondary }}>
+              Expand to fixed resolution
+            </InputLabel>
+            <Checkbox checked={expandToFixed} sx={{ marginLeft:"-12px", marginTop:"-6px"}} onChange={(ev) => setExpandToFixed(ev.target.checked)} />
+            <span style={{ position:"relative" }}>
+              <IconButton disabled={!expandToFixed || !selectedFixed.length}  onClick={() => setFixedWidth(Math.round(selectedFixed[0])) }
+                  sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", zIndex:1}}>
+                <SystemUpdateAlt sx={{height:16}} />
+              </IconButton>
+              <TextField
+                type="number"
+                sx={{ width:"100px", marginRight:"8px" }}
+                inputProps={{ style:{ textAlign: "left", paddingLeft:"28px" }, step: 1, min:-1, max:10000 }}
+                variant="standard"                
+                value={fixedWidth}
+                disabled={!expandToFixed}
+                onChange={(e) => setFixedWidth(Number(e.target.value))}
+                onFocus={() => setEditExpandToFixed(true)}
+                onBlur={() => setEditExpandToFixed(false)}
+              />
+            </span>
+            <span style={{ fontSize: "16px", lineHeight: "30px" }}> : </span>
+            <span style={{ position:"relative" }}>
+              <IconButton disabled={!expandToFixed || !selectedFixed.length}  onClick={() => setFixedHeight(Math.round(selectedFixed[1])) }
+                  sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", position: "absolute", marginTop:"3px", marginLeft:"7px", zIndex:1}}>
+                <SystemUpdateAlt sx={{height:16}} />
+              </IconButton>
+              <TextField
+                type="number"
+                sx={{ width:"100px", marginLeft:"8px" }}
+                inputProps={{ step: 1, min:-1, max:10000, style: { paddingLeft:"28px" }}}
+                variant="standard"
+                value={fixedHeight}
+                disabled={!expandToFixed}
+                onChange={(e) => setFixedHeight(Number(e.target.value))}
+                onFocus={() => setEditExpandToFixed(true)}
+                onBlur={() => setEditExpandToFixed(false)}
+                />
+            </span>
+              {/* <IconButton disabled={!expandToFixed || !selectedexpandToFixed.length} onClick={() => { setFixedWidth(selectedexpandToFixed[0]); setFixedHeight(selectedexpandToFixed[1]); }}
                   sx={{width:24, height:24, transform:"rotate(180deg)", color:"black", marginLeft:"5px", marginTop:"-5px", zIndex:1}}>
                 <SystemUpdateAlt sx={{height:16}} />
               </IconButton> */}

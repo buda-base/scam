@@ -146,6 +146,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   left:0;
 }
 
+.scam-image.filter-outliar.outliar-false:not(.grid-mozaic),
 .scam-image.filter-random.random-false:not(.grid-mozaic),
 .scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic),
 .scam-image.filter-warning.warning-false:not(.focus-true):not(.grid-mozaic),
@@ -162,6 +163,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 }
 */
 
+.scam-image.filter-outliar.outliar-false:not(.grid-mozaic) > figure > div,
 .scam-image.filter-random.random-false:not(.grid-mozaic) > figure > div,
 .scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic) > figure > div,
 .scam-image.filter-warning.warning-false:not(.focus-true):not(.grid-mozaic) > figure > div,
@@ -170,6 +172,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   visibility: hidden; height:45px;
 }
 
+.scam-image.filter-outliar.outliar-false.grid-mozaic > figure > div,
 .scam-image.filter-random.random-false.grid-mozaic > figure > div,
 .scam-image.filter-warning.warning-true.checked-true.grid-mozaic > figure > div,
 .scam-image.filter-warning.warning-false:not(.focus-true).grid-mozaic > figure > div,
@@ -178,6 +181,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   pointer-events: none;
 }
 
+.scam-image.filter-outliar.outliar-false > figure figcaption label > span:last-child,
 .scam-image.filter-random.random-false > figure figcaption label > span:last-child,
 .scam-image.filter-warning.warning-true.checked-true > figure figcaption label > span:last-child,
 .scam-image.filter-warning.warning-false:not(.focus-true) > figure figcaption label > span:last-child,
@@ -191,6 +195,22 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+
+.scam-image figcaption label > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+
+.scam-image.grid-2x1 figcaption label > span:last-child { max-width:calc(50vw - 130px); }
+.scam-image.grid-3x2 figcaption label > span:last-child { max-width:calc(33vw - 130px); }
+.scam-image.grid-4x3 figcaption label > span:last-child { max-width:calc(25vw - 130px); }
+.scam-image.grid-5x3 figcaption label > span:last-child { max-width:calc(20vw - 130px); }
 
 /* .scam-image.filter-random.random-false { display:none; } */
 
@@ -219,10 +239,19 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   word-break: break-all;
   padding:8px;
   box-sizing: border-box;
+  /* 
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: center; 
+  */
+  overflow: hidden;
+  left:10%;
+  width: 80%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
 }
 
 .scam-image .visible-false img { opacity: 50%; margin:10px; }
@@ -240,6 +269,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   box-sizing: border-box;
   z-index:0;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .scam-image figcaption .tag {

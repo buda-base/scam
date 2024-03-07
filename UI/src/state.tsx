@@ -21,6 +21,7 @@ export const configReady = atom<boolean|undefined>(undefined)
 export const fixedWidthAtom = atom(hasCustomOptions?.fixedWidth || -1)
 export const fixedHeightAtom = atom(hasCustomOptions?.fixedHeight || -1)
 export const cutAtFixedAtom = atom(hasCustomOptions?.cutAtFixed || false)
+export const expandToFixedAtom = atom(hasCustomOptions?.expandToFixed || false)
 
 export const shouldRunAfterAtom = atom(123)
 
@@ -73,7 +74,7 @@ export const configs = atom<ScamOptions[]>([])
 
 export const selectedRatio = atom(0)
 export const selectedAreaRatio = atom(0)
-export const selectedCutAtFixed = atom<number[]>([])
+export const selectedFixed = atom<number[]>([])
 
 export const showSettings = atom(false);
 
@@ -85,6 +86,7 @@ export const defaultPadding = 56
 export const padding = atom<number>(defaultPadding)
 
 export const random = atom<boolean[]>([])
+export const outliar = atom<boolean[]>([])
 
 export const numWarn = atom(0)
 

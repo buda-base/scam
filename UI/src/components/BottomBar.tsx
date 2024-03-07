@@ -47,6 +47,7 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
   const [fixedWidth, setFixedWidth] = useAtom(state.fixedWidthAtom)
   const [fixedHeight, setFixedHeight] = useAtom(state.fixedHeightAtom)
   const [cutAtFixed, setCutAtFixed] = useAtom(state.cutAtFixedAtom)
+  const [expandToFixed, setExpandToFixed] = useAtom(state.expandToFixedAtom)
 
   const [popChecked, setPopChecked] = useState(false)
   const [checked, setChecked] = useState(true)
@@ -70,22 +71,22 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
   const [scamOptionsSelected, setScamOptionsSelected] = useAtom(state.scamOptionsSelected)
 
   const updateOptions = useCallback(async () => {
-    const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed }:{} }
+    const opts:ScamOptions = { orient, ...orient === "custom" ? { direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, expandToFixed }:{} }
     //debug("opts!", opts, selectedItems.length, globalScamOptionsUpdate, checkedRestrict)
     if(selectedItems.length > 0 && !checkedRestrict || !selectedItems.length || globalScamOptionsUpdate) setScamOptions(opts)
     else setScamOptionsSelected(opts)    
     if(globalScamOptionsUpdate != false) setGlobalScamOptionsUpdate(false)
 
     const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
-    local.options = { orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed }
+    local.options = { orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, expandToFixed }
     localStorage.setItem("scamUI", JSON.stringify(local))
 
-  }, [orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, selectedItems.length, checkedRestrict, globalScamOptionsUpdate, 
+  }, [orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, expandToFixed, selectedItems.length, checkedRestrict, globalScamOptionsUpdate, 
       setScamOptions, setScamOptionsSelected, setGlobalScamOptionsUpdate])   
     
   useEffect(() => {
     updateOptions()
-  },[ orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, selectedItems, globalScamOptionsUpdate])
+  },[ orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, expandToFixed, selectedItems, globalScamOptionsUpdate])
 
   /*  
   useEffect(() =>  {
@@ -592,8 +593,9 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   }, [grid, padding])
 
   const [random, setRandom] = useAtom(state.random)
+  const [outliar, setOutliar] = useAtom(state.outliar)
 
-  const handleRandom = () => {    
+  const handleRandom = useCallback(() => {    
     if(typeof json == "object") {
       const n = json?.files.length
       const p = Math.floor(json?.files.length / 10)
@@ -611,16 +613,57 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
 
       setRandom(randAll)
     }
-  }
+  }, [json, setRandom])
 
   const handleRotate = (angle:number) => {
     batchRotate(angle)
   }
 
+  const handleOutliar = useCallback(() => {    
+    const newOutliar = []
+    let total = 0, n = 0
+    for(let im of json?.files ?? []) {      
+      if(allScamData[im.thumbnail_path]) im = allScamData[im.thumbnail_path].data 
+      if(im?.pages) { 
+        for(const p of im.pages) {
+          if(!p.tags?.length) {
+            total += p.minAreaRect[2] * p.minAreaRect[3]
+            n++
+          }
+        }
+      }
+    }
+    const med = total / n, maxMed = 1.5 * med, minMed = 0.75 * med
+    let found 
+    for(let im of json?.files ?? []) {      
+      found = false
+      if(allScamData[im.thumbnail_path]) im = allScamData[im.thumbnail_path].data 
+      if(im?.pages) { 
+        for(const p of im.pages) {
+          if(!p.tags?.length) {
+            const area = p.minAreaRect[2] * p.minAreaRect[3]
+            if(area < minMed || area > maxMed) {
+              newOutliar.push(true)
+              found = true
+              break
+            }
+          }
+        }
+      } 
+      if(!found) newOutliar.push(false)
+    } 
+    setOutliar(newOutliar)
+  }, [allScamData, json, setOutliar])
+
   const [loadThumbnails, setLoadThumbnails] = useAtom(state.loadThumbnails)
   const [brighten, setBrighten] = useAtom(state.brighten)
   const [contrast, setContrast] = useAtom(state.contrast)
   const [hideAnno, setHideAnno] = useAtom(state.hideAnno)
+
+  const funcs:Record<string,()=>void> = useMemo(() => ({
+    random:handleRandom,
+    outliar:handleOutliar
+  }), [handleRandom, handleOutliar])
 
   return (<nav className="bot">
     <Box sx={{ display:"flex", alignItems:"center" /*, minWidth:"250px"*/ }}>        
@@ -649,7 +692,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         label="Filter images"
         onChange={(r) => r.target.value != "load" ? setFilter(r.target.value) : null}
       >
-        { ["all", "warning", "unchecked", "random" ].map(f => <MenuItem value={f} {...f === "random" ? {onClick:() => handleRandom()}:{}}>{f}</MenuItem>) }
+        { ["all", "warning", "unchecked", "random", "outliar" ].map(f => <MenuItem value={f} {...funcs[f] ? {onClick:() => (funcs[f])()}:{}}>{f}</MenuItem>) }
       </TextField>
       <TextField
         SelectProps={{ 

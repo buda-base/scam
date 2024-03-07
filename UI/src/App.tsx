@@ -318,6 +318,7 @@ function App() {
   const [fixedWidth, setFixedWidth] = useAtom(state.fixedWidthAtom)
   const [fixedHeight, setFixedHeight] = useAtom(state.fixedHeightAtom)
   const [cutAtFixed, setCutAtFixed] = useAtom(state.cutAtFixedAtom)
+  const [expandToFixed, setExpandToFixed] = useAtom(state.expandToFixedAtom)
   const [configReady, setConfigReady] = useAtom(state.configReady)
 
   const [configs, setConfigs] = useAtom(state.configs)
@@ -461,6 +462,7 @@ function App() {
     if(options.fixedWidth) setFixedWidth(options.fixedWidth)
     if(options.fixedHeight) setFixedHeight(options.fixedHeight)
     if(options.cutAtFixed) setCutAtFixed(options.cutAtFixed)
+    if(options.expandToFixed) setExpandToFixed(options.expandToFixed)
   }
 
   const options= {
@@ -486,6 +488,9 @@ function App() {
     "cut_at_fixed": orient == "custom" 
       ? cutAtFixed
       : false,
+    "expand_to_fixed": orient == "custom" 
+        ? expandToFixed
+        : false,
     "fixed_width": orient == "custom" 
       ? fixedWidth
       : -1,
@@ -550,13 +555,14 @@ function App() {
   const [grid] = useAtom(state.grid)
 
   const [random, setRandom] = useAtom(state.random)
+  const [outliar, setOutliar] = useAtom(state.outliar)
 
   return (
     <ThemeProvider theme={theme}>
       {reloadDialog}
       <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, config, error, json, jsonPath, setFolder }}/></header>
       <main onClick={checkDeselectMain} className={"main-grid-"+grid}>{
-        images.map((image,i) => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ isRandom:random[i] || false, folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
+        images.map((image,i) => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ isOutliar:outliar[i] || false, isRandom:random[i] || false, folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
       }</main>
       { typeof json == "object" && <footer><BottomBar {...{ ...loadDraft?{drafts}:{}, folder, config, ...typeof json === 'object'?{json, setJson}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, options, setOptions, batchRotate }}/></footer>}
     </ThemeProvider>
