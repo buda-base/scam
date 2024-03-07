@@ -99,8 +99,21 @@ The next stage of the processing consists in transforming this XYZ matrix into a
 
 This gamma function will transform each value `v` into approximately `1.055 * v^0.41 - 0.055`. This non-linearity means that compensating for exposure on an `sRGB` image is more complex than a linear transformation.
 
-Now, given a white patch of a color card, we can know based on external data that we want the average pixel of that regsion to have the value `[0.95,0.95,0.95]` in sRGB (`[243,243,243]` in 8-bit int representation). We can thus apply the following steps to that value:
-- apply inverse gamma function, resulting in `[0.89,0.89,0.89]` (in "linear sRGB" color space)
-- apply the linear transformation to get `XYZ` coordinates: `[1.072258, 0.84, 0.809]`
-- apply the inverse matrix of the camera color space profile the get the camera RGB values: `[]`
+##### Computing the exposure shift factor
 
+Now, given a white patch of a color card, we can know based on external data that we want the average pixel of that regsion to have the value `[0.95 0.95 0.95]` in sRGB (`[243 243 243]` in 8-bit int representation). We can thus apply the following steps to that value:
+- apply inverse gamma function, resulting in `[0.89 0.89 0.89]` (in "linear sRGB" color space)
+- apply the linear transformation to get `XYZ` coordinates: `[0.8459183 0.89000009 0.9690587]`
+- apply the inverse matrix of the camera color space profile the get the camera RGB values: `[0.89 0.89 0.89]`, in that case they happen the be the same as in the linear sRGB color space, so we assume that the camera color profile doesn't do much, if anything
+
+Now that we have our expected camera RGB value for the white patch area, we can just compare to the value we read in the image after white balance correction. In the example above it would be `[0.62 0.62 0.62]`. The factor we want to apply on the camera RGB values is thus `0.89/0.62 = 1.43`.
+
+##### Using the exposure shift factor on other images
+
+While the white balance factors can be used directly on all the images of a batch, the exposure shift factor is more delicate as different images in the same batch may have different exposure times and exposure compensation (EV).
+
+Fortunately for us, these two settings can easily be found in the exif metadata of the RAW files, and the data can be assumer to be completely linear. So for instance:
+- the raw image with the color card has an exposure time of 4s
+- we compute an exposure shift factor of `1.43` based on the white patch of the color card
+- the next image has no color card and an exposure time of 3s
+- we assume linearity and apply an exposure shift factor of `(4 / 3) * 1.43 = 1.91` on this image
