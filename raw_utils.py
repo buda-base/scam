@@ -26,7 +26,7 @@ def cam_rgb_to_nrgb(raw, cam_rgb, c):
     cblack = raw.black_level_per_channel[c] # the black value for the channel
     cam_rgb -= cblack # we substract the black value
     cam_rgb = max(0, cam_rgb) # if the value is below 0, we set it to 0
-    adjusted_max = raw.white_level - cblack # the adjusted maximum value (I'm not sure if we should have raw.tone_curve[raw.white_level] ?)
+    adjusted_max = raw.tone_curve[raw.white_level - cblack] # the adjusted maximum value (I'm not sure if we should have raw.tone_curve[raw.white_level] ?)
     return cam_rgb / adjusted_max # we divide by the maximum to get the normalized rgb
 
 def get_median_cam_nrgb(raw, bbox):
@@ -36,7 +36,7 @@ def get_median_cam_nrgb(raw, bbox):
     For instance if the image has 4 channels, the result could be [0.12, 0.34, 0.18, 0.35]
     """
     x_0, y_0, w, h = bbox
-    vals_per_c = [[]] * 4 # initialize for the number of channels
+    vals_per_c = [[], [], [], []] # initialize for the number of channels
     for x in range(x_0, x_0+w):
         for y in range(y_0, y_0+h):
             c = raw.raw_color(y, x)
@@ -110,18 +110,19 @@ def get_factors_from_raw(raw, bbox, target_lnsrgb_mean=0.89):
     corresponding to the white patch on usual color cards.
     """
     medians = get_median_cam_nrgb(raw, bbox)
+    logging.info("get medians %s", str(medians))
     wb_factors = get_wb_factors_from_median_cam_nrgb(medians)
     exp_shift = get_exposure_factor(raw, medians, target_lnsrgb_mean)
     logging.info("get factors %s, %f from bbox %s" % (str(wb_factors), exp_shift, str(bbox)))
     return wb_factors, exp_shift
 
-def get_cv2_from_raw(fp, params):
+def get_np_from_raw(fp, params):
     """
     returns an opencv image from a raw file-like object.
 
     params can be
     - "pre" for preprocess (resulting in 8-bit images),
-    - "base" to get the untouched matrix (resulting in 16 bit images, not currently handled by Pillow)
+    - "base" to get the untouched matrix (resulting in 16 bit sRGB encoded array, not currently handled by Pillow)
     - a set of two values: a list of 4 floats (channel correction factors) and an int (bps)
     """
     array = None
@@ -145,13 +146,13 @@ def get_cv2_from_raw(fp, params):
                 use_auto_wb=False
                 )
         else:
-            user_wb, exp_shift, bps = params
+            user_wb, exp_shift, _ = params
             logging.info("open raw with user_wb = %s, exp_shift=%f" % (str(user_wb), exp_shift))
             array = raw.postprocess(
                 # supposedly better quality
                 demosaic_algorithm = rawpy.DemosaicAlgorithm.AAHD,
                 output_color=rawpy.ColorSpace.sRGB,
-                output_bps=bps,
+                output_bps=8,
                 # no auto_scale is a bit misleading a should always be False, it just casts 12 bit ints into 16 bit
                 #no_auto_scale=True,
                 no_auto_bright=True,
@@ -163,7 +164,7 @@ def get_cv2_from_raw(fp, params):
                 )
     except:
         raise TypeError("Not a RAW file")
-    return cv2.cvtColor(array, cv2.COLOR_RGB2BGR)
+    return array
 
 
 class RawImageFile(ImageFile.ImageFile):

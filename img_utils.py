@@ -73,31 +73,6 @@ def rotate_warp_affine_cv2(opencv_img, rect):
         res = res.astype(bool)
     return res
 
-def apply_scale_factors_cv2(cv2_img, scale_factors, output_bps=8):
-    """
-    Applies scale factors to a cv2_img, and casts the result to the target bps
-    """
-    # Apply scale factors to the entire image
-    corrected_img_np = cv2_img.astype(np.float32)  # Convert to float to prevent clipping during multiplication
-    for i in range(3):  # Apply the scale factor for each channel
-        if cv2_img.dtype.itemsize == 2 and output_bps == 8: # 16 bps -> 8 bps
-            corrected_img_np[:, :, i] *= (scale_factors[i] / 255)
-        else:
-            corrected_img_np[:, :, i] *= scale_factors[i]
-    if output_bps == 16:
-        corrected_img_np = np.clip(corrected_img_np, 0, 255*255).astype(np.uint16)
-    else:
-        corrected_img_np = np.clip(corrected_img_np, 0, 255).astype(np.uint8)
-    return corrected_img_np
-
-def apply_scale_factors_pil(pil_img, scale_factors):
-    if pil_img.mode != "RGB":
-        return pil_img
-    matrix = ( scale_factors[0], 0,  0, 0, 
-                 0,   scale_factors[1],  0, 0, 
-                 0,   0,  scale_factors[2], 0)
-    return pil_img.convert("RGB", matrix) 
-
 def get_bounding_box(min_area_rect, width, height):
     """
     Returns the smallest bounding box containing the minAreaRect.
@@ -257,3 +232,69 @@ def get_debug_img_bytes(img_orig, image_anns, max_size_px=256, draw_rotated=True
     new_img = Image.fromarray(new_img)
     return encode_img(new_img, target_mode="RGB", mozjpeg_optimize=False)
 
+def sRGB_inverse_gamma(value):
+    """Applies the inverse sRGB gamma correction on a normalized RGB value."""
+    if value <= 0.04045:
+        return value / 12.92
+    else:
+        return ((value + 0.055) / 1.055) ** 2.4
+
+def sRGB_gamma(value):
+    """Applies the sRGB gamma correction on a normalized RGB value."""
+    if value <= 0.0031308:
+        return 12.92 * value
+    else:
+        return 1.055 * (value ** (1.0 / 2.4)) - 0.055
+
+def multiply_linear_srgb(srgb_img, rgb_factors):
+    """
+    This function converts the image in linear sRGB, applies a linear transformation on
+    each color channel and then transforms the result in regular sRGB.
+    """
+    bit_depth = img.dtype.itemsize * 8  # Determine bit depth per channel
+    num_channels = img.shape[2] if len(img.shape) > 2 else 1  # Determine number of channels
+
+    # Generate LUTs for each channel
+    luts = []
+    for c in range(num_channels):
+        lut = np.zeros((1 << bit_depth, 1), dtype=np.float32)  # Initialize LUT based on bit depth
+        for i in range(lut.shape[0]):
+            normalized_val = i / float(lut.shape[0] - 1)  # Normalize to [0, 1]
+            # Apply inverse sRGB gamma, multiply by factor, and apply sRGB gamma
+            val = sRGB_inverse_gamma(normalized_val)
+            val = val * factors[c]
+            val = sRGB_gamma(val)
+            lut[i] = np.clip(val * (lut.shape[0] - 1), 0, lut.shape[0] - 1)  # Scale back and clip
+        
+        luts.append(lut.astype(img.dtype))
+
+    # Apply the LUTs to each channel of the image
+    if num_channels > 1:
+        result_img = cv2.merge([cv2.LUT(img[:, :, c], luts[c]) for c in range(num_channels)])
+    else:
+        result_img = cv2.LUT(img, luts[0])
+
+    return result_img
+
+def srgb_to_lnsrgb(rgb_array, bps):
+    res = []
+    for v in rgb_array:
+        if bps:
+            v = v / 2^bps
+        v = sRGB_inverse_gamma(v)
+    res.append(v)
+    return np.array(res)
+
+def get_linear_factors(srgb_img, bbox, expected_nsRGB):
+    x_start, y_start, bbox_w, bbox_h = bbox
+    white_patch = srgb_img[y_start:(y_start+bbox_h), x_start:(x_start+bbox_w)]
+    median_srgb = np.median(white_patch.reshape(-1, 3), axis=0)
+    median_lnsrgb = srgb_to_lnsrgb(median_srgb, 16 if img.dtype.itemsize == 2 else 8)
+    expected_lnsrgb = srgb_to_lnsrgb(expected_nsRGB, 0)
+    scale_factors = expected_lnsrgb / median_lnsrgb
+    return scale_factors
+
+def apply_scale_factors_pil(pil_img, linear_rgb_factors):
+    np_img = np.array(img)
+    np_transformed_img = multiply_linear_srgb(np_img, linear_rgb_factors)
+    pil_img.paste(Image.fromarray(np_transformed_img))

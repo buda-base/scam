@@ -4,11 +4,11 @@ import os
 import logging
 from PIL import Image
 from tqdm import tqdm
-from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_cv2, apply_scale_factors_pil
+from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3, gets3blob
-from raw_utils import register_raw_opener, is_likely_raw, get_cv2_from_raw, get_factors_from_raw
+from raw_utils import register_raw_opener, is_likely_raw, get_np_from_raw, get_factors_from_raw
 from natsort import natsorted
 import numpy as np
 import cv2
@@ -30,7 +30,7 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "dryrun": False,
     "output_bps": 8, # can be 8, 16 or "auto" (16 bits if raw with no correction, 8 bits otherwise). Actually 16 and "auto" can't work with PIL
     "wb_correction": "auto", # can be a list of 4 floats, "auto" to check for white patch annotations in the folders, or None for no auto_correction
-    "wb_patch_rgb_target": [243, 243, 242], # the target RGB values given on 8-bit per channel, corresponding to the white patch of the color card. These usually are aroun 240, 240, 240
+    "wb_patch_nsrgb_target": [0.95, 0.95, 0.95], # the target sRGB values given in [0:1], corresponding to the white patch of the color card
     "force_apply_icc": False, # when False, icc is kept when possible in the output files, if not it is applied
     # compensate exposure:
     # When True, if the folder has some white patch annotations, use it to also compensate exposure. 
@@ -327,47 +327,40 @@ def get_bbox(page_info, file_info, img_w, img_h, add_file_info_rotation=False):
         mar = c, s, a+file_info["rotation"]
     return get_bounding_box(mar, img_w, img_h)
 
-def get_raw_corrections(folder_path, img_path, page_info, file_info):
+def get_raw_corrections(folder_path, img_path, page_info, file_info, postprocess_options):
     """
     returns the corrections for a raw file
     """
     blob = gets3blob(folder_path+img_path)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
+        return
     blob.seek(0)
     tags = exifread.process_file(blob, details=False)
     blob.seek(0)
     raw = raw = rawpy.imread(blob)
     bbox = get_bbox(page_info, file_info, raw.sizes.width, raw.sizes.height, add_file_info_rotation=True)
     logging.error("getting correction factors from %s" % img_path)
-    wb_factors, exp_shift = get_factors_from_raw(raw, bbox)
+    target_lnsrgb_mean = sRGB_inverse_gamma(postprocess_options["wb_patch_nsrgb_target"][0])
+    wb_factors, exp_shift = get_factors_from_raw(raw, bbox, target_lnsrgb_mean)
     return wb_factors, exp_shift, tags
 
-def get_cv2_corrections(folder_path, img_path, page_info, file_info):
-    """
-    returns the corrections for a regular file
-    """
-    # TODO: ungamma... this is not ok to use at the moment
-    img, exif = get_cv2_img(scam_json["folder_path"], file_info["img_path"])
-    # first, rotate
-    if file_info["rotation"] != 0:
-        img = cv2.rotate(img, ROTATION_TO_CV2[file_info["rotation"]])
-    img_h, img_w, _ = img.shape
-    bbox = get_bbox(page_info, file_info, img_w, img_h)
-    x_start, y_start, bbox_w, bbox_h = bbox
-    white_patch = img[y_start:(y_start+bbox_h), x_start:(x_start+bbox_w)]
-    #cv2.imwrite("/tmp/wp.tif", white_patch)
-    median_rgb = np.median(white_patch.reshape(-1, 3), axis=0)
-    target_rgb = np.array(postprocess_options["wb_patch_rgb_target"])
-    if img.dtype.itemsize == 2: # 16 bits
-        target_rgb *= 255
-    scale_factors = target_rgb / median_rgb
-    logging.info("found white patch on %s (%d, %d, %d, %d), median rgb is [%d,%d,%d], compensate to [%d,%d,%d] -> factors = [%f,%f,%f]" % (file_info["img_path"], x_start, y_start, bbox_w, bbox_h, median_rgb[0], median_rgb[1], median_rgb[2], target_rgb[0], target_rgb[1], target_rgb[2], scale_factors[0], scale_factors[1], scale_factors[2]))
-    # just for debugging:
-    #img = apply_scale_factors_cv2(img, scale_factors, 8)
-    #wp2 = apply_scale_factors_cv2(white_patch, scale_factors, 8)
-    #cv2.imwrite("/tmp/res.jpg", img)
-    #cv2.imwrite("/tmp/res-wp.jpg", wp2)
+def get_cv2_corrections(folder_path, img_path, page_info, file_info, postprocess_options):
+    blob = gets3blob(folder_path+img_path)
+    if blob is None:
+        logging.error("cannot find %s", (folder_path+img_path))
+        return
+    blob.seek(0)
+    tags = exifread.process_file(blob, details=False)
+    blob.seek(0)
+    pil_img = Image.open(blob)
+    pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=True)
+    bbox = get_bbox(page_info, file_info, raw.sizes.width, raw.sizes.height, add_file_info_rotation=True)
+    linear_factors = get_linear_factors(np.array(pil_img), bbox, postprocess_options["wb_patch_nsrgb_target"])
+    exp_shift = min(linear_factors)
+    wb_factors = np.array(linear_factors) / exp_shift
+    return wb_factors, exp_shift, tags
+
 
 def get_cv2_img(folder_path, img_path):
     """
@@ -380,8 +373,8 @@ def get_cv2_img(folder_path, img_path):
     tags = exifread.process_file(blob, details=False)
     blob.seek(0)
     if is_likely_raw(img_path):
-        cv2_array = get_cv2_from_raw(blob, "base")
-        return cv2_array, tags
+        np_array = get_cv2_from_raw(blob, "base")
+        return cv2.cvtColor(np_array, cv2.COLOR_RGB2BGR), tags
     else:
         pil_img = Image.open(blob)
         pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=True)
@@ -390,7 +383,7 @@ def get_cv2_img(folder_path, img_path):
         return np.asarray(im_pil), tags
 
 
-def get_adjusted_wb_correction(orig_corrections, dest_exif):
+def get_adjusted_correction(orig_corrections, dest_exif):
     """
     This function takes:
     - the exposure shift factor calculated for the image with the color card
@@ -405,24 +398,26 @@ def get_adjusted_wb_correction(orig_corrections, dest_exif):
         return wb_factors, new_exp_shift, original_exif
     return orig_corrections
 
-def get_postprocess_pil_img(folder_path, img_path, wb_correction, postprocess_options):
+def get_postprocess_pil_img(folder_path, img_path, correction, postprocess_options):
     blob = gets3blob(folder_path+img_path)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
     blob.seek(0)
     exif = exifread.process_file(blob, details=False)
     blob.seek(0)
-    params = get_adjusted_wb_correction(wb_correction, exif)
+    params = get_adjusted_correction(correction, exif)
     if is_likely_raw(img_path):
-        cv2_img = get_cv2_from_raw(blob, params)
-        return Image.fromarray(cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB))
+        np_img = get_np_from_raw(blob, params)
+        return Image.fromarray(np_img)
     else:
         pil_img = Image.open(blob)
         pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=postprocess_options["force_apply_icc"])
-        if wb_factors is not None:
+        if correction is not None:
             if not icc_applied:
                 pil_img = apply_icc(pil_img)
-            pil_img = apply_scale_factors_pil(pil_img)
+            wb_factors, exp_shift, orig_exif = params
+            linear_factors = np.array(wb_factors) * exp_shift
+            pil_img = apply_scale_factors_pil(pil_img, linear_factors)
         return pil_img
 
 ROTATION_TO_CV2 = {
@@ -462,9 +457,9 @@ def get_white_patch_corrections(scam_json, postprocess_options):
         for p in file_info["pages"]:
             if "tags" in p and "T1" in p["tags"]:
                 if is_likely_raw(file_info["img_path"]):
-                    corrs = get_raw_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info)
+                    corrs = get_raw_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info, postprocess_options)
                 else:
-                    corrs = get_cv2_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info)
+                    corrs = get_cv2_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info, postprocess_options)
                 res[img_path] = corrs
                 break
     return res
