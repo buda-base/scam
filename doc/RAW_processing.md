@@ -8,6 +8,16 @@ This part took some time to figure out and is not particularly straightforward, 
 
 In many cases we receive raw files organized in folders where one file has a color checker and the other files don't. What we want to do is use the color checker to correct white balance and exposure on all the images in the folder. To do so, we have a special annotation for color checkers
 
+##### Example
+
+Here is an image with the camera white balance applied and then automatic brightness adjustment (which is the best we can do without a color card):
+
+![auto_params](https://raw.githubusercontent.com/buda-base/scam/raw/doc/assets/example_nc.jpg)
+
+And the same image with post processing options derived from analyzing the white patch in a different image of the same batch:
+
+![white_patch_params](https://raw.githubusercontent.com/buda-base/scam/raw/doc/assets/example_nc.jpg)
+
 ### The Bayer filter mozaic
 
 In order to obtain the best quality images, we need to make some color correction (white balance, exposure, etc.) as
@@ -103,7 +113,7 @@ This gamma function will transform each value `v` into approximately `1.055 * v^
 
 Now, given a white patch of a color card, we can know based on external data that we want the average pixel of that regsion to have the value `[0.95 0.95 0.95]` in sRGB (`[243 243 243]` in 8-bit int representation). We can thus apply the following steps to that value:
 - apply inverse gamma function, resulting in `[0.89 0.89 0.89]` (in "linear sRGB" color space)
-- apply the linear transformation to get `XYZ` coordinates: `[0.8459183 0.89000009 0.9690587]`
+- apply the well-known linear transformation to get `XYZ` coordinates: `[0.8459183 0.89000009 0.9690587]`
 - apply the inverse matrix of the camera color space profile the get the camera RGB values: `[0.89 0.89 0.89]`, in that case they happen the be the same as in the linear sRGB color space, so we assume that the camera color profile doesn't do much, if anything
 
 Now that we have our expected camera RGB value for the white patch area, we can just compare to the value we read in the image after white balance correction. In the example above it would be `[0.62 0.62 0.62]`. The factor we want to apply on the camera RGB values is thus `0.89/0.62 = 1.43`.
