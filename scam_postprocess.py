@@ -8,12 +8,14 @@ from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3, gets3blob
-from raw_utils import register_raw_opener, is_likely_raw, get_cv2_from_raw
+from raw_utils import register_raw_opener, is_likely_raw, get_cv2_from_raw, get_factors_from_raw
 from natsort import natsorted
 import numpy as np
 import cv2
+import exifread
+import rawpy
 
-#logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 
 DEFAULT_POSTPROCESS_OPTIONS = {
     "rotation_in_derivation": True, # derive tiffs with the small rotation
@@ -29,7 +31,12 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "output_bps": 8, # can be 8, 16 or "auto" (16 bits if raw with no correction, 8 bits otherwise). Actually 16 and "auto" can't work with PIL
     "wb_correction": "auto", # can be a list of 4 floats, "auto" to check for white patch annotations in the folders, or None for no auto_correction
     "wb_patch_rgb_target": [243, 243, 242], # the target RGB values given on 8-bit per channel, corresponding to the white patch of the color card. These usually are aroun 240, 240, 240
-    "force_apply_icc": False # when False, icc is kept when possible in the output files, if not it is applied
+    "force_apply_icc": False, # when False, icc is kept when possible in the output files, if not it is applied
+    # compensate exposure:
+    # When True, if the folder has some white patch annotations, use it to also compensate exposure. 
+    # If ExposureTime is exposed in the exif data, the code will compare the value in the image with the color card and the value in the image and make a ratio
+    # if no exposuretime is found, it's assumed that all the images have the same exposure
+    "compensate_exposure": True
 }
 
 # pages are 
@@ -227,7 +234,7 @@ def derive_from_page(scam_json, file_info, pil_img, page_info, page_position, po
     if page_info is not None:
         original_img_w = pil_img.height if file_info["rotation"] in ["-90", "90", "-270", "270"] else pil_img.width
         original_img_h = pil_img.width if file_info["rotation"] in ["-90", "90", "-270", "270"] else pil_img.height
-        mar = get_scaled_mar(file_info, page_info, original_img_w, original_img_h)
+        mar = get_scaled_mar(file_info, page_info["minAreaRect"], original_img_w, original_img_h)
         if not postprocess_options["rotation_in_derivation"]:
             bbox = get_bounding_box(mar, pil_img.width, pil_img.height)
             logging.info("  extract with no rotation (%d, %d, %d, %d)", bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3])
@@ -291,7 +298,7 @@ def postprocess_folder(folder_path, postprocess_options):
                 img_path_to_wb_corr[img_path] = cur_corr
     else:
         for img_path in img_paths:
-            img_path_to_wb_corr[img_path] = postprocess_options["wb_correction"]
+            img_path_to_wb_corr[img_path] = (postprocess_options["wb_correction"], None)
     if not scam_json["checked"]:
         logging.warning("warning: processing unchecked json %s" % folder_path)
     add_prefix = postprocess_options["add_prefix"]
@@ -310,34 +317,109 @@ def postprocess_folder(folder_path, postprocess_options):
         elif file_info["img_path"] in sequence_info:
             derive_from_file(scam_json, file_info, postprocess_options, sequence_info[file_info["img_path"]], img_path_to_wb_corr[file_info["img_path"]])
 
-def get_cv2_img(folder_path, img_path):
+def get_bbox(page_info, file_info, img_w, img_h, add_file_info_rotation=False):
+    # TODO: test rotation stuff
+    if add_file_info_rotation and file_info["rotation"] in [90, -90, 270, -270]:
+        img_w, img_h = img_h, img_w
+    mar = get_scaled_mar(file_info, page_info["minAreaRect"], img_w, img_h)
+    if add_file_info_rotation and file_info["rotation"]:
+        c, s, a = mar
+        mar = c, s, a+file_info["rotation"]
+    return get_bounding_box(mar, img_w, img_h)
+
+def get_raw_corrections(folder_path, img_path, page_info, file_info):
+    """
+    returns the corrections for a raw file
+    """
     blob = gets3blob(folder_path+img_path)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
     blob.seek(0)
+    tags = exifread.process_file(blob, details=False)
+    blob.seek(0)
+    raw = raw = rawpy.imread(blob)
+    bbox = get_bbox(page_info, file_info, raw.sizes.width, raw.sizes.height, add_file_info_rotation=True)
+    logging.error("getting correction factors from %s" % img_path)
+    wb_factors, exp_shift = get_factors_from_raw(raw, bbox)
+    return wb_factors, exp_shift, tags
+
+def get_cv2_corrections(folder_path, img_path, page_info, file_info):
+    """
+    returns the corrections for a regular file
+    """
+    # TODO: ungamma... this is not ok to use at the moment
+    img, exif = get_cv2_img(scam_json["folder_path"], file_info["img_path"])
+    # first, rotate
+    if file_info["rotation"] != 0:
+        img = cv2.rotate(img, ROTATION_TO_CV2[file_info["rotation"]])
+    img_h, img_w, _ = img.shape
+    bbox = get_bbox(page_info, file_info, img_w, img_h)
+    x_start, y_start, bbox_w, bbox_h = bbox
+    white_patch = img[y_start:(y_start+bbox_h), x_start:(x_start+bbox_w)]
+    #cv2.imwrite("/tmp/wp.tif", white_patch)
+    median_rgb = np.median(white_patch.reshape(-1, 3), axis=0)
+    target_rgb = np.array(postprocess_options["wb_patch_rgb_target"])
+    if img.dtype.itemsize == 2: # 16 bits
+        target_rgb *= 255
+    scale_factors = target_rgb / median_rgb
+    logging.info("found white patch on %s (%d, %d, %d, %d), median rgb is [%d,%d,%d], compensate to [%d,%d,%d] -> factors = [%f,%f,%f]" % (file_info["img_path"], x_start, y_start, bbox_w, bbox_h, median_rgb[0], median_rgb[1], median_rgb[2], target_rgb[0], target_rgb[1], target_rgb[2], scale_factors[0], scale_factors[1], scale_factors[2]))
+    # just for debugging:
+    #img = apply_scale_factors_cv2(img, scale_factors, 8)
+    #wp2 = apply_scale_factors_cv2(white_patch, scale_factors, 8)
+    #cv2.imwrite("/tmp/res.jpg", img)
+    #cv2.imwrite("/tmp/res-wp.jpg", wp2)
+
+def get_cv2_img(folder_path, img_path):
+    """
+    returns a set with the cv2 image and exif data
+    """
+    blob = gets3blob(folder_path+img_path)
+    if blob is None:
+        logging.error("cannot find %s", (folder_path+img_path))
+    blob.seek(0)
+    tags = exifread.process_file(blob, details=False)
+    blob.seek(0)
     if is_likely_raw(img_path):
-        return get_cv2_from_raw(blob, "base")
+        cv2_array = get_cv2_from_raw(blob, "base")
+        return cv2_array, tags
     else:
         pil_img = Image.open(blob)
         pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=True)
         if pil_img.mode == "RGB":
             return cv2.cvtColor(np.asarray(im_pil), cv2.COLOR_RGB2BGR)
-        return np.asarray(im_pil)
+        return np.asarray(im_pil), tags
+
+
+def get_adjusted_wb_correction(orig_corrections, dest_exif):
+    """
+    This function takes:
+    - the exposure shift factor calculated for the image with the color card
+    - the exif data of the image with the color card
+    - the exif data of the image we want the new exposure shift
+    """
+    wb_factors, orig_exp_shift, original_exif = orig_corrections
+    if "EXIF ExposureTime" in dest_exif and "EXIF ExposureTime" in original_exif:
+        exp_diff_factor = float(original_exif.get("EXIF ExposureTime").values[0]) / float(dest_exif.get("EXIF ExposureTime").values[0])
+        # TODO: it may be too simplistic
+        new_exp_shift = exp_diff_factor * orig_exp_shift
+        return wb_factors, new_exp_shift, original_exif
+    return orig_corrections
 
 def get_postprocess_pil_img(folder_path, img_path, wb_correction, postprocess_options):
     blob = gets3blob(folder_path+img_path)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
     blob.seek(0)
+    exif = exifread.process_file(blob, details=False)
+    blob.seek(0)
+    params = get_adjusted_wb_correction(wb_correction, exif)
     if is_likely_raw(img_path):
-        cv2_img = get_cv2_from_raw(blob, "base")
-        if wb_correction is not None:
-            cv2_img = apply_scale_factors_cv2(cv2_img, wb_correction, 8)
+        cv2_img = get_cv2_from_raw(blob, params)
         return Image.fromarray(cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB))
     else:
         pil_img = Image.open(blob)
         pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=postprocess_options["force_apply_icc"])
-        if wb_correction is not None:
+        if wb_factors is not None:
             if not icc_applied:
                 pil_img = apply_icc(pil_img)
             pil_img = apply_scale_factors_pil(pil_img)
@@ -352,7 +434,7 @@ ROTATION_TO_CV2 = {
     -180: cv2.ROTATE_180
 }
 
-def get_scaled_mar(file_info, page_info, img_w, img_h):
+def get_scaled_mar(file_info, mar, img_w, img_h):
     """
     returns a scaled version of page_info["minAreaRect"] that is scaled in case
     the file_info is smaller than the actual image (which can happens if preprocessing of raw files was deficient)
@@ -363,13 +445,14 @@ def get_scaled_mar(file_info, page_info, img_w, img_h):
         return page_info["minAreaRect"]
     scale_factor_x = img_w / file_info["width"]
     scale_factor_y = img_h / file_info["height"]
-    c_x, c_y, w, h, a = page_info["minAreaRect"]
+    c_x, c_y, w, h, a = mar
     return ((c_x*scale_factor_x, c_y*scale_factor_y), (w*scale_factor_x, h*scale_factor_y), a)
 
 def get_white_patch_corrections(scam_json, postprocess_options):
     """
-    returns an object with the keys being file paths and values being wb correction factors
-            derived from white patch annotations
+    returns an object with the keys being file paths and values being a set with:
+            - wb correction factors derived from white patch annotations. These are not normalized so that the green channel is 1 and thus include some exposure compensation
+            - the exif data of the image with the white patch
     """
     res = {}
     for file_info in scam_json["files"]:
@@ -378,27 +461,11 @@ def get_white_patch_corrections(scam_json, postprocess_options):
         img_path = file_info["img_path"]
         for p in file_info["pages"]:
             if "tags" in p and "T1" in p["tags"]:
-                img = get_cv2_img(scam_json["folder_path"], file_info["img_path"])
-                img_h, img_w, _ = img.shape
-                mar = get_scaled_mar(file_info, p, img_w, img_h)
-                # first, rotate
-                if file_info["rotation"] != 0:
-                    img = cv2.rotate(img, ROTATION_TO_CV2[file_info["rotation"]])
-                bbox = get_bounding_box(mar, img_w, img_h)
-                x_start, y_start, bbox_w, bbox_h = bbox
-                white_patch = img[y_start:(y_start+bbox_h), x_start:(x_start+bbox_w)]
-                #cv2.imwrite("/tmp/wp.tif", white_patch)
-                median_rgb = np.median(white_patch.reshape(-1, 3), axis=0)
-                target_rgb = np.array(postprocess_options["wb_patch_rgb_target"])
-                if img.dtype.itemsize == 2: # 16 bits
-                    target_rgb *= 255
-                scale_factors = target_rgb / median_rgb
-                # just for debugging:
-                #img = apply_scale_factors(img, scale_factors, 8)
-                #wp2 = apply_scale_factors(white_patch, scale_factors, 8)
-                #cv2.imwrite("/tmp/res.jpg", img)
-                #cv2.imwrite("/tmp/res-wp.jpg", wp2)
-                res[img_path] = list(scale_factors)
+                if is_likely_raw(file_info["img_path"]):
+                    corrs = get_raw_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info)
+                else:
+                    corrs = get_cv2_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info)
+                res[img_path] = corrs
                 break
     return res
 
@@ -418,5 +485,5 @@ def postprocess_csv():
             postprocess_folder(folder, postprocess_options)
 
 if __name__ == '__main__':
-    postprocess_csv()
-    #postprocess_folder("NLM1/W2KG208159/sources/W2KG208159-I2KG208409/", DEFAULT_POSTPROCESS_OPTIONS)
+    #postprocess_csv()
+    postprocess_folder("NLM1/W2KG208153/sources/W2KG208153-I2KG208393/", DEFAULT_POSTPROCESS_OPTIONS)
