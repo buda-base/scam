@@ -16,7 +16,7 @@ Here is an image with the camera white balance applied and then automatic bright
 
 And the same image with post processing options derived from analyzing the white patch in a different image of the same batch:
 
-![white_patch_params](https://raw.githubusercontent.com/buda-base/scam/raw/doc/assets/example_nc.jpg)
+![white_patch_params](https://raw.githubusercontent.com/buda-base/scam/raw/doc/assets/example.jpg)
 
 ### The Bayer filter mozaic
 
