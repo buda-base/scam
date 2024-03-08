@@ -29,7 +29,7 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "resequence": "auto", # in the case where a prefix can be added, resequence images assuming that one image is all rectos and the next is all versos. "auto" will do that on all images if it can find a pair of consecutive images with 3 pages
     "dryrun": False,
     "output_bps": 8, # can be 8, 16 or "auto" (16 bits if raw with no correction, 8 bits otherwise). Actually 16 and "auto" can't work with PIL
-    "wb_correction": "auto", # can be a list of 4 floats, "auto" to check for white patch annotations in the folders, or None for no auto_correction
+    "rgb_correction": "auto", # can be a list of 4 floats, "auto" to check for white patch annotations in the folders, or None for no auto_correction
     "wb_patch_nsrgb_target": [0.95, 0.95, 0.95], # the target sRGB values given in [0:1], corresponding to the white patch of the color card
     "force_apply_icc": False, # when False, icc is kept when possible in the output files, if not it is applied
     # compensate exposure:
@@ -197,7 +197,7 @@ def order_pages(pages):
     else:
         return sorted(pages, key=(lambda x: x["minAreaRect"][1]))
 
-def derive_from_file(scam_json, file_info, postprocess_options, prefixes, wb_correction):
+def derive_from_file(scam_json, file_info, postprocess_options, prefixes, correction):
     pages = get_output_pages(file_info)
     if pages is None:
         logging.info("do not derive from hidden image %s" % file_info["img_path"])
@@ -205,7 +205,7 @@ def derive_from_file(scam_json, file_info, postprocess_options, prefixes, wb_cor
     pil_img = None
     if postprocess_options["src_storage"] == "s3":
         if not postprocess_options["dryrun"]:
-            pil_img = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], wb_correction, postprocess_options["output_bps"])
+            pil_img = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], correction, postprocess_options["output_bps"])
     else:
         local_path = postprocess_options["local_src_folder"]
         if not postprocess_options["skip_folder_local_input"]:
@@ -277,10 +277,10 @@ def postprocess_folder(folder_path, postprocess_options):
     """
     logging.info("preprocess %s" % folder_path)
     scam_json = get_scam_json(folder_path)
-    img_path_to_wb_corr = {}
+    img_path_to_corr = {}
     img_paths = [file_info["img_path"] for file_info in scam_json["files"]]
     img_paths = natsorted(img_paths)
-    if postprocess_options["wb_correction"] == "auto":
+    if postprocess_options["rgb_correction"] == "auto":
         corrs = get_white_patch_corrections(scam_json, postprocess_options)
         if len(corrs) > 0:
             # we potentially use the first correction for images that are
@@ -295,10 +295,10 @@ def postprocess_folder(folder_path, postprocess_options):
             for img_path in img_paths:
                 if img_path in corrs:
                     cur_corr = corrs[img_path]
-                img_path_to_wb_corr[img_path] = cur_corr
+                img_path_to_corr[img_path] = cur_corr
     else:
         for img_path in img_paths:
-            img_path_to_wb_corr[img_path] = (postprocess_options["wb_correction"], None)
+            img_path_to_corr[img_path] = postprocess_options["rgb_correction"]
     if not scam_json["checked"]:
         logging.warning("warning: processing unchecked json %s" % folder_path)
     add_prefix = postprocess_options["add_prefix"]
@@ -313,9 +313,9 @@ def postprocess_folder(folder_path, postprocess_options):
             add_prefix = True
     for file_info in tqdm(scam_json["files"]):
         if not add_prefix:
-            derive_from_file(scam_json, file_info, postprocess_options, None, img_path_to_wb_corr[file_info["img_path"]])
+            derive_from_file(scam_json, file_info, postprocess_options, None, img_path_to_corr[file_info["img_path"]])
         elif file_info["img_path"] in sequence_info:
-            derive_from_file(scam_json, file_info, postprocess_options, sequence_info[file_info["img_path"]], img_path_to_wb_corr[file_info["img_path"]])
+            derive_from_file(scam_json, file_info, postprocess_options, sequence_info[file_info["img_path"]], img_path_to_corr[file_info["img_path"]])
 
 def get_bbox(page_info, file_info, img_w, img_h, add_file_info_rotation=False):
     # TODO: test rotation stuff
@@ -398,14 +398,15 @@ def get_adjusted_correction(orig_corrections, dest_exif):
         return wb_factors, new_exp_shift, original_exif
     return orig_corrections
 
-def get_postprocess_pil_img(folder_path, img_path, correction, postprocess_options):
+def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options):
     blob = gets3blob(folder_path+img_path)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
     blob.seek(0)
     exif = exifread.process_file(blob, details=False)
     blob.seek(0)
-    params = get_adjusted_correction(correction, exif)
+    if params and params != "auto":
+        params = get_adjusted_correction(params, exif)
     if is_likely_raw(img_path):
         np_img = get_np_from_raw(blob, params)
         return Image.fromarray(np_img)
@@ -480,5 +481,5 @@ def postprocess_csv():
             postprocess_folder(folder, postprocess_options)
 
 if __name__ == '__main__':
-    #postprocess_csv()
-    postprocess_folder("NLM1/W2KG208153/sources/W2KG208153-I2KG208393/", DEFAULT_POSTPROCESS_OPTIONS)
+    postprocess_csv()
+    #postprocess_folder("NLM1/W2KG208153/sources/W2KG208153-I2KG208393/", DEFAULT_POSTPROCESS_OPTIONS)

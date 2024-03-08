@@ -145,6 +145,20 @@ def get_np_from_raw(fp, params):
                 use_camera_wb=False,
                 use_auto_wb=False
                 )
+        elif params == "auto":
+            # to get the more "raw" image and either store it as-is or compute the channel correction factors:
+            array = raw.postprocess(
+                # see https://letmaik.github.io/rawpy/api/rawpy.Params.html
+                # supposedly better quality
+                demosaic_algorithm = rawpy.DemosaicAlgorithm.AAHD,
+                output_color=rawpy.ColorSpace.sRGB,
+                output_bps=8,
+                # no auto_scale is a bit misleading a should always be False, it just casts 12 bit ints into 16 bit
+                #no_auto_scale=True,
+                no_auto_bright=False,
+                use_camera_wb=True,
+                use_auto_wb=False
+                )
         else:
             user_wb, exp_shift, _ = params
             logging.info("open raw with user_wb = %s, exp_shift=%f" % (str(user_wb), exp_shift))
