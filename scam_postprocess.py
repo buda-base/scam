@@ -321,7 +321,7 @@ def get_bbox(page_info, file_info, img_w, img_h, add_file_info_rotation=False):
     # TODO: test rotation stuff
     if add_file_info_rotation and file_info["rotation"] in [90, -90, 270, -270]:
         img_w, img_h = img_h, img_w
-    mar = get_scaled_mar(file_info, page_info["minAreaRect"], img_w, img_h)
+    mar = get_scaled_mar(file_info, page_info, img_w, img_h)
     if add_file_info_rotation and file_info["rotation"]:
         c, s, a = mar
         mar = c, s, a+file_info["rotation"]
@@ -430,18 +430,18 @@ ROTATION_TO_CV2 = {
     -180: cv2.ROTATE_180
 }
 
-def get_scaled_mar(file_info, mar, img_w, img_h):
+def get_scaled_mar(file_info, page_info, img_w, img_h):
     """
     returns a scaled version of page_info["minAreaRect"] that is scaled in case
     the file_info is smaller than the actual image (which can happens if preprocessing of raw files was deficient)
     img_w, img_h need to be pre-rotation
     returns the minAreaRect in the cv2 format ((cx, cy), (w, h), a)
     """
+    c_x, c_y, w, h, a = page_info["minAreaRect"]
     if img_w == file_info["width"] and img_h == file_info["height"]:
-        return page_info["minAreaRect"]
+        return ((c_x, c_y), (w, h), a)
     scale_factor_x = img_w / file_info["width"]
     scale_factor_y = img_h / file_info["height"]
-    c_x, c_y, w, h, a = mar
     return ((c_x*scale_factor_x, c_y*scale_factor_y), (w*scale_factor_x, h*scale_factor_y), a)
 
 def get_white_patch_corrections(scam_json, postprocess_options):
