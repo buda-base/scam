@@ -298,3 +298,46 @@ def apply_scale_factors_pil(pil_img, linear_rgb_factors):
     np_img = np.array(img)
     np_transformed_img = multiply_linear_srgb(np_img, linear_rgb_factors)
     pil_img.paste(Image.fromarray(np_transformed_img))
+
+def rotate_mar(rect, n, image_width, image_height):
+    """
+    Rotates a cv2.minAreaRect around the center of the image by n degrees, where n can be 90, 180, or 270.
+    Adjusts the position and orientation of the rectangle accordingly.
+    
+    Parameters:
+    - rect: The cv2.minAreaRect to rotate, in the form ((center_x, center_y), (width, height), angle).
+    - n: The rotation angle, which can be 90, 180, or 270 degrees.
+    - image_width: Width of the image.
+    - image_height: Height of the image.
+    
+    Returns:
+    - A rotated cv2.minAreaRect in the same format.
+    """
+    
+    if n not in [90, 180, 270]:
+        raise ValueError("Rotation must be 90, 180, or 270 degrees")
+    
+    ((center_x, center_y), (width, height), angle) = rect
+    image_center = np.array([image_width / 2.0, image_height / 2.0])
+    
+    # Calculate the new center after rotation
+    rect_center = np.array([center_x, center_y])
+    rect_center -= image_center  # Translate to rotate around image center
+    cos_angle = np.cos(np.radians(n))
+    sin_angle = np.sin(np.radians(n))
+    rotated_center = np.dot(np.array([[cos_angle, -sin_angle], [sin_angle, cos_angle]]), rect_center)
+    rotated_center += image_center  # Translate back after rotation
+    
+    # Width and height are swapped if rotated by 90 or 270 degrees
+    if n == 90 or n == 270:
+        new_width, new_height = height, width
+    else:  # For 180 degrees, width and height remain the same
+        new_width, new_height = width, height
+    
+    # Adjust angle for rotation
+    new_angle = angle - n
+    # Normalize the new angle to the range [-90, 0) as per cv2.minAreaRect convention
+    if new_angle <= -90:
+        new_angle += 180
+
+    return ((rotated_center[0], rotated_center[1]), (new_width, new_height), new_angle)

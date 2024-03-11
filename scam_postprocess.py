@@ -4,7 +4,7 @@ import os
 import logging
 from PIL import Image
 from tqdm import tqdm
-from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma
+from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma, rotate_mar
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3, gets3blob
@@ -323,8 +323,7 @@ def get_bbox(page_info, file_info, img_w, img_h, add_file_info_rotation=False):
         img_w, img_h = img_h, img_w
     mar = get_scaled_mar(file_info, page_info, img_w, img_h)
     if add_file_info_rotation and file_info["rotation"]:
-        c, s, a = mar
-        mar = c, s, a+file_info["rotation"]
+        mar = rotate_mar(mar, file_info["rotation"], img_w, img_h)
     return get_bounding_box(mar, img_w, img_h)
 
 def get_raw_corrections(folder_path, img_path, page_info, file_info, postprocess_options):
