@@ -21,6 +21,7 @@ logging.basicConfig(level=logging.INFO)
 
 DEFAULT_POSTPROCESS_OPTIONS = {
     "rotation_in_derivation": True, # derive tiffs with the small rotation
+    "use_exif_rotation": False,
     "src_storage": "s3", # s3 or local
     "dst_storage": "s3", # s3 or local
     "skip_folder_local_output": False, # 
@@ -428,10 +429,17 @@ def get_adjusted_correction(orig_corrections, dest_exif):
     - the exif data of the image we want the new exposure shift
     """
     wb_factors, orig_exp_shift, original_exif = orig_corrections
-    if "EXIF ExposureTime" in dest_exif and "EXIF ExposureTime" in original_exif:
+    if original_exif and dest_exif and "EXIF ExposureTime" in dest_exif and "EXIF ExposureTime" in original_exif:
         exp_diff_factor = float(original_exif.get("EXIF ExposureTime").values[0]) / float(dest_exif.get("EXIF ExposureTime").values[0])
+        # the value is usually too big for some reason, this is a random adjustment
+        if exp_diff_factor > 1:
+            exp_diff_factor = 1 + (exp_diff_factor - 1)/2
+            print(exp_diff_factor)
+        else:
+            exp_diff_factor = 1 - (1 - exp_diff_factor)/2
         # TODO: it may be too simplistic
-        new_exp_shift = exp_diff_factor * orig_exp_shift
+        new_exp_shift = orig_exp_shift * exp_diff_factor
+        logging.info("adjust exposure shift correction from %f to %f (%fs vs. %fs)", orig_exp_shift, new_exp_shift, float(original_exif.get("EXIF ExposureTime").values[0]), float(dest_exif.get("EXIF ExposureTime").values[0]))
         return wb_factors, new_exp_shift, original_exif
     return orig_corrections
 
@@ -448,7 +456,7 @@ def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, 
         output_file_info["wb_factors"] = wb_factors
         output_file_info["exp_shift"] = exp_shift
     if is_likely_raw(img_path):
-        np_img = get_np_from_raw(blob, params)
+        np_img = get_np_from_raw(blob, params, postprocess_options["use_exif_rotation"])
         return Image.fromarray(np_img)
     else:
         pil_img = Image.open(blob)
@@ -522,4 +530,4 @@ def postprocess_csv():
 
 if __name__ == '__main__':
     postprocess_csv()
-    #postprocess_folder("NLM1/W2KG208153/sources/W2KG208153-I2KG208393/", DEFAULT_POSTPROCESS_OPTIONS)
+    #postprocess_folder("NLM1/W8LS32549/sources/W8LS32549-I8LS32588/", DEFAULT_POSTPROCESS_OPTIONS)
