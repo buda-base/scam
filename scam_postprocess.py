@@ -33,7 +33,8 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "dryrun": False,
     "output_bps": 8, # can be 8, 16 or "auto" (16 bits if raw with no correction, 8 bits otherwise). Actually 16 and "auto" can't work with PIL
     "correct_non_raw": False, # if True, also applies rgb and exposure corrections to non-raw files
-    "rgb_correction": ([2.47195, 1.0, 1.9305, 1.0017], 3.2, None), # can be a list of 4 floats, "auto" to check for white patch annotations in the folders, or None for no auto_correction
+    "rgb_correction": "auto", # can be "default" (see below), "auto" to check for white patch annotations in the folders, or None for no auto_correction
+    "rgb_correction_default": ([2.47195, 1.0, 1.9305, 1.0017], 3.2, None), # for the case where no white patch is found
     "wb_patch_nsrgb_target": [0.95, 0.95, 0.95], # the target sRGB values given in [0:1], corresponding to the white patch of the color card
     "force_apply_icc": False, # when False, icc is kept when possible in the output files, if not it is applied
     # compensate exposure:
@@ -335,7 +336,7 @@ def postprocess_folder(folder_path, postprocess_options):
                 img_path_to_corr[img_path] = cur_corr
     else:
         for img_path in img_paths:
-            img_path_to_corr[img_path] = postprocess_options["rgb_correction"]
+            img_path_to_corr[img_path] = postprocess_options["rgb_correction_default"]
     if not scam_json["checked"]:
         logging.warning("warning: processing unchecked json %s" % folder_path)
     add_prefix = postprocess_options["add_prefix"]
