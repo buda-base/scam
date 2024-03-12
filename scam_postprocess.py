@@ -136,6 +136,73 @@ def get_sequence_info(scam_json, apply_resequence=True, sort_key=None):
             recto_img_path = None
     return res, apply_resequence
 
+NLM1_REORDER = None
+def get_all_reorder_info_nlm1():
+    global NLM1_REORDER
+    if NLM1_REORDER is not None:
+        return NLM1_REORDER
+    wi_prefix_order = {}
+    # in the form
+    # {
+    #   "W123-I123": {
+    #     "prefix": order,
+    #     "other_prefix": order,
+    #   }
+    # }
+    with open("nlm1/NLM 1.0 image order - Sheet1.csv", newline='') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            if not row[0] or not row[0].startswith("W"):
+                continue
+            wi_prefix = row[0]
+            idx = wi_prefix.find('/')
+            wi = wi_prefix[:idx+1] # keeping the /
+            if wi not in wi_prefix_order:
+                wi_prefix_order[wi] = {}
+            prefix = wi_prefix[idx+1:]
+            order = int(row[1])
+            wi_prefix_order[wi][prefix] = order
+    NLM1_REORDER = wi_prefix_order
+    return wi_prefix_order
+
+def get_sequence_info_nlm1(scam_json, apply_resequence):
+    folder = scam_json["folder_path"]
+    slashidx = folder[:-1].rfind('/')
+    wi = folder[slashidx+1:]
+    nlm1_reorder = get_all_reorder_info_nlm1()
+    if wi not in nlm1_reorder:
+        return get_sequence_info(scam_json, True)
+    prefix_to_order = nlm1_reorder[wi]
+    # define sorting function:
+    def nlm1_compare(img_path_a, img_path_b):
+        #print("compare %s and %s" % (img_path_a, img_path_b))
+        order_a = 0
+        order_b = 0
+        for p, o in prefix_to_order.items():
+            if img_path_a.startswith(p):
+                order_a = o
+                rest_a = img_path_a[len(p):]
+                if rest_a[0] == '_' and rest_a[3] == '_':
+                    try:
+                        order_a = int(rest_a[1:3])
+                    except ValueError:
+                        order_a = o
+            if img_path_b.startswith(p):
+                order_b = o
+                rest_b = img_path_b[len(p):]
+                if rest_b[0] == '_' and rest_b[3] == '_':
+                    try:
+                        order_b = int(rest_b[1:3])
+                    except ValueError:
+                        order_b = o
+            if order_a and order_b:
+                break
+        if (order_a or order_b) and order_a != order_b:
+            #print("return %d-%d = %d" % (order_a, order_b, order_a - order_b))
+            return order_a - order_b
+        return -1 if img_path_a < img_path_b else 1
+    return get_sequence_info(scam_json, True, cmp_to_key(nlm1_compare))
+
 def get_direction(pages):
     """
     returns "x" or "y" depending on the axis of the annotations
@@ -347,7 +414,7 @@ def postprocess_folder(folder_path, postprocess_options):
     if add_prefix == "auto" and not postprocess_options["resequence"]:
         add_prefix = False
     if add_prefix: # "auto" or True
-        sequence_info, resequenced = get_sequence_info(scam_json, postprocess_options["resequence"])
+        sequence_info, resequenced = get_sequence_info_nlm1(scam_json, postprocess_options["resequence"])
         if postprocess_options["resequence"] == "auto" and not resequenced and add_prefix == "auto":
             add_prefix = False
         else:
@@ -534,4 +601,4 @@ def postprocess_csv():
 
 if __name__ == '__main__':
     postprocess_csv()
-    #postprocess_folder("NLM1/W8LS32549/sources/W8LS32549-I8LS32588/", DEFAULT_POSTPROCESS_OPTIONS)
+    #postprocess_folder("NLM1/W8LS32390/sources/W8LS32390-I8LS32392/", DEFAULT_POSTPROCESS_OPTIONS)
