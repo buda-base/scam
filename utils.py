@@ -1,5 +1,5 @@
 import os
-
+from hashlib import sha256
 import boto3
 import io
 import botocore
@@ -21,6 +21,9 @@ def gets3blob(s3Key, bucket=BUCKET_NAME):
             return None
         else:
             raise
+
+def get_sha256(b):
+    return sha256(b).hexdigest()
 
 def upload_to_s3(data, s3_key):
     return S3.put_object(Bucket=BUCKET_NAME, Key=s3_key, Body=data)
@@ -46,7 +49,6 @@ def is_img(path: str) -> bool:
     Better to use try: Image.open() but this is faster)
     """
     end4 = os.path.splitext(path)
-
     if len(end4) < 2:
         return False
     return end4[1].lower() in [".jpg", ".jpeg", ".tif", ".tiff", ".cr2", ".nef", ".arw"]

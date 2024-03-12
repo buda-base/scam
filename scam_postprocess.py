@@ -7,13 +7,15 @@ from tqdm import tqdm
 from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma, rotate_mar
 from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
-from utils import upload_to_s3, gets3blob
+from utils import upload_to_s3, gets3blob, get_sha256
 from raw_utils import register_raw_opener, is_likely_raw, get_np_from_raw, get_factors_from_raw
 from natsort import natsorted
 import numpy as np
 import cv2
 import exifread
 import rawpy
+from datetime import datetime
+import json
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,6 +31,7 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "resequence": "auto", # in the case where a prefix can be added, resequence images assuming that one image is all rectos and the next is all versos. "auto" will do that on all images if it can find a pair of consecutive images with 3 pages
     "dryrun": False,
     "output_bps": 8, # can be 8, 16 or "auto" (16 bits if raw with no correction, 8 bits otherwise). Actually 16 and "auto" can't work with PIL
+    "correct_non_raw": False, # if True, also applies rgb and exposure corrections to non-raw files
     "rgb_correction": "auto", # can be a list of 4 floats, "auto" to check for white patch annotations in the folders, or None for no auto_correction
     "wb_patch_nsrgb_target": [0.95, 0.95, 0.95], # the target sRGB values given in [0:1], corresponding to the white patch of the color card
     "force_apply_icc": False, # when False, icc is kept when possible in the output files, if not it is applied
@@ -36,7 +39,7 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     # When True, if the folder has some white patch annotations, use it to also compensate exposure. 
     # If ExposureTime is exposed in the exif data, the code will compare the value in the image with the color card and the value in the image and make a ratio
     # if no exposuretime is found, it's assumed that all the images have the same exposure
-    "compensate_exposure": True
+    "compensate_exposure": True,
 }
 
 # pages are 
@@ -197,21 +200,25 @@ def order_pages(pages):
     else:
         return sorted(pages, key=(lambda x: x["minAreaRect"][1]))
 
-def derive_from_file(scam_json, file_info, postprocess_options, prefixes, correction):
+def derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, prefixes, correction):
     pages = get_output_pages(file_info)
     if pages is None:
         logging.info("do not derive from hidden image %s" % file_info["img_path"])
         return
     pil_img = None
+    output_file_info = {
+        "original_file_info": file_info,
+    }
     if postprocess_options["src_storage"] == "s3":
         if not postprocess_options["dryrun"]:
-            pil_img = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], correction, postprocess_options["output_bps"])
+            pil_img = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], correction, postprocess_options, output_file_info)
     else:
         local_path = postprocess_options["local_src_folder"]
         if not postprocess_options["skip_folder_local_input"]:
             local_path += scam_json["folder_path"]
         local_path += file_info["img_path"]
         if not postprocess_options["dryrun"]:
+            # TODO: this is wrong
             pil_img = Image.open(local_path)
     if file_info["rotation"] != 0:
         logging.info("rotate %s by %d", file_info["img_path"], file_info["rotation"])
@@ -221,53 +228,72 @@ def derive_from_file(scam_json, file_info, postprocess_options, prefixes, correc
         logging.error("len(pages) != len(prefixes):  %d != %d for %s", max(1, len(pages)), len(prefixes), file_info["img_path"])
         return
     if len(pages) == 0:
-        derive_from_page(scam_json, file_info, pil_img, None, 1, postprocess_options, None if prefixes is None else prefixes[0])
+        scam_log_json["output_files"].append(output_file_info)
+        derive_from_page(scam_json, output_file_info, file_info, pil_img, None, 1, postprocess_options, None if prefixes is None else prefixes[0])
         return
     for i, page in enumerate(pages):
-        derive_from_page(scam_json, file_info, pil_img, page, i+1, postprocess_options, None if prefixes is None else prefixes[i])
+        ofi_p = output_file_info.copy()
+        scam_log_json["output_files"].append(ofi_p)
+        derive_from_page(scam_json, ofi_p, file_info, pil_img, page, i+1, postprocess_options, None if prefixes is None else prefixes[i])
 
-def derive_from_page(scam_json, file_info, pil_img, page_info, page_position, postprocess_options, prefix=None):
+def derive_from_page(scam_json, output_file_info, file_info, pil_img, page_info, page_position, postprocess_options, prefix=None):
     # page_info is None means we take the whole image
     # page_position starts at 1
     suffix_letter = chr(96+page_position)
     extract = pil_img
+    output_file_info["scam_page_info"] = page_info
+    output_file_info["page_in_file"] = page_position
     if page_info is not None:
         original_img_w = pil_img.height if file_info["rotation"] in ["-90", "90", "-270", "270"] else pil_img.width
         original_img_h = pil_img.width if file_info["rotation"] in ["-90", "90", "-270", "270"] else pil_img.height
-        mar = get_scaled_mar(file_info, page_info["minAreaRect"], original_img_w, original_img_h)
+        mar = get_scaled_mar(file_info, page_info, original_img_w, original_img_h)
         if not postprocess_options["rotation_in_derivation"]:
             bbox = get_bounding_box(mar, pil_img.width, pil_img.height)
+            output_file_info["crop_bbox"] = bbox
             logging.info("  extract with no rotation (%d, %d, %d, %d)", bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3])
             if not postprocess_options["dryrun"]:
                 extract = pil_img.crop((bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]))
         else:
             logging.info("  extract with rotation ((%f, %f), (%f, %f), %f)", mar[0][0], mar[0][1], mar[1][0], mar[1][1], mar[2])
+            output_file_info["crop_rect"] = [mar[0][0], mar[0][1], mar[1][0], mar[1][1], mar[2]]
             if not postprocess_options["dryrun"]:
                 extract = rotate_warp_affine(pil_img, mar)
+    output_path = None
     if postprocess_options["dst_storage"] == "s3":
         s3key = "scam_cropped/"+scam_json["folder_path"]
         if prefix is None:
-            s3key += os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
+            output_path = os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
+            s3key += output_path
         else:
             base = ("%04d_" % prefix) + file_info["img_path"].replace("/", "_")
-            s3key += os.path.splitext(base)[0]+suffix_letter+".tiff"
+            output_path = os.path.splitext(base)[0]+suffix_letter+".tiff"
+            s3key += output_path
         logging.info("  write to s3 key %s", s3key)
         if not postprocess_options["dryrun"]:
             b, ext = encode_img_uncompressed(extract)
+            sha256 = get_sha256(b)
+            output_file_info["sha256"] = sha256
             upload_to_s3(b, s3key)
     else:
         local_path = postprocess_options["local_dst_folder"]
         if not postprocess_options["skip_folder_local_output"]:
             local_path += scam_json["folder_path"]
         if prefix is None:
-            local_path += os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
+            output_path = os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
+            local_path += output_path
         else:
             base = ("%04d_" % prefix) + file_info["img_path"].replace("/", "_")
-            local_path += os.path.splitext(base)[0]+suffix_letter+".tiff"
+            output_path = os.path.splitext(base)[0]+suffix_letter+".tiff"
+            local_path += output_path
         logging.info("  write to local file %s", local_path)
         if not postprocess_options["dryrun"]:
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            pil_img.save(local_path, icc_profile=extract.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
+            b, ext = encode_img_uncompressed(extract)
+            sha256 = get_sha256(b)
+            output_file_info["sha256"] = sha256
+            with open(local_path, "wb") as binary_file:
+                binary_file.write(b)
+    output_file_info["output_img_path"] = output_path
 
 def postprocess_folder(folder_path, postprocess_options):
     """
@@ -275,7 +301,13 @@ def postprocess_folder(folder_path, postprocess_options):
 
     - download scam.json from S3
     """
-    logging.info("preprocess %s" % folder_path)
+    scam_log_json = { 
+        "folder_path": folder_path,
+        "timestamp": str(datetime.now().isoformat()),
+        "postprocess_options": postprocess_options,
+        "output_files": []
+        }
+    logging.info("postprocess %s" % folder_path)
     scam_json = get_scam_json(folder_path)
     img_path_to_corr = {}
     img_paths = [file_info["img_path"] for file_info in scam_json["files"]]
@@ -283,6 +315,10 @@ def postprocess_folder(folder_path, postprocess_options):
     if postprocess_options["rgb_correction"] == "auto":
         corrs = get_white_patch_corrections(scam_json, postprocess_options)
         if len(corrs) > 0:
+            scam_log_json["found_rgb_corrections"] = {}
+            for img_path, corr in corrs.items():
+                wb_factors, exp_shift, _ = corr
+                scam_log_json["found_rgb_corrections"][img_path] = { "wb_factors": wb_factors, "exp_shift": exp_shift }
             # we potentially use the first correction for images that are
             # before the first image with a color card
             curr_corr = None
@@ -313,9 +349,13 @@ def postprocess_folder(folder_path, postprocess_options):
             add_prefix = True
     for file_info in tqdm(scam_json["files"]):
         if not add_prefix:
-            derive_from_file(scam_json, file_info, postprocess_options, None, img_path_to_corr[file_info["img_path"]])
+            derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, None, img_path_to_corr[file_info["img_path"]])
         elif file_info["img_path"] in sequence_info:
-            derive_from_file(scam_json, file_info, postprocess_options, sequence_info[file_info["img_path"]], img_path_to_corr[file_info["img_path"]])
+            derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, sequence_info[file_info["img_path"]], img_path_to_corr[file_info["img_path"]])
+    scam_log_s3_key = "scam_logs/"+scam_json["folder_path"]+"scam_log.json"
+    logging.info("write scam log on %s", scam_log_s3_key)
+    scam_log_json_str = json.dumps(scam_log_json, indent=2)
+    upload_to_s3(scam_log_json_str.encode('utf-8'), scam_log_s3_key)
 
 def get_bbox(page_info, file_info, img_w, img_h, add_file_info_rotation=False):
     # TODO: test rotation stuff
@@ -360,7 +400,6 @@ def get_cv2_corrections(folder_path, img_path, page_info, file_info, postprocess
     wb_factors = np.array(linear_factors) / exp_shift
     return wb_factors, exp_shift, tags
 
-
 def get_cv2_img(folder_path, img_path):
     """
     returns a set with the cv2 image and exif data
@@ -381,7 +420,6 @@ def get_cv2_img(folder_path, img_path):
             return cv2.cvtColor(np.asarray(im_pil), cv2.COLOR_RGB2BGR)
         return np.asarray(im_pil), tags
 
-
 def get_adjusted_correction(orig_corrections, dest_exif):
     """
     This function takes:
@@ -397,7 +435,7 @@ def get_adjusted_correction(orig_corrections, dest_exif):
         return wb_factors, new_exp_shift, original_exif
     return orig_corrections
 
-def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options):
+def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, output_file_info):
     blob = gets3blob(folder_path+img_path)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
@@ -406,13 +444,16 @@ def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options):
     blob.seek(0)
     if params and params != "auto":
         params = get_adjusted_correction(params, exif)
+        wb_factors, exp_shift, exif = params
+        output_file_info["wb_factors"] = wb_factors
+        output_file_info["exp_shift"] = exp_shift
     if is_likely_raw(img_path):
         np_img = get_np_from_raw(blob, params)
         return Image.fromarray(np_img)
     else:
         pil_img = Image.open(blob)
         pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=postprocess_options["force_apply_icc"])
-        if correction is not None:
+        if params and params != "auto" and postprocess_options["correct_non_raw"]:
             if not icc_applied:
                 pil_img = apply_icc(pil_img)
             wb_factors, exp_shift, orig_exif = params
