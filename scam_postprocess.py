@@ -9,15 +9,16 @@ from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3, gets3blob, get_sha256
 from raw_utils import register_raw_opener, is_likely_raw, get_np_from_raw, get_factors_from_raw
-from natsort import natsorted
+from natsort import natsort_keygen, natsorted
 import numpy as np
 import cv2
 import exifread
 import rawpy
 from datetime import datetime
 import json
+from functools import cmp_to_key
 
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 
 DEFAULT_POSTPROCESS_OPTIONS = {
     "rotation_in_derivation": True, # derive tiffs with the small rotation
@@ -51,7 +52,7 @@ DEFAULT_POSTPROCESS_OPTIONS = {
 #   }
 # ]
 
-def get_sequence_info(scam_json, apply_resequence=True):
+def get_sequence_info(scam_json, apply_resequence=True, sort_key=None):
     """
     returns two values, first:
 
@@ -74,7 +75,9 @@ def get_sequence_info(scam_json, apply_resequence=True):
         nb_pages = max(1, len(pages)) # 0 counts for 1
         img_path_to_nb_output_pages[img_path] = nb_pages
         max_nb_pages = max(max_nb_pages, nb_pages)
-    sorted_img_paths = natsorted(list(img_path_to_nb_output_pages.keys()))
+    if sort_key is None:
+        sort_key = natsort_keygen()
+    sorted_img_paths = sorted(list(img_path_to_nb_output_pages.keys()), key=sort_key)
     if apply_resequence == "auto":
         if max_nb_pages < 3:
             apply_resequence = False
@@ -334,7 +337,7 @@ def postprocess_folder(folder_path, postprocess_options):
                 if img_path in corrs:
                     cur_corr = corrs[img_path]
                 img_path_to_corr[img_path] = cur_corr
-    else:
+    if len(img_path_to_corr) == 0:
         for img_path in img_paths:
             img_path_to_corr[img_path] = postprocess_options["rgb_correction_default"]
     if not scam_json["checked"]:
