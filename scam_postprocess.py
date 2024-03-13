@@ -505,7 +505,6 @@ def get_adjusted_correction(orig_corrections, dest_exif):
         # the value is usually too big for some reason, this is a random adjustment
         if exp_diff_factor > 1:
             exp_diff_factor = 1 + (exp_diff_factor - 1)/2
-            print(exp_diff_factor)
         else:
             exp_diff_factor = 1 - (1 - exp_diff_factor)/2
         # TODO: it may be too simplistic
