@@ -163,11 +163,14 @@ def apply_icc(img):
     Convert PIL image to sRGB color space (if possible)
     """
     icc = img.info.get('icc_profile', '')
-    if icc:
+    if icc and img.mode not in ["1", "L"]:
         io_handle = io.BytesIO(icc)     # virtual file
         src_profile = ImageCms.ImageCmsProfile(io_handle)
         dst_profile = ImageCms.createProfile('sRGB')
-        ImageCms.profileToProfile(img, src_profile, dst_profile, inPlace=True)
+        if img.mode in ["RGB", "RGBA"]:
+            ImageCms.profileToProfile(img, src_profile, dst_profile, inPlace=True)
+        else:
+            img = ImageCms.profileToProfile(img, src_profile, dst_profile, outputMode='RGB')
     return img
 
 def apply_exif_rotation(img):
