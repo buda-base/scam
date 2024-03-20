@@ -371,11 +371,13 @@ def add_scam_results(file_info, sam_ann_list, scam_options):
             print_debug("ann %d included in potential split, excluding" % i)
             continue
         diff_factor = 0.4 if len(image_anns) < scam_options["nb_pages_expected"] else 0.15
-        print_debug("diff is %f / %f" % (abs(ref_size - ann.contour_area) / ann.contour_area, diff_factor))
+        print_debug("diff is %f / %f" % (abs(ref_size - ann.contour_area) / ref_size, diff_factor))
         if abs(ref_size - ann.contour_area) / ref_size < diff_factor and not ann_included_in(ann, image_anns):
             if not scam_options["wh_ratio_range"] or (ann_ratio >= scam_options["wh_ratio_range"][0] and ann_ratio <= scam_options["wh_ratio_range"][1]):
                 image_anns.append(ann)
                 print_debug("select ann %d, aspect ratio %f" % (i, ann_ratio))
+            else:
+                print_debug("reject annotation %d with wrong aspect ratio %f not in [%f, %f]" % (i, ann_ratio, scam_options["wh_ratio_range"][0], scam_options["wh_ratio_range"][1]))
         elif len(image_anns) < scam_options["nb_pages_expected"] and len(potential_split_anns) < scam_options["nb_pages_expected"]:
             print_debug("add annotation %d to the potential union detection, aspect ratio %f" % (i, ann_ratio))
             potential_split_anns.append(ann)
@@ -390,6 +392,11 @@ def add_scam_results(file_info, sam_ann_list, scam_options):
                 continue
             side = "left" if i == 0 else "right" 
             image_ann.move_side_inwards(side, width - scam_options["fixed_width"])
+        if scam_options["expand_to_fixed"]:
+            c, (width, height), a = image_ann.minAreaRect
+            width = max(width, scam_options["fixed_width"])
+            height = max(height, scam_options["fixed_height"])
+            image_ann.minAreaRect = (c, (width, height), a)
 
     # we sort according to the split direction:
     file_info["pages"] = []
