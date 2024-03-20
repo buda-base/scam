@@ -144,7 +144,7 @@ function App() {
   const handleKeyDown = useCallback((ev:KeyboardEvent) => {
     //debug("down", ev, showSettings)
     if(!showSettings) { 
-      if(ev.ctrlKey && ["C","V","X"].includes(ev.key.toUpperCase())) setKeyDown("CTRL+"+ev.key.toUpperCase())
+      if((ev.ctrlKey || ev.metaKey) && ["C","V","X"].includes(ev.key.toUpperCase())) setKeyDown("CTRL+"+ev.key.toUpperCase())
       else setKeyDown(ev.key)
     }
     if(ev.key == " ") {
