@@ -179,7 +179,7 @@ class RawImageFile(ImageFile.ImageFile):
         array = None
         try:
             # we only open in 8-bits in PIL, for pre-processing
-            array = raw.postprocess(output_bps=8, use_camera_wb=True)
+            array = raw.postprocess(output_bps=8, use_camera_wb=True, user_flip=0)
         except:
             raise TypeError("Not a RAW file")
 
@@ -214,7 +214,7 @@ class RawDecoder(ImageFile.PyDecoder):
         raw_decoder.setimage(self.im)
         return raw_decoder.decode(data)
 
-def register_raw_opener():
+def register_raw_opener(use_exif_rotation=False):
     print("register raw opener")
     Image.register_open('RAW', RawImageFile)
     Image.register_decoder('RAW', RawDecoder)
