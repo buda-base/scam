@@ -1214,7 +1214,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
 
   const showCheckbox = true
 
-  return (<div data-title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)|(_)/g,(m,g1,g2,g3) => g3?"-":"" )} title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"") } ref={divRef} className={"scam-image" + (loading ? " loading" : "") 
+  return (<div data-title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)|(_)/g,(_m,_g1,_g2,g3) => g3?"-":"" )} title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"") } ref={divRef} className={"scam-image" + (loading ? " loading" : "") 
       + ( scamData != true && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
       + (" random-" + isRandom) + (" outliar-" + isOutliar) + ( " showCheckbox-"+showCheckbox ) + ( " hasThumb-" + (typeof konvaImg === 'object' && loadThumbnails)) }
