@@ -123,7 +123,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 .scam-image > figure {
   font-size:0;
   position:relative;
-  display: block;
+  display: inline-block;
   max-width:100%;
   margin:0;
 }
@@ -231,7 +231,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 }
 
 .scam-image.grid-mozaic::after {
-  content:attr(title);
+  content:attr(data-title);
   position: absolute;
   left:0;top:0;
   width:100%;
@@ -355,6 +355,31 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 .scam-image:hover .image-menu svg.disabled {
   pointer-events: none;
   opacity:0.5;
+}
+
+.scam-image.grid-mozaic.showCheckbox-true {
+  margin-top:28px;
+}
+.scam-image.grid-mozaic.showCheckbox-true figcaption {
+  top:-28px;
+  left:0;
+  width:100%;  
+  display: flex;
+  justify-content: center;
+}
+.scam-image.grid-mozaic.hasThumb-true::after {
+  content:none;
+}
+
+.scam-image.grid-mozaic.showCheckbox-true figcaption label {
+  margin:0;
+
+}
+.scam-image.grid-mozaic.showCheckbox-true figcaption label span:last-child {
+  display:none;
+}
+.scam-image.grid-mozaic.showCheckbox-true figcaption label::after {
+  content:none;
 }
 
 button.saving { color:transparent; }

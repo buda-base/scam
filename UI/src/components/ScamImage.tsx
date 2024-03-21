@@ -5,6 +5,8 @@ import { Layer, Stage, Image as KImage, Rect, Transformer, Text } from "react-ko
 import { KonvaEventObject } from "konva/lib/Node";
 import { useInView } from "react-intersection-observer";
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { setupCache } from 'axios-cache-interceptor';
+//import { setupCache } from 'axios-cache-interceptor/dev'; 
 import Konva from "konva";
 import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
@@ -12,7 +14,6 @@ import { ErrorOutline, Warning, WarningAmber, LocalOffer } from "@mui/icons-mate
 import { Checkbox, FormControlLabel, IconButton, MenuItem, Paper } from "@mui/material";
 import _ from "lodash";
 import useImage from "use-image";
-
 import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap, MinAreaRect } from "../types";
 import { apiUrl, scam_options } from "../App";
 import ImageMenu from "./ImageMenu";
@@ -267,9 +268,12 @@ export const ScamImageContainer = (props: { isOutliar:boolean, isRandom:boolean,
     setImageData: (data:ScamImageData|ScamImageData[]) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
   const { isOutliar, isRandom, image, selected, handleSelectItem } = props;
 
+  const [grid, setGrid] = useAtom(state.grid)  
+  const [filter, setFilter] = useAtom(state.filter)  
+
   const { ref, inView, entry } = useInView({
     triggerOnce: false,
-    rootMargin: '200% 0px'
+    rootMargin: grid === "mozaic" ? '120%' : '200% 0px'
   });
 
   const [padding, setPadding] = useAtom(state.padding)
@@ -286,9 +290,6 @@ export const ScamImageContainer = (props: { isOutliar:boolean, isRandom:boolean,
   }, [image.checked])
 
   const figureRef = useRef<HTMLElement>(null)
-  
-  const [grid, setGrid] = useAtom(state.grid)  
-  const [filter, setFilter] = useAtom(state.filter)  
 
   /*
   useEffect(() => {
@@ -301,9 +302,14 @@ export const ScamImageContainer = (props: { isOutliar:boolean, isRandom:boolean,
     return <ScamImage {...props} divRef={ref} {...{isRandom, isOutliar, visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
   }
   else {    
-    const w = (grid === "mozaic" ? Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * mozaicFactor : image.thumbnail_info.width )
-    const h = Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1) * image.thumbnail_info.height / image.thumbnail_info.width
 
+    
+    let w = (grid === "mozaic" ? Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * mozaicFactor : image.thumbnail_info.width )
+    let h = Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1) * image.thumbnail_info.height / image.thumbnail_info.width
+    if(grid === "mozaic" && w < h) { 
+      h = Math.round(minThumbWidth * mozaicFactor)
+      w = h //Math.round(h * (image.width / image.height))      
+    }
 
     return (
       <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid) + (" filter-" + filter) + (" random-" + isRandom) + (" outliar-" + isOutliar) }
@@ -450,16 +456,23 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
 
   const figureRef = useRef<HTMLElement>(null)
 
-  let initW
-  const [dimensions, setDimensions] = useState({
-    width: (initW = Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1)),
-    height:  initW * image.height / image.width     
-  })
-
   const [portrait, setPortrait] = useState(false)
   useEffect(() => {
     setPortrait([90,270].includes(image.rotation) ? true : false)
   }, [image.rotation])
+
+  let initW, initH
+  initW = Math.round(Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1))
+  initH = Math.round(initW * image.height / image.width)
+  if(!portrait && grid === "mozaic" && image.width < image.height) {    
+    initH = Math.round(minThumbWidth * mozaicFactor)
+    initW = Math.round(initH * (image.width / image.height))
+  }
+  
+  const [dimensions, setDimensions] = useState({
+    width: initW,
+    height:  initH
+  })
 
   useEffect(() => {    
     //debug("setDim?", image.thumbnail_path)
@@ -473,9 +486,12 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
           h = w
         }
         w = h * image.width / image.height
+      } else if(image.width < image.height && grid === "mozaic") {
+        h = minThumbWidth
+        w = h * (image.width / image.height)
       }
-      w = w * (grid === "mozaic" ? mozaicFactor : 1)
-      h = h * (grid === "mozaic" ? mozaicFactor : 1)
+      w = Math.round(w * (grid === "mozaic" ? mozaicFactor : 1))
+      h = Math.round(h * (grid === "mozaic" ? mozaicFactor : 1))
       if(w != dimensions.width || h != dimensions.height) {
         //debug("dim!", dimensions.width, dimensions.height, w, h)
         setDimensions({
@@ -1196,13 +1212,15 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
     numAnno = (typeof scamData === "object" ? scamData?.pages?.length ?? 0 : 0),
     tagAnno = (typeof scamData === "object" ? scamData?.pages?.filter(p => p.tags?.length).length ?? 0 : 0)
 
-  return (<div title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} ref={divRef} className={"scam-image" + (loading ? " loading" : "") 
+  const showCheckbox = true
+
+  return (<div data-title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)|(_)/g,(m,g1,g2,g3) => g3?"-":"" )} title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"") } ref={divRef} className={"scam-image" + (loading ? " loading" : "") 
       + ( scamData != true && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
-      + (" random-" + isRandom) + (" outliar-" + isOutliar) }
+      + (" random-" + isRandom) + (" outliar-" + isOutliar) + ( " showCheckbox-"+showCheckbox ) + ( " hasThumb-" + (typeof konvaImg === 'object' && loadThumbnails)) }
     style={{ 
       height: visible ? actualH + 2 * padding : 80, 
-      maxWidth: (grid === "mozaic" ? (portrait ? actualH : actualW) : image.thumbnail_info[portrait ? "height":"width"]) + 2*padding 
+      maxWidth: (grid === "mozaic" ? (portrait ? actualH : (actualW < actualH ? Math.round(minThumbWidth * mozaicFactor) : actualW)) : image.thumbnail_info[portrait ? "height":"width"]) + 2*padding 
     }}
     onMouseDown={checkDeselectDiv}
   >
@@ -1271,12 +1289,14 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
           )}
         </Layer>
       </Stage> }
-      { grid != "mozaic" && <figcaption><FormControlLabel attr-numanno={ (tagAnno ? tagAnno+"+" : "" ) + (numAnno - tagAnno) + "/" + expectedNumAnno } label={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} 
+      { (grid != "mozaic" || showCheckbox) && <figcaption><FormControlLabel attr-numanno={ (tagAnno ? tagAnno+"+" : "" ) + (numAnno - tagAnno) + "/" + expectedNumAnno } label={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"")} onChange={(ev) => handleSelectItem(ev, !selected, image.thumbnail_path)} 
           control={<Checkbox checked={selected} sx={{padding: "0 8px"}}/>} 
         />          
-          { scamData != true && visible && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "2px" }} /> }
-          {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
-          { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
+          { grid != "mozaic" && <>
+            { scamData != true && visible && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "2px" }} /> }
+            {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
+            { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
+          </> }
       </figcaption> }
       {showDebug && visible && typeof scamData === 'object' &&
         <div className="debug">
