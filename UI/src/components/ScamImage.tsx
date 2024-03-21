@@ -5,8 +5,6 @@ import { Layer, Stage, Image as KImage, Rect, Transformer, Text } from "react-ko
 import { KonvaEventObject } from "konva/lib/Node";
 import { useInView } from "react-intersection-observer";
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { setupCache } from 'axios-cache-interceptor';
-//import { setupCache } from 'axios-cache-interceptor/dev'; 
 import Konva from "konva";
 import { useAtom } from "jotai"
 import { useReducerAtom } from "jotai/utils"
