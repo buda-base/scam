@@ -11,3 +11,5 @@ flask
 flask-cors
 pillow >= 10.2.0
 Flask-CacheControl
+exifread
+natsort

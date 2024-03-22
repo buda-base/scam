@@ -116,7 +116,12 @@ def encode_img_uncompressed(img) -> (bytes, str):
         try:
             img.save(output, icc_profile=img.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
         except:
-            return None, ".tiff"
+            try:
+                # https://github.com/python-pillow/Pillow/issues/7892
+                img = img.rotate(180).rotate(180)
+                img.save(output, icc_profile=img.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
+            except:
+                return None, ".tiff"
         return output.getvalue(), ".tiff"
 
 def encode_img(img, target_mode=None, mozjpeg_optimize=True):
