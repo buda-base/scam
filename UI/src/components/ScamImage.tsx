@@ -991,7 +991,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
         const page_n = scamData.rects.findIndex(r => r.n === selectedId) 
         setClipboard({ ...scamData.rects[page_n] })
         removeId(selectedId)
-      } else if((focused === image.thumbnail_path || multiplePaste && selected) && keyDown === "CTRL+V") { 
+      } else if((!multiplePaste && focused === image.thumbnail_path || multiplePaste && selected) && keyDown === "CTRL+V") { 
         //debug(clipboard)
         if(clipboard) { 
           const n = typeof scamData === "object" ? scamData?.rects?.length ?? 0 : 0
