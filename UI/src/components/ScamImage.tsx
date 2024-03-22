@@ -874,6 +874,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
       setSelectedAreaRatio(0);
       setSelectedFixed([]);
     }
+    setFocused(image.thumbnail_path)
   };
 
   const onSelect = (i: number) => {
@@ -974,6 +975,8 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
   
   }, [checked, dimensions, modified, dispatch, drafted, handleZindex, image, scamData, setDrafted, setModified, shouldRunAfter, visible])
 
+  const [multiplePaste, setMultiplePaste] = useAtom(state.multiplePaste)
+
   const handleKeyDown = useCallback( () => {
     if(keyDown == 'Delete' && selectedId != null) {
       removeId(selectedId)
@@ -988,7 +991,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
         const page_n = scamData.rects.findIndex(r => r.n === selectedId) 
         setClipboard({ ...scamData.rects[page_n] })
         removeId(selectedId)
-      } else if(focused === image.thumbnail_path && keyDown === "CTRL+V") { 
+      } else if((focused === image.thumbnail_path || multiplePaste && selected) && keyDown === "CTRL+V") { 
         //debug(clipboard)
         if(clipboard) { 
           const n = typeof scamData === "object" ? scamData?.rects?.length ?? 0 : 0
@@ -1000,7 +1003,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
       }
       setKeyDown('')
     }
-  }, [keyDown, selectedId, scamData, removeId, setKeyDown, setClipboard, clipboard, onChange, focused, image])
+  }, [keyDown, selectedId, scamData, removeId, setKeyDown, setClipboard, clipboard, onChange, focused, image, multiplePaste, selected])
 
   useEffect(()=>{
     handleKeyDown()
@@ -1215,7 +1218,8 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
   return (<div data-title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)|(_)/g,(_m,_g1,_g2,g3) => g3?"-":"" )} title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"") } ref={divRef} className={"scam-image" + (loading ? " loading" : "") 
       + ( scamData != true && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
-      + (" random-" + isRandom) + (" outliar-" + isOutliar) + ( " showCheckbox-"+showCheckbox ) + ( " hasThumb-" + (typeof konvaImg === 'object' && loadThumbnails)) }
+      + (" random-" + isRandom) + (" outliar-" + isOutliar) + ( " showCheckbox-"+showCheckbox ) + ( " hasThumb-" + (typeof konvaImg === 'object' && loadThumbnails)) 
+      + (" focused-"+ (focused === image.thumbnail_path) ) }
     style={{ 
       height: visible ? actualH + 2 * padding : 80, 
       maxWidth: (grid === "mozaic" ? (actualW < actualH ? Math.round(minThumbWidth * mozaicFactor) : actualW) : image.thumbnail_info[portrait ? "height":"width"]) + 2*padding 

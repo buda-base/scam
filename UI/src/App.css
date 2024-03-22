@@ -382,6 +382,15 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   content:none;
 }
 
+.scam-image { 
+  border:1px solid transparent;
+  box-sizing: border-box;
+}
+
+.scam-image.focused-true { 
+  border:1px solid #ddd;  
+}
+
 button.saving { color:transparent; }
 
 button.saving::after {

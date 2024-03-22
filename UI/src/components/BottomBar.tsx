@@ -664,6 +664,15 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   const [contrast, setContrast] = useAtom(state.contrast)
   const [hideAnno, setHideAnno] = useAtom(state.hideAnno)
 
+  const [clipboard, setClipboard] = useAtom(state.clipboard)
+  const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
+  const [keyDown, setKeyDown] = useAtom(state.keyDown)
+  const [multiplePaste, setMultiplePaste] = useAtom(state.multiplePaste)
+
+  useEffect(() => {
+    if(multiplePaste) setMultiplePaste(false)
+  }, [multiplePaste])
+
   const funcs:Record<string,()=>void> = useMemo(() => ({
     random:handleRandom,
     outliar:handleOutliar
@@ -727,6 +736,13 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         { hasWarning.length != 0 && <MenuItem value={2} onClick={() => selectWithWarnings()}>{"Select images with warning"}</MenuItem> }
         <MenuItem value={3} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
         <MenuItem value={4} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
+        <hr/>
+        <MenuItem value={51} disabled={selectedRatio === 0} onClick={() => setKeyDown("CTRL+C")}>Copy annotation</MenuItem>
+        <MenuItem value={52} disabled={!clipboard} onClick={() => setKeyDown("CTRL+V")}>Paste in current image</MenuItem>
+        <MenuItem value={53} disabled={!clipboard || !selectedItems.length} onClick={() => {
+          setKeyDown("CTRL+V")
+          setMultiplePaste(true)
+        }}>Paste in selected images</MenuItem>
         <hr/>
         { (hasUnchecked || !hasChecked) && <MenuItem value={2} disabled={!hasUnchecked} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
         { hasChecked && <MenuItem value={3} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}
