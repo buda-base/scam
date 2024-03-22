@@ -721,8 +721,8 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
             val: { data: newData, state: 'draft', time: shouldRunAfter, image: draft.image, visible: draft.visible, checked: draft.checked, options: draft.options }
           }
         })
-        if(visible != draft.visible) setVisible(draft.visible)
-        if(checked != draft.checked) setChecked(draft.checked)
+        if(draft.visible != undefined && visible != draft.visible) setVisible(draft.visible)
+        if(draft.checked != undefined && checked != draft.checked) setChecked(draft.checked)
         return
 
       } else if(uploadedData && (!globalData || globalData.state === "uploaded")) {
@@ -1117,7 +1117,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
       })
     }  
 
-    if(modified) setDrafted(false) 
+    setDrafted(false) 
     setModified(true)
     setLastRun(1)
     //if(!checked) setChecked(true)
@@ -1172,7 +1172,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
   useEffect( () => {
     if(typeof scamData === 'object') { 
       const numP = globalData?.options?.nbPages ?? (checkedRestrict && selected ? scamOptionsSelected.nbPages : scamOptions.nbPages) ?? scam_options.nb_pages_expected
-      if((scamData?.rects?.length ?? 0) - (scamData?.pages?.filter(p => p.tags?.length ?? 0 > 0).length ?? 0) != numP || scamData?.rects?.some(r => r.warning)) {
+      if(scamData?.pages && (scamData?.rects?.length ?? 0) - (scamData?.pages?.filter(p => p.tags?.length ?? 0 > 0).length ?? 0) != numP || scamData?.rects?.some(r => r.warning)) {
         setWarning(true)
       } else {
         setWarning(false)
@@ -1218,7 +1218,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
       + (" random-" + isRandom) + (" outliar-" + isOutliar) + ( " showCheckbox-"+showCheckbox ) + ( " hasThumb-" + (typeof konvaImg === 'object' && loadThumbnails)) }
     style={{ 
       height: visible ? actualH + 2 * padding : 80, 
-      maxWidth: (grid === "mozaic" ? (portrait ? actualH : (actualW < actualH ? Math.round(minThumbWidth * mozaicFactor) : actualW)) : image.thumbnail_info[portrait ? "height":"width"]) + 2*padding 
+      maxWidth: (grid === "mozaic" ? (actualW < actualH ? Math.round(minThumbWidth * mozaicFactor) : actualW) : image.thumbnail_info[portrait ? "height":"width"]) + 2*padding 
     }}
     onMouseDown={checkDeselectDiv}
   >
@@ -1291,7 +1291,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
           control={<Checkbox checked={selected} sx={{padding: "0 8px"}}/>} 
         />          
           { grid != "mozaic" && <>
-            { scamData != true && visible && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "2px" }} /> }
+            { scamData != true && visible && warning && (!checked || expectedNumAnno > 0 && numAnno > expectedNumAnno) && <Warning sx={{ position: "absolute", color: "orange", marginLeft: "5px", marginTop: "2px" }} /> }
             {/* <WarningAmber sx={{ position: "absolute", opacity:"50%" }} /> */}
             { !loading && typeof scamData !== "object" && <span title="no data yet"><ErrorOutline sx={{ position: "absolute", color: "black", opacity:0.5, marginLeft: "5px", marginTop: "2px" }} /></span> }
           </> }

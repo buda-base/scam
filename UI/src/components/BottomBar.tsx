@@ -107,6 +107,10 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
       images: { ...images, ...Object.keys(allScamData).reduce( (acc,a) => {
         const val = allScamData[a]
         val.data = { ...val.data }
+        // save rotation
+        val.image = { ...val.data }
+        if(val.image.pages) delete val.image.pages
+        if(val.image.rects) delete val.image.rects
         // #9 always ungray save buttons after run_ (=> save previous scam run as draft)
         if(["new", "draft", "modified", "uploaded"].includes(val.state)) { 
           if(val.data.pages) val.data.pages = val.data.pages.filter((p,i) => !val.data.pages?.some((q,j) => samePage(p,q) && j > i)).map(withoutRotatedHandle) as Page[]

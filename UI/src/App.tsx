@@ -285,6 +285,7 @@ function App() {
     }
     setImages(newImages)
     setModified(true)
+    setDrafted(false)
   }, [selectedItems, images, allScamData, dispatch])
 
   useEffect(() => {
