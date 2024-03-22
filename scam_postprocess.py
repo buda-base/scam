@@ -276,6 +276,10 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, page_info,
         logging.info("  write to s3 key %s", s3key)
         if not postprocess_options["dryrun"]:
             b, ext = encode_img_uncompressed(extract)
+            if b is None:
+                output_file_info["error"] = "could not encode image"
+                logging.error(" got no resulting image for %s", json.dumps(page_info))
+                return
             sha256 = get_sha256(b)
             output_file_info["sha256"] = sha256
             upload_to_s3(b, s3key)
