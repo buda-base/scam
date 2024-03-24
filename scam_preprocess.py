@@ -6,7 +6,7 @@ from datetime import datetime
 import logging
 from PIL import Image
 from cal_sam_pickles import get_sam_output
-from img_utils import apply_exif_rotation, encode_img, get_best_mode
+from img_utils import apply_exif_rotation, encode_img, get_best_mode, apply_icc
 from tqdm import tqdm
 from raw_utils import register_raw_opener
 from natsort import natsorted
@@ -45,6 +45,7 @@ def get_pil_img(folder_path, img_path):
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
     if not RAW_OPENER_REGISTERED and img_path[-4:].lower() in [".nef", ".cr2", ".dng", ".arw"]:
+        print("register raw opener")
         register_raw_opener()
         RAW_OPENER_REGISTERED = True
     img = Image.open(blob)
@@ -63,9 +64,13 @@ def save_thumbnail(folder_path, img_path, pil_img, preprocess_options):
         byts, ext = encode_img(pil_img, mozjpeg_optimize=True)
         upload_to_s3(byts, path)
     except Exception as e:
-        print("error saving %s" % (folder_path+img_path))
-        print(e)
+        logging.error("error saving %s" % (folder_path+img_path))
+        logging.error(e)
     return path, new_width, new_height
+
+def sanitize_for_preprocessing(pil_img):
+    pil_img = apply_icc(pil_img)
+    return pil_img.convert('RGB')
 
 def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS):
     """
@@ -93,14 +98,16 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
     for img_path in tqdm(img_paths):
         # pil_img is not rotated
         pil_img = None
+        sam_res = None
         try:
             pil_img = get_pil_img(folder_path, img_path)
+            if preprocess_options["use_exif_rotation"]:
+                pil_img = apply_exif_rotation(img)
+            #pil_img = sanitize_for_preprocessing(pil_img)
+            sam_res = run_sam(pil_img, preprocess_options)
         except Exception as e:
             logging.error("error on %s/%s" % (folder_path, img_path), e)
             continue
-        if preprocess_options["use_exif_rotation"]:
-            pil_img = apply_exif_rotation(img)
-        sam_res = run_sam(pil_img, preprocess_options)
         pickle_path = get_pickle_path(folder_path, img_path)
         save_sam_pickle(pickle_path, sam_res)
         # thumbnail will get rotated
