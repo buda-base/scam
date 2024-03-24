@@ -171,7 +171,7 @@ def get_sequence_info_nlm1(scam_json, apply_resequence):
     wi = folder[slashidx+1:]
     nlm1_reorder = get_all_reorder_info_nlm1()
     if wi not in nlm1_reorder:
-        return get_sequence_info(scam_json, True)
+        return get_sequence_info(scam_json, "auto")
     prefix_to_order = nlm1_reorder[wi]
     # define sorting function:
     def nlm1_compare(img_path_a, img_path_b):
@@ -201,7 +201,7 @@ def get_sequence_info_nlm1(scam_json, apply_resequence):
             #print("return %d-%d = %d" % (order_a, order_b, order_a - order_b))
             return order_a - order_b
         return -1 if img_path_a < img_path_b else 1
-    return get_sequence_info(scam_json, True, cmp_to_key(nlm1_compare))
+    return get_sequence_info(scam_json, "auto", cmp_to_key(nlm1_compare))
 
 def get_direction(pages):
     """
