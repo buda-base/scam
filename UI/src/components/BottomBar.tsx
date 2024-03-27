@@ -664,7 +664,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   const [contrast, setContrast] = useAtom(state.contrast)
   const [hideAnno, setHideAnno] = useAtom(state.hideAnno)
 
-  const [clipboard, setClipboard] = useAtom(state.clipboard)
+  const [clipboardWithCorner, setClipboardWithCorner] = useAtom(state.clipboardWithCorner)
   const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
   const [keyDown, setKeyDown] = useAtom(state.keyDown)
   const [multiplePaste, setMultiplePaste] = useAtom(state.multiplePaste)
@@ -738,8 +738,8 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         <MenuItem value={4} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
         <hr/>
         <MenuItem value={51} disabled={selectedRatio === 0} onClick={() => setKeyDown("CTRL+C")}>Copy annotation</MenuItem>
-        <MenuItem value={52} disabled={!clipboard} onClick={() => setKeyDown("CTRL+V")}>Paste in current image</MenuItem>
-        <MenuItem value={53} disabled={!clipboard || !selectedItems.length} onClick={() => {
+        <MenuItem value={52} disabled={!clipboardWithCorner} onClick={() => setKeyDown("CTRL+V")}>Paste in current image</MenuItem>
+        <MenuItem value={53} disabled={!clipboardWithCorner || !selectedItems.length} onClick={() => {
           setKeyDown("CTRL+V")
           setMultiplePaste(true)
         }}>Paste in selected images</MenuItem>

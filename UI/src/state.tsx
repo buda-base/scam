@@ -80,7 +80,7 @@ export const showSettings = atom(false);
 
 export const scamQueue = atom<ScamQueue>({});
 
-export const clipboard = atom<KonvaPage|null>(null)
+export const clipboardWithCorner = atom<{rect:KonvaPage, corner:number[]}|null>(null)
 export const multiplePaste = atom<boolean>(false)
 
 export const defaultPadding = 56

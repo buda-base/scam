@@ -918,7 +918,7 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
     }
   }, [focused, image.thumbnail_path])
 
-  const [clipboard, setClipboard] = useAtom(state.clipboard)
+  const [clipboardWithCorner, setClipboardWithCorner] = useAtom(state.clipboardWithCorner)
 
   const onChange = useCallback((p: KonvaPage, add?: boolean) => {
     
@@ -977,6 +977,13 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
 
   const [multiplePaste, setMultiplePaste] = useAtom(state.multiplePaste)
 
+  const  getClosestCorner: (r:KonvaPage) => number[] = useCallback((r:KonvaPage) => {
+    const corner = []
+    corner.push(r.x + r.width / 2 < dimensions.width / 2 ? 0 : dimensions.width)
+    corner.push(r.y + r.height / 2 < dimensions.height / 2 ? 0 : dimensions.height)
+    return corner
+  },[dimensions])
+
   const handleKeyDown = useCallback( () => {
     if(keyDown == 'Delete' && selectedId != null) {
       removeId(selectedId)
@@ -984,26 +991,33 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
     } else if(keyDown.startsWith("CTRL+")){
       //debug("key:", keyDown, focused, image.thumbnail_path)      
       if(selectedId != null && keyDown === "CTRL+C"  && typeof scamData === "object" && scamData.rects ) {
-        //debug(scamData.rects[selectedId])
         const page_n = scamData.rects.findIndex(r => r.n === selectedId) 
-        setClipboard({ ...scamData.rects[page_n] })
+        const corner = getClosestCorner(scamData.rects[page_n])
+        //debug(scamData.rects[selectedId], corner, dimensions)
+        setClipboardWithCorner({ rect: { ...scamData.rects[page_n] }, corner})
       } else if(selectedId != null && keyDown === "CTRL+X"  && typeof scamData === "object" && scamData.rects) {
         const page_n = scamData.rects.findIndex(r => r.n === selectedId) 
-        setClipboard({ ...scamData.rects[page_n] })
+        const corner = getClosestCorner(scamData.rects[page_n])
+        setClipboardWithCorner({ rect: { ...scamData.rects[page_n] }, corner})
         removeId(selectedId)
       } else if((!multiplePaste && focused === image.thumbnail_path || multiplePaste && selected) && keyDown === "CTRL+V") { 
-        //debug(clipboard)
-        if(clipboard) { 
+        //debug(clipboardWithCorner)
+        if(clipboardWithCorner) { 
           const n = typeof scamData === "object" ? scamData?.rects?.length ?? 0 : 0
+          const newRect = { ...clipboardWithCorner.rect }
+          const { corner } = clipboardWithCorner
+          //debug(newRect, corner, dimensions)
+          if(corner[0] > 0) newRect.x = dimensions.width - (corner[0] - newRect.x)
+          if(corner[1] > 0) newRect.y = dimensions.height - (corner[1] - newRect.y)
           selectShape(null)
-          onChange({...clipboard, n}, true)
+          onChange({...newRect, n}, true)
           selectShape(n)
         }
 
       }
       setKeyDown('')
     }
-  }, [keyDown, selectedId, scamData, removeId, setKeyDown, setClipboard, clipboard, onChange, focused, image, multiplePaste, selected])
+  }, [keyDown, selectedId, scamData, removeId, setKeyDown, setClipboardWithCorner, clipboardWithCorner, onChange, focused, image, multiplePaste, selected, dimensions, getClosestCorner])
 
   useEffect(()=>{
     handleKeyDown()
