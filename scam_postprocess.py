@@ -9,7 +9,7 @@ from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3, gets3blob, get_sha256
 from raw_utils import register_raw_opener, is_likely_raw, get_np_from_raw, get_factors_from_raw
-from natsort import natsort_keygen, natsorted
+from natsort import natsort_keygen, natsorted, ns
 import numpy as np
 import cv2
 import exifread
@@ -17,6 +17,7 @@ import rawpy
 from datetime import datetime
 import json
 from functools import cmp_to_key
+import shlex
 
 #logging.basicConfig(level=logging.INFO)
 
@@ -31,10 +32,10 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "local_dst_folder": "./scam_cropped/",
     "add_prefix": "auto", # controls adding an image sequence prefix to the file name, can be True, False or "auto" to do it only if resequencing happens
     "resequence": "auto", # in the case where a prefix can be added, resequence images assuming that one image is all rectos and the next is all versos. "auto" will do that on all images if it can find a pair of consecutive images with 3 pages
-    "dryrun": False,
+    "dryrun": True,
     "output_bps": 8, # can be 8, 16 or "auto" (16 bits if raw with no correction, 8 bits otherwise). Actually 16 and "auto" can't work with PIL
     "correct_non_raw": False, # if True, also applies rgb and exposure corrections to non-raw files
-    "rgb_correction": "auto", # can be "default" (see below), "auto" to check for white patch annotations in the folders, or None for no auto_correction
+    "rgb_correction": None, # can be "default" (see below), "auto" to check for white patch annotations in the folders, or None for no auto_correction
     "rgb_correction_default": ([2.47195, 1.0, 1.9305, 1.0017], 3.2, None), # for the case where no white patch is found
     "wb_patch_nsrgb_target": [0.95, 0.95, 0.95], # the target sRGB values given in [0:1], corresponding to the white patch of the color card
     "force_apply_icc": False, # when False, icc is kept when possible in the output files, if not it is applied
@@ -171,7 +172,7 @@ def get_sequence_info_nlm1(scam_json, apply_resequence):
     wi = folder[slashidx+1:]
     nlm1_reorder = get_all_reorder_info_nlm1()
     if wi not in nlm1_reorder:
-        return get_sequence_info(scam_json, "auto")
+        return get_sequence_info(scam_json, apply_resequence)
     prefix_to_order = nlm1_reorder[wi]
     # define sorting function:
     def nlm1_compare(img_path_a, img_path_b):
@@ -179,7 +180,7 @@ def get_sequence_info_nlm1(scam_json, apply_resequence):
         order_a = 0
         order_b = 0
         for p, o in prefix_to_order.items():
-            if img_path_a.startswith(p):
+            if img_path_a.startswith(p+("" if apply_resequence == True else "_")):
                 order_a = o
                 rest_a = img_path_a[len(p):]
                 if rest_a[0] == '_' and rest_a[3] == '_':
@@ -187,7 +188,7 @@ def get_sequence_info_nlm1(scam_json, apply_resequence):
                         order_a = int(rest_a[1:3])
                     except ValueError:
                         order_a = o
-            if img_path_b.startswith(p):
+            if img_path_b.startswith(p+("" if apply_resequence == True else "_")):
                 order_b = o
                 rest_b = img_path_b[len(p):]
                 if rest_b[0] == '_' and rest_b[3] == '_':
@@ -200,8 +201,12 @@ def get_sequence_info_nlm1(scam_json, apply_resequence):
         if (order_a or order_b) and order_a != order_b:
             #print("return %d-%d = %d" % (order_a, order_b, order_a - order_b))
             return order_a - order_b
-        return -1 if img_path_a < img_path_b else 1
-    return get_sequence_info(scam_json, "auto", cmp_to_key(nlm1_compare))
+        if apply_resequence == "auto":
+            l = natsorted([img_path_a, img_path_b], alg=ns.IC|ns.INT)
+            return -1 if l[0] == img_path_a else 1
+        else:
+            return -1 if img_path_a < img_path_b else 1
+    return get_sequence_info(scam_json, apply_resequence, cmp_to_key(nlm1_compare))
 
 def get_direction(pages):
     """
@@ -383,7 +388,7 @@ def postprocess_folder(folder_path, postprocess_options):
     scam_json = get_scam_json(folder_path)
     img_path_to_corr = {}
     img_paths = [file_info["img_path"] for file_info in scam_json["files"]]
-    img_paths = natsorted(img_paths)
+    img_paths = natsorted(img_paths, alg=ns.IC|ns.INT|ns.U)
     if postprocess_options["rgb_correction"] == "auto":
         corrs = get_white_patch_corrections(scam_json, postprocess_options)
         if len(corrs) > 0:
@@ -409,25 +414,22 @@ def postprocess_folder(folder_path, postprocess_options):
             img_path_to_corr[img_path] = postprocess_options["rgb_correction_default"]
     if not scam_json["checked"]:
         logging.warning("warning: processing unchecked json %s" % folder_path)
-    add_prefix = postprocess_options["add_prefix"]
+    add_prefix = True
     sequence_info = None
-    if add_prefix == "auto" and not postprocess_options["resequence"]:
-        add_prefix = False
     if add_prefix: # "auto" or True
-        sequence_info, resequenced = get_sequence_info_nlm1(scam_json, postprocess_options["resequence"])
-        if postprocess_options["resequence"] == "auto" and not resequenced and add_prefix == "auto":
-            add_prefix = False
-        else:
-            add_prefix = True
-    for file_info in tqdm(scam_json["files"]):
-        if not add_prefix:
-            derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, None, img_path_to_corr[file_info["img_path"]])
-        elif file_info["img_path"] in sequence_info:
-            derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, sequence_info[file_info["img_path"]], img_path_to_corr[file_info["img_path"]])
-    scam_log_s3_key = "scam_logs/"+scam_json["folder_path"]+"scam_log.json"
-    logging.info("write scam log on %s", scam_log_s3_key)
-    scam_log_json_str = json.dumps(scam_log_json, indent=2)
-    upload_to_s3(scam_log_json_str.encode('utf-8'), scam_log_s3_key)
+        sequence_info_new, _ = get_sequence_info_nlm1(scam_json, "auto")
+        sequence_info_old, _ = get_sequence_info_nlm1(scam_json, True)
+        for fname, seqlist_old in sequence_info_old.items():
+            seqlist_new = sequence_info_new[fname]
+            for i, s in enumerate(seqlist_old):
+                if s != seqlist_new[i]:
+                    suffix_letter = chr(97+i)
+                    base_old = ("%04d_" % s) + fname.replace("/", "_")
+                    output_path_old = os.path.splitext(base_old)[0]+suffix_letter+".tiff"
+                    base_new = ("%04d_" % seqlist_new[i]) + fname.replace("/", "_")
+                    output_path_new = os.path.splitext(base_new)[0]+suffix_letter+".tiff"
+                    print("mv %s %s" % (shlex.quote(folder_path+output_path_old), shlex.quote(folder_path+output_path_new)))
+
 
 def get_bbox(page_info, file_info, img_w, img_h, add_file_info_rotation=False):
     # TODO: test rotation stuff
@@ -599,5 +601,5 @@ def postprocess_csv():
             postprocess_folder(folder, postprocess_options)
 
 if __name__ == '__main__':
-    postprocess_csv()
-    #postprocess_folder("NLM1/W8LS32390/sources/W8LS32390-I8LS32392/", DEFAULT_POSTPROCESS_OPTIONS)
+    #postprocess_csv()
+    postprocess_folder("NLM1/W8LS32390/sources/W8LS32390-I8LS32392/", DEFAULT_POSTPROCESS_OPTIONS)
