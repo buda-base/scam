@@ -664,14 +664,80 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   const [contrast, setContrast] = useAtom(state.contrast)
   const [hideAnno, setHideAnno] = useAtom(state.hideAnno)
 
-  const [clipboard, setClipboard] = useAtom(state.clipboard)
+  const [clipboardWithCorner, setClipboardWithCorner] = useAtom(state.clipboardWithCorner)
   const [selectedRatio, setSelectedRatio ] = useAtom(state.selectedRatio) 
   const [keyDown, setKeyDown] = useAtom(state.keyDown)
-  const [multiplePaste, setMultiplePaste] = useAtom(state.multiplePaste)
 
-  useEffect(() => {
-    if(multiplePaste) setMultiplePaste(false)
-  }, [multiplePaste])
+  const handleMultiplePaste = useCallback(() => {  
+    
+    //debug("mP:", selectedItems, allScamData, JSON.stringify(clipboardWithCorner, null, 3))
+
+    if(clipboardWithCorner) { 
+      const { corner, page, rect, dimensions:sourceDim } = clipboardWithCorner
+      for(const image of images) {
+        
+        if(selectedItems.includes(image.thumbnail_path)) {
+          
+          const targetDim = { rect:{ ...sourceDim.rect }, page:{ width: image.width, height: image.height } }
+          if(sourceDim.page.width / sourceDim.page.height > 1 && targetDim.page.width / targetDim.page.height < 1
+            || sourceDim.page.width / sourceDim.page.height < 1 && targetDim.page.width / targetDim.page.height > 1) {
+  
+            if(grid == "mozaic") {
+              targetDim.rect.width  = sourceDim.rect.height
+              targetDim.rect.height = targetDim.rect.width * image.height / image.width
+            } else {
+              targetDim.rect.width  = sourceDim.rect.width
+              targetDim.rect.height = targetDim.rect.width * image.height / image.width  
+            }
+  
+          } else {
+            targetDim.rect.width  = sourceDim.rect.width
+            targetDim.rect.height = targetDim.rect.width * image.height / image.width
+          }        
+          
+          const newData = allScamData[image.thumbnail_path]?.data 
+            ?? (typeof json === "object" && json.files.find((im) => im?.thumbnail_path === image.thumbnail_path))
+            ?? {}
+          
+          //debug("nd:", newData, sourceDim.page, targetDim.page)
+
+          if(page && sourceDim.page) {
+
+            const coefW = (sourceDim.rect.width  / sourceDim.page.width)  * (targetDim.page.width  / targetDim.rect.width)
+            const coefH = (sourceDim.rect.height / sourceDim.page.height) * (targetDim.page.height / targetDim.rect.height)
+
+            const newPage = { ...page, minAreaRect: { ...page.minAreaRect } }            
+            newPage.minAreaRect[0] = newPage.minAreaRect[0] * coefW
+            newPage.minAreaRect[1] = newPage.minAreaRect[1] * coefH
+            newPage.minAreaRect[2] = newPage.minAreaRect[2] * coefW
+            newPage.minAreaRect[3] = newPage.minAreaRect[3] * coefH
+
+            //debug("np:",JSON.stringify(newPage, null,3), coefW, coefH)
+
+            if(corner[0] > 0) newPage.minAreaRect[0] = targetDim.page.width  - (sourceDim.page.width  - page.minAreaRect[0]) * coefW 
+            if(corner[1] > 0) newPage.minAreaRect[1] = targetDim.page.height - (sourceDim.page.height - page.minAreaRect[1]) * coefH          
+
+            //debug("np:corner",JSON.stringify(newPage, null,3))
+
+            if(!newData.pages) newData.pages = []
+            newData.pages.push(newPage)
+            if(newData.rects) delete newData.rects
+          }
+          
+          dispatch({
+            type: 'UPDATE_DATA',
+            payload: {
+              id: image.thumbnail_path,
+              val: { state: "modified", data: newData }
+            }
+          })
+          
+        }
+      }
+
+
+    }
+  }, [allScamData, clipboardWithCorner, images, json, selectedItems, grid])
 
   const funcs:Record<string,()=>void> = useMemo(() => ({
     random:handleRandom,
@@ -738,11 +804,8 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         <MenuItem value={4} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
         <hr/>
         <MenuItem value={51} disabled={selectedRatio === 0} onClick={() => setKeyDown("CTRL+C")}>Copy annotation</MenuItem>
-        <MenuItem value={52} disabled={!clipboard} onClick={() => setKeyDown("CTRL+V")}>Paste in current image</MenuItem>
-        <MenuItem value={53} disabled={!clipboard || !selectedItems.length} onClick={() => {
-          setKeyDown("CTRL+V")
-          setMultiplePaste(true)
-        }}>Paste in selected images</MenuItem>
+        <MenuItem value={52} disabled={!clipboardWithCorner} onClick={() => setKeyDown("CTRL+V")}>Paste in current image</MenuItem>
+        <MenuItem value={53} disabled={!clipboardWithCorner || !selectedItems.length} onClick={handleMultiplePaste}>Paste in selected images</MenuItem>
         <hr/>
         { (hasUnchecked || !hasChecked) && <MenuItem value={2} disabled={!hasUnchecked} onClick={() => markChecked(true)}>{"Mark checked"}</MenuItem>}
         { hasChecked && <MenuItem value={3} onClick={() => markChecked(false)}>{"Mark unchecked"}</MenuItem>}

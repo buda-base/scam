@@ -2,7 +2,7 @@ import { atom } from "jotai"
 import { atomWithReducer } from "jotai/utils"
 import debugFactory from "debug"
 
-import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction, Orientation, LocalData, ScamQueue, KonvaPage } from "./types"
+import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction, Orientation, LocalData, ScamQueue, KonvaPage, Page } from "./types"
 
 const debug = debugFactory("scam:state")
 
@@ -80,8 +80,7 @@ export const showSettings = atom(false);
 
 export const scamQueue = atom<ScamQueue>({});
 
-export const clipboard = atom<KonvaPage|null>(null)
-export const multiplePaste = atom<boolean>(false)
+export const clipboardWithCorner = atom<{rect:KonvaPage, corner:number[], dimensions:{rect:{width:number, height:number},page:{width:number, height:number}}, page?:Page}|null>(null)
 
 export const defaultPadding = 56
 export const padding = atom<number>(defaultPadding)
