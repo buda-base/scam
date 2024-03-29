@@ -9,7 +9,7 @@ from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3, gets3blob, get_sha256
 from raw_utils import register_raw_opener, is_likely_raw, get_np_from_raw, get_factors_from_raw
-from natsort import natsort_keygen, natsorted
+from natsort import natsort_keygen, natsorted, ns
 import numpy as np
 import cv2
 import exifread
@@ -76,7 +76,7 @@ def get_sequence_info(scam_json, apply_resequence=True, sort_key=None):
         img_path_to_nb_output_pages[img_path] = nb_pages
         max_nb_pages = max(max_nb_pages, nb_pages)
     if sort_key is None:
-        sort_key = natsort_keygen()
+        sort_key = natsort_keygen(alg=ns.IC|ns.INT)
     sorted_img_paths = sorted(list(img_path_to_nb_output_pages.keys()), key=sort_key)
     if apply_resequence == "auto":
         if max_nb_pages < 3:
@@ -320,7 +320,7 @@ def postprocess_folder(folder_path, postprocess_options):
     scam_json = get_scam_json(folder_path)
     img_path_to_corr = {}
     img_paths = [file_info["img_path"] for file_info in scam_json["files"]]
-    img_paths = natsorted(img_paths)
+    img_paths = natsorted(img_paths, alg=ns.IC|ns.INT)
     if postprocess_options["rgb_correction"] == "auto":
         corrs = get_white_patch_corrections(scam_json, postprocess_options)
         if len(corrs) > 0:
