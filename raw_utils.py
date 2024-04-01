@@ -160,11 +160,14 @@ def get_np_from_raw(fp, params, use_exif_rotation):
             user_wb, exp_shift, _ = params
             logging.info("open raw with user_wb = %s, exp_shift=%f" % (str(user_wb), exp_shift))
             postprocess_kwargs["demosaic_algorithm"] = rawpy.DemosaicAlgorithm.AAHD
-            postprocess_kwargs["no_auto_bright"] = True
             postprocess_kwargs["use_camera_wb"] = False
             postprocess_kwargs["use_auto_wb"] = False
             postprocess_kwargs["user_wb"] = user_wb
-            postprocess_kwargs["exp_shift"] = exp_shift
+            if exp_shift is not None:
+                postprocess_kwargs["exp_shift"] = exp_shift
+                postprocess_kwargs["no_auto_bright"] = True
+            else:
+                postprocess_kwargs["auto_bright_thr"] = 0.0001
             array = raw.postprocess(**postprocess_kwargs)
     except:
         raise TypeError("Not a RAW file")
