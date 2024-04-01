@@ -158,7 +158,7 @@ def get_np_from_raw(fp, params, use_exif_rotation):
             array = raw.postprocess(**postprocess_kwargs)
         else:
             user_wb, exp_shift, _ = params
-            logging.info("open raw with user_wb = %s, exp_shift=%f" % (str(user_wb), exp_shift))
+            logging.info("open raw with user_wb = %s, exp_shift=%s" % (str(user_wb), str(exp_shift)))
             postprocess_kwargs["demosaic_algorithm"] = rawpy.DemosaicAlgorithm.AAHD
             postprocess_kwargs["use_camera_wb"] = False
             postprocess_kwargs["use_auto_wb"] = False
