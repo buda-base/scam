@@ -75,7 +75,7 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, qual
             f.write(img)
 
 def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir):
-    sources_dir = wlname+"/sources/"+wlname+"-"+ilname+"/"
+    sources_dir = dst_dir + wlname+"/sources/"+wlname+"-"+ilname+"/"
     if not s3prefix.endswith(wlname+"-"+ilname+"/"):
         lastpart = s3prefix
         wilnameidx = s3prefix.rfind(wlname+"-"+ilname+"/") 
@@ -93,8 +93,8 @@ def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir):
             lastpart = lastpart[7:]
         if len(lastpart) > 0:
             sources_dir += lastpart
-    archive_dir = wlname+"/archive/"+wlname+"-"+ilname+"/"
-    images_dir = wlname+"/images/"+wlname+"-"+ilname+"/"
+    archive_dir = dst_dir + wlname+"/archive/"+wlname+"-"+ilname+"/"
+    images_dir = dst_dir + wlname+"/images/"+wlname+"-"+ilname+"/"
     download_folder_into(s3prefix, sources_dir)
     nbintropages = get_nbintropages(wlname, ilname)
     #download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages)
@@ -110,6 +110,12 @@ def postprocess_csv():
     if len(sys.argv) <= 1:
         print("nothing to do, please pass the path to a csv file")
 
+    dest_dir = "./"
+    if len(sys.argv) > 2:
+        dest_dir = sys.argv[2]
+        if not dest_dir.endswith("/"):
+            dest_dir += "/"
+
     with open(sys.argv[1], newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
@@ -121,7 +127,7 @@ def postprocess_csv():
             shrink_factor = 1.0
             if len(row) > 3:
                 shrink_factor = float(row[3])
-            download_prefix(folder, wlname, ilname, shrink_factor, "./")
+            download_prefix(folder, wlname, ilname, shrink_factor, dest_dir)
 
 if __name__ == '__main__':
     postprocess_csv()
