@@ -44,6 +44,32 @@ def s3key_exists(s3_key):
             return False # ?
     return True
 
+def sanitize_fname_for_archive(fpath, imgnum):
+    fpath = fpath.replace("/", "_")
+    suffix = "%04d" % imgnum
+    fpathnoext = fpath[:fpath.rfind(".")]
+    if not fpathnoext.endswith(suffix):
+        fpath = fpathnoext+"_"+suffix+fpath[fpath.rfind("."):]
+    return fpath
+
+def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, bucket=BUCKET_NAME):
+    obj_keys = natsorted(list_obj_keys(s3prefix, bucket), alg=ns.IC|ns.INT)
+    for fnum, obj_key in enumerate(obj_keys):
+        obj_key_afterprefix = obj_key[len(s3prefix):]
+        obj_key_afterprefix = sanitize_fname_for_archive(fpath, fnum+nb_intro_pages)
+        dest_fname = dst_dir+obj_key_afterprefix
+        if not os.path.exists(os.path.dirname(dest_fname)):
+            os.makedirs(os.path.dirname(dest_fname))
+        S3.download_file(obj_key, dest_fname, Bucket = bucket)
+
+def download_folder_into(s3prefix, dst_dir, bucket=BUCKET_NAME):
+    for obj_key in list_obj_keys(s3prefix, bucket):
+        obj_key_afterprefix = obj_key[len(s3prefix):]
+        dest_fname = dst_dir+obj_key_afterprefix
+        if not os.path.exists(os.path.dirname(dest_fname)):
+            os.makedirs(os.path.dirname(dest_fname))
+        S3.download_file(obj_key, dest_fname, Bucket = bucket)
+
 def is_img(path: str) -> bool:
     """"
     Better to use try: Image.open() but this is faster)
