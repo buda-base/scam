@@ -48,7 +48,7 @@ def get_nbintropages(wlname, ilname):
         return 0
     iginfo = winfo["image_groups"][ilname]
     if "volume_pages_bdrc_intro" in iginfo:
-        logging.error("found %d intro pages for %s" % (iginfo["volume_pages_bdrc_intro"], ilname))
+        logging.info("found %d intro pages for %s" % (iginfo["volume_pages_bdrc_intro"], ilname))
         return iginfo["volume_pages_bdrc_intro"]
     return 0
 
@@ -97,7 +97,7 @@ def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir):
     images_dir = dst_dir + wlname+"/images/"+wlname+"-"+ilname+"/"
     download_folder_into(s3prefix, sources_dir)
     nbintropages = get_nbintropages(wlname, ilname)
-    #download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages)
+    download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages)
     encode_folder(archive_dir, images_dir, ilname)
     if nbintropages > 0:
         shutil.copyfile("tbrcintropages/1.tif", archive_dir+ilname+"0001.tif")
