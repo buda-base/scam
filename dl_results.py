@@ -61,11 +61,12 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, qual
             logging.error("%s likely not an image" % file)
             continue
         file = file[len(archive_folder):]
-        img = Image.open(archive_folder + file)
-        img, ext = encode_img(img, shrink_factor=shrink_factor, quality=quality)
-        while len(img) > 1024*1024:
+        img_pil = Image.open(archive_folder + file)
+        img, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
+        while len(img) > 800*1024:
             shrink_factor = 0.8*shrink_factor
-            img, ext = encode_img(img, shrink_factor=shrink_factor, quality=quality)
+            img, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
+        img_pil = None
         if orig_shrink_factor != shrink_factor:
             logging.warn("had to use %f instead of %f starting with %s" % (shrink_factor, orig_shrink_factor, file))
         filenoext = file[:file.rfind(".")]
