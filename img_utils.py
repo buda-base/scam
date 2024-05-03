@@ -124,26 +124,51 @@ def encode_img_uncompressed(img) -> (bytes, str):
                 return None, ".tiff"
         return output.getvalue(), ".tiff"
 
-def encode_img(img, target_mode=None, mozjpeg_optimize=True):
+def encode_img(img, target_mode=None, mozjpeg_optimize=True, shrink_factor=1.0, quality=85):
     """
     returns the bytes of the encoded image (jpg or g4 tiff if binary)
     """
+    cleanup_exif(img)
+    img = apply_icc(img)
     target_mode = target_mode if target_mode is not None else get_best_mode(img)
     if img.mode != target_mode:
         img = img.convert(target_mode)
+    if shrink_factor != 1.0:
+        img = img.resize((int(img.width*shrink_factor), int(img.height*shrink_factor)), Image.Resampling.LANCZOS)
     if target_mode != "1":
         jpg_bytes = None
         with io.BytesIO() as output:
-            img.save(output, icc_profile=img.info.get('icc_profile'), format="JPEG", quality=85, optimize=True, progressive=True, subsampling="4:2:2", comment="")
+            img.save(output, format="JPEG", quality=quality, optimize=True, progressive=True, subsampling="4:2:2", comment="")
             jpg_bytes = output.getvalue()
         if mozjpeg_optimize:
             jpg_bytes = mozjpeg_lossless_optimization.optimize(jpg_bytes)
         return jpg_bytes, ".jpg"
     out_bytes = None
     with io.BytesIO() as output:
-        img.save(output, format="PNG")
+        img.save(output, format="TIF", compression="group4")
         out_bytes = output.getvalue()
-    return out_bytes, ".png"
+    return out_bytes, ".tif"
+
+def encode_one_img(src_folder, src_path, dst_folder, shrink_factor=1.0, quality=85):
+    img = Image.open(src_folder + src_path)
+    img, ext = encode_img(img, shrink_factor=shrink_factor, quality=quality)
+    dst_path = Path(dst_folder) / Path(src_path).with_suffix(ext)
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    with dst_path.open("wb") as f:
+        f.write(img)
+
+def encode_folder(src_folder, dst_folder, shrink_factor=1.0, quality=85):
+    files = glob(src_folder+'/**/*', recursive = True)
+    for file in tqdm(files): 
+        if not likely_img(file):
+            continue
+        file = file[len(src_folder):]
+        encode_one_img(src_folder, file, dst_folder, shrink_factor=shrink_factor, quality=quality)
+
+def cleanup_exif(img):
+    exif_fields = list(img.info.keys())
+    for k in exif_fields:
+        del img.info[k]
 
 def get_best_mode(img):
     """
