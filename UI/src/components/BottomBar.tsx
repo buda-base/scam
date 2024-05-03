@@ -735,9 +735,39 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         }
       }
 
+      if(!modified) setModified(true)
+      if(drafted) setDrafted(false)
+      if(published) setPublished(false)
+    }
+  }, [allScamData, clipboardWithCorner, images, json, selectedItems, grid, dispatch])
+
+  const handleDeleteAnnotations = useCallback(() => {  
+
+    for(const image of selectedItems) {  
+      const newData = allScamData[image]?.data 
+        ?? (typeof json === "object" && json.files.find((im) => im?.thumbnail_path === image))
+        ?? {}
+      
+      if(newData.pages) {
+        delete newData.pages        
+        if(newData.rects) delete newData.rects
+
+        dispatch({
+          type: 'UPDATE_DATA',
+          payload: {
+            id: image,
+            val: { state: "modified", data: newData }
+          }
+        })
+      }                
 
     }
-  }, [allScamData, clipboardWithCorner, images, json, selectedItems, grid])
+
+    if(!modified) setModified(true)
+    if(drafted) setDrafted(false)
+    if(published) setPublished(false)
+
+  }, [allScamData, json, selectedItems, dispatch])
 
   const funcs:Record<string,()=>void> = useMemo(() => ({
     random:handleRandom,
@@ -802,6 +832,8 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         { hasWarning.length != 0 && <MenuItem value={2} onClick={() => selectWithWarnings()}>{"Select images with warning"}</MenuItem> }
         <MenuItem value={3} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
         <MenuItem value={4} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
+        <hr/>
+        <MenuItem value={61} disabled={!selectedItems.length} onClick={handleDeleteAnnotations}>Remove annotations in selected images</MenuItem>
         <hr/>
         <MenuItem value={51} disabled={selectedRatio === 0} onClick={() => setKeyDown("CTRL+C")}>Copy annotation</MenuItem>
         <MenuItem value={52} disabled={!clipboardWithCorner} onClick={() => setKeyDown("CTRL+V")}>Paste in current image</MenuItem>

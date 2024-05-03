@@ -110,7 +110,7 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
     : Math.round(page?.minAreaRect[2] || 0) + " x " + Math.round(page?.minAreaRect[3] || 0)
   ), [page, rotatedHandle])
 
-  const tags = page?.tags?.map(t => state.possibleTags[t]).join(", ") ?? ""
+  const tags = page?.tags?.map(t => t.match(/^T1[0-9]+$/)?t.replace(/^T10*/,"p."):state.possibleTags[t]).join(", ") ?? ""
 
   return (
     <>

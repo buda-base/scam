@@ -312,7 +312,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   left:0; bottom:4px; width:100%;
   display: flex; justify-content: space-between;
   padding:0 60px; box-sizing: border-box;
-  z-index:2;
+  z-index:3;
 }
 
 .scam-image .newPage-true .image-menu {
