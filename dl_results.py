@@ -25,7 +25,7 @@ def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, bucket=BUCKE
     obj_keys = natsorted(list_obj_keys(s3prefix, bucket), alg=ns.IC|ns.INT)
     for fnum, obj_key in enumerate(obj_keys):
         obj_key_afterprefix = obj_key[len(s3prefix):]
-        obj_key_afterprefix = sanitize_fname_for_archive(obj_key_afterprefix, fnum+nb_intro_pages)
+        obj_key_afterprefix = sanitize_fname_for_archive(obj_key_afterprefix, fnum+1+nb_intro_pages)
         dest_fname = dst_dir+obj_key_afterprefix
         if not os.path.exists(os.path.dirname(dest_fname)):
             os.makedirs(os.path.dirname(dest_fname))
