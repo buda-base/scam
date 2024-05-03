@@ -5,6 +5,7 @@ import io
 import botocore
 import gzip
 import pickle
+from natsort import natsorted, ns
 
 BUCKET_NAME = "image-processing.bdrc.io"
 

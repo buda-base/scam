@@ -149,22 +149,6 @@ def encode_img(img, target_mode=None, mozjpeg_optimize=True, shrink_factor=1.0, 
         out_bytes = output.getvalue()
     return out_bytes, ".tif"
 
-def encode_one_img(src_folder, src_path, dst_folder, shrink_factor=1.0, quality=85):
-    img = Image.open(src_folder + src_path)
-    img, ext = encode_img(img, shrink_factor=shrink_factor, quality=quality)
-    dst_path = Path(dst_folder) / Path(src_path).with_suffix(ext)
-    dst_path.parent.mkdir(parents=True, exist_ok=True)
-    with dst_path.open("wb") as f:
-        f.write(img)
-
-def encode_folder(src_folder, dst_folder, shrink_factor=1.0, quality=85):
-    files = glob(src_folder+'/**/*', recursive = True)
-    for file in tqdm(files): 
-        if not likely_img(file):
-            continue
-        file = file[len(src_folder):]
-        encode_one_img(src_folder, file, dst_folder, shrink_factor=shrink_factor, quality=quality)
-
 def cleanup_exif(img):
     exif_fields = list(img.info.keys())
     for k in exif_fields:
