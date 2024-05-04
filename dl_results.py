@@ -21,15 +21,20 @@ def sanitize_fname_for_archive(fpath, imgnum):
         fpath = fpathnoext+"_"+suffix+fpath[fpath.rfind("."):]
     return fpath
 
-def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, bucket=BUCKET_NAME):
+def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, bucket=BUCKET_NAME):
     obj_keys = natsorted(list_obj_keys(s3prefix, bucket), alg=ns.IC|ns.INT)
+    fnum = 1
     for fnum, obj_key in enumerate(obj_keys):
+        if obj_key.endswith(ilname+"0001.tif") or obj_key.endswith(ilname+"0002.tif"):
+            # skip scan requests
+            continue
         obj_key_afterprefix = obj_key[len(s3prefix):]
-        obj_key_afterprefix = sanitize_fname_for_archive(obj_key_afterprefix, fnum+1+nb_intro_pages)
+        obj_key_afterprefix = sanitize_fname_for_archive(obj_key_afterprefix, fnum+nb_intro_pages)
         dest_fname = dst_dir+obj_key_afterprefix
         if not os.path.exists(os.path.dirname(dest_fname)):
             os.makedirs(os.path.dirname(dest_fname))
         S3.download_file(bucket, obj_key, dest_fname)
+        fnum += 1
 
 def download_folder_into(s3prefix, dst_dir, bucket=BUCKET_NAME):
     for obj_key in list_obj_keys(s3prefix, bucket):
@@ -97,8 +102,9 @@ def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir):
     archive_dir = dst_dir + wlname+"/archive/"+wlname+"-"+ilname+"/"
     images_dir = dst_dir + wlname+"/images/"+wlname+"-"+ilname+"/"
     download_folder_into(s3prefix, sources_dir)
+    download_folder_into("scam_logs/"+s3prefix, sources_dir)
     nbintropages = get_nbintropages(wlname, ilname)
-    download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages)
+    download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages, ilname)
     encode_folder(archive_dir, images_dir, ilname)
     if nbintropages > 0:
         shutil.copyfile("tbrcintropages/1.tif", archive_dir+ilname+"0001.tif")
