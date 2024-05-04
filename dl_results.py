@@ -14,6 +14,7 @@ from PIL import Image
 WINFOS_CACHE = {}
 
 def sanitize_fname_for_archive(fpath, imgnum):
+    print("")
     fpath = fpath.replace("/", "_")
     suffix = "%04d" % imgnum
     fpathnoext = fpath[:fpath.rfind(".")]
@@ -24,7 +25,7 @@ def sanitize_fname_for_archive(fpath, imgnum):
 def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, bucket=BUCKET_NAME):
     obj_keys = natsorted(list_obj_keys(s3prefix, bucket), alg=ns.IC|ns.INT)
     fnum = 1
-    for fnum, obj_key in enumerate(obj_keys):
+    for obj_key in obj_keys:
         if obj_key.endswith(ilname+"0001.tif") or obj_key.endswith(ilname+"0002.tif"):
             # skip scan requests
             continue
