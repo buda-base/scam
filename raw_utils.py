@@ -181,6 +181,7 @@ class RawImageFile(ImageFile.ImageFile):
     def _open(self):
         array = None
         try:
+            raw = rawpy.imread(self.fp)
             # we only open in 8-bits in PIL, for pre-processing
             array = raw.postprocess(output_bps=8, use_camera_wb=True, user_flip=0)
         except:
@@ -225,7 +226,7 @@ def register_raw_opener(use_exif_rotation=False):
 
 def test():
     register_raw_opener()
-    img = Image.open("v4_00000.ARW")
+    img = Image.open("I1EAP100000001.ARW")
     print("dims: %dx%d" % (img.width, img.height))
     img.save("/tmp/India_001.jpg")
 
