@@ -73,7 +73,7 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, qual
             img, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
         img_pil = None
         if orig_shrink_factor != shrink_factor:
-            logging.warn("had to use %f instead of %f starting with %s" % (shrink_factor, orig_shrink_factor, file))
+            logging.warning("had to use %f instead of %f starting with %s" % (shrink_factor, orig_shrink_factor, file))
         filenoext = file[:file.rfind(".")]
         last4 = filenoext[-4:]
         dst_path = Path(images_folder) / Path(ilname+last4+ext)
