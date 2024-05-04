@@ -145,7 +145,7 @@ def encode_img(img, target_mode=None, mozjpeg_optimize=True, shrink_factor=1.0, 
         return jpg_bytes, ".jpg"
     out_bytes = None
     with io.BytesIO() as output:
-        img.save(output, format="TIF", compression="group4")
+        img.save(output, format="TIFF", compression="group4")
         out_bytes = output.getvalue()
     return out_bytes, ".tif"
 
