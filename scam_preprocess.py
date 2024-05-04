@@ -6,7 +6,7 @@ from datetime import datetime
 import logging
 from PIL import Image
 from cal_sam_pickles import get_sam_output
-from img_utils import apply_exif_rotation, encode_img, get_best_mode, apply_icc
+from img_utils import apply_exif_rotation, encode_thumbnail_img, get_best_mode, apply_icc
 from tqdm import tqdm
 from raw_utils import register_raw_opener
 from natsort import natsorted
@@ -61,7 +61,7 @@ def save_thumbnail(folder_path, img_path, pil_img, preprocess_options):
     if preprocess_options["pre_rotate"] != 0:
         pil_img = pil_img.rotate(preprocess_options["pre_rotate"], expand=True)
     try:
-        byts, ext = encode_img(pil_img, mozjpeg_optimize=True)
+        byts, ext = encode_thumbnail_img(pil_img, mozjpeg_optimize=True)
         upload_to_s3(byts, path)
     except Exception as e:
         logging.error("error saving %s" % (folder_path+img_path))

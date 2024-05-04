@@ -149,12 +149,45 @@ def encode_img(img, target_mode=None, mozjpeg_optimize=True, shrink_factor=1.0, 
         out_bytes = output.getvalue()
     return out_bytes, ".tif"
 
+def encode_thumbnail_img(img, target_mode=None, mozjpeg_optimize=True, shrink_factor=1.0, quality=85):
+    """
+    returns the bytes of the encoded image (jpg or g4 tiff if binary)
+    """
+    cleanup_exif(img)
+    img = apply_icc(img)
+    target_mode = target_mode if target_mode is not None else get_best_thumbnail_mode(img)
+    if img.mode != target_mode:
+        img = img.convert(target_mode)
+    if shrink_factor != 1.0:
+        img = img.resize((int(img.width*shrink_factor), int(img.height*shrink_factor)), Image.Resampling.LANCZOS)
+    if target_mode != "1":
+        jpg_bytes = None
+        with io.BytesIO() as output:
+            img.save(output, format="JPEG", quality=quality, optimize=True, progressive=True, subsampling="4:2:2", comment="")
+            jpg_bytes = output.getvalue()
+        if mozjpeg_optimize:
+            jpg_bytes = mozjpeg_lossless_optimization.optimize(jpg_bytes)
+        return jpg_bytes, ".jpg"
+    out_bytes = None
+    with io.BytesIO() as output:
+        img.save(output, format="PNG")
+        out_bytes = output.getvalue()
+    return out_bytes, ".png"
+
 def cleanup_exif(img):
     exif_fields = list(img.info.keys())
     for k in exif_fields:
         del img.info[k]
 
 def get_best_mode(img):
+    """
+    returns the best Pillow mode for an image
+    """
+    if img.mode in ["1", "L", "RGB"]:
+        return img.mode
+    return "RGB"
+
+def get_best_thumbnail_mode(img):
     """
     returns the best Pillow mode for an image
     """
