@@ -25,7 +25,7 @@ def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, buck
     obj_keys = natsorted(list_obj_keys(s3prefix, bucket), alg=ns.IC|ns.INT)
     fnum = 1
     for obj_key in obj_keys:
-        if obj_key.endswith(ilname+"0001.tif") or obj_key.endswith(ilname+"0002.tif"):
+        if nb_intro_pages > 0 and (obj_key.endswith(ilname+"0001.tif") or obj_key.endswith(ilname+"0002.tif")):
             # skip scan requests
             continue
         obj_key_afterprefix = obj_key[len(s3prefix):]
@@ -35,6 +35,8 @@ def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, buck
             os.makedirs(os.path.dirname(dest_fname))
         S3.download_file(bucket, obj_key, dest_fname)
         fnum += 1
+    # return the number of files
+    return fnum - 1
 
 def download_folder_into(s3prefix, dst_dir, bucket=BUCKET_NAME):
     for obj_key in list_obj_keys(s3prefix, bucket):
@@ -104,7 +106,10 @@ def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir):
     download_folder_into(s3prefix, sources_dir)
     download_folder_into("scam_logs/"+s3prefix, sources_dir)
     nbintropages = get_nbintropages(wlname, ilname)
-    download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages, ilname)
+    nb_archive_imgs = download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages, ilname)
+    if nb_archive_imgs < 1:
+        logging.warning("%s-%s has no archive or image files" % (wlname, ilname))
+        return
     encode_folder(archive_dir, images_dir, ilname)
     if nbintropages > 0:
         shutil.copyfile("tbrcintropages/1.tif", archive_dir+ilname+"0001.tif")
