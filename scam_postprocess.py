@@ -2,6 +2,7 @@ import csv
 import sys
 import os
 import logging
+import mozjpeg_lossless_optimization
 from PIL import Image
 from tqdm import tqdm
 from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma, rotate_mar
@@ -194,6 +195,14 @@ def get_output_pages(file_info):
         res.append(p)
     if len(res) == 0:
         return None
+    # when there is one a page covering the full image, remove it
+    if len(res) == 1 and pages[0]["minAreaRect"][4] < 0.01 and pages[0]["minAreaRect"][4] > -0.01:
+        page_area = pages[0]["minAreaRect"][2] * pages[0]["minAreaRect"][3]
+        img_area = file_info["width"] * file_info["height"]
+        r = (img_area - page_area) / img_area
+        if r < 0.01:
+            logging.info("remove full page")
+            return None
     return res
 
 def order_pages(pages):
@@ -205,18 +214,33 @@ def order_pages(pages):
     else:
         return sorted(pages, key=(lambda x: x["minAreaRect"][1]))
 
+def can_simple_copy(file_info, pages):
+    ext = file_info["img_path"][:-4].lower()
+    if ext not in ["jpeg", ".jpg"]: # TODO: tiffs too?
+        return False
+    if len(pages) > 1:
+        return False
+    if file_info["rotation"] != 0:
+        return False
+    return len(pages) == 0
+
 def derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, prefixes, correction):
     pages = get_output_pages(file_info)
     if pages is None:
         logging.info("do not derive from hidden image %s" % file_info["img_path"])
         return
     pil_img = None
+    img_bytes = None
     output_file_info = {
         "original_file_info": file_info,
     }
+    if prefixes is not None and max(1, len(pages)) != len(prefixes):
+        logging.error("len(pages) != len(prefixes):  %d != %d for %s", max(1, len(pages)), len(prefixes), file_info["img_path"])
+        return
+    try_simple_copy = can_simple_copy(file_info, pages)
     if postprocess_options["src_storage"] == "s3":
         if not postprocess_options["dryrun"]:
-            pil_img = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], correction, postprocess_options, output_file_info)
+            pil_img, img_bytes, img_ext = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], correction, postprocess_options, output_file_info, try_simple_copy)
     else:
         local_path = postprocess_options["local_src_folder"]
         if not postprocess_options["skip_folder_local_input"]:
@@ -229,22 +253,21 @@ def derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, p
         logging.info("rotate %s by %d", file_info["img_path"], file_info["rotation"])
         if not postprocess_options["dryrun"]:
             pil_img = pil_img.rotate(file_info["rotation"], expand=True)
-    if prefixes is not None and max(1, len(pages)) != len(prefixes):
-        logging.error("len(pages) != len(prefixes):  %d != %d for %s", max(1, len(pages)), len(prefixes), file_info["img_path"])
-        return
     if len(pages) == 0:
         scam_log_json["output_files"].append(output_file_info)
-        derive_from_page(scam_json, output_file_info, file_info, pil_img, None, 1, postprocess_options, None if prefixes is None else prefixes[0])
+        derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes, img_ext, None, 1, postprocess_options, None if prefixes is None else prefixes[0])
         return
     for i, page in enumerate(pages):
         ofi_p = output_file_info.copy()
         scam_log_json["output_files"].append(ofi_p)
-        derive_from_page(scam_json, ofi_p, file_info, pil_img, page, i+1, postprocess_options, None if prefixes is None else prefixes[i])
+        derive_from_page(scam_json, ofi_p, file_info, pil_img, img_bytes, img_ext, page, i+1, postprocess_options, None if prefixes is None else prefixes[i])
 
-def derive_from_page(scam_json, output_file_info, file_info, pil_img, page_info, page_position, postprocess_options, prefix=None):
+def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes, img_ext, page_info, page_position, postprocess_options, prefix=None):
     # page_info is None means we take the whole image
     # page_position starts at 1
     suffix_letter = chr(96+page_position)
+    if img_ext is None:
+        img_ext = ".tiff"
     extract = pil_img
     output_file_info["scam_page_info"] = page_info
     output_file_info["page_in_file"] = page_position
@@ -266,33 +289,35 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, page_info,
     output_path = None
     if postprocess_options["dst_storage"] == "s3":
         s3key = "scam_cropped/"+scam_json["folder_path"]
+        img_path = file_info["img_path"].replace(" ", "_").replace("'", "v").replace('"', "")
         if prefix is None:
-            output_path = os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
+            output_path = os.path.splitext(img_path)[0]+suffix_letter+img_ext
             s3key += output_path
         else:
-            base = ("%04d_" % prefix) + file_info["img_path"].replace("/", "_")
-            output_path = os.path.splitext(base)[0]+suffix_letter+".tiff"
+            base = ("%04d_" % prefix) + img_path.replace("/", "_")
+            output_path = os.path.splitext(base)[0]+suffix_letter+img_ext
             s3key += output_path
         logging.info("  write to s3 key %s", s3key)
         if not postprocess_options["dryrun"]:
-            b, ext = encode_img_uncompressed(extract)
-            if b is None:
+            if img_bytes is None:
+                img_bytes, img_ext = encode_img_uncompressed(extract)
+            if img_bytes is None:
                 output_file_info["error"] = "could not encode image"
                 logging.error(" got no resulting image for %s", json.dumps(page_info))
                 return
-            sha256 = get_sha256(b)
+            sha256 = get_sha256(img_bytes)
             output_file_info["sha256"] = sha256
-            upload_to_s3(b, s3key)
+            upload_to_s3(img_bytes, s3key)
     else:
         local_path = postprocess_options["local_dst_folder"]
         if not postprocess_options["skip_folder_local_output"]:
             local_path += scam_json["folder_path"]
         if prefix is None:
-            output_path = os.path.splitext(file_info["img_path"])[0]+suffix_letter+".tiff"
+            output_path = os.path.splitext(file_info["img_path"])[0]+suffix_letter+img_ext
             local_path += output_path
         else:
             base = ("%04d_" % prefix) + file_info["img_path"].replace("/", "_")
-            output_path = os.path.splitext(base)[0]+suffix_letter+".tiff"
+            output_path = os.path.splitext(base)[0]+suffix_letter+img_ext
             local_path += output_path
         logging.info("  write to local file %s", local_path)
         if not postprocess_options["dryrun"]:
@@ -450,7 +475,7 @@ def get_adjusted_correction(orig_corrections, dest_exif):
         return wb_factors, new_exp_shift, original_exif
     return orig_corrections
 
-def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, output_file_info):
+def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, output_file_info, try_simple_copy=False):
     blob = gets3blob(folder_path+img_path)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
@@ -464,9 +489,18 @@ def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, 
         output_file_info["exp_shift"] = exp_shift
     if is_likely_raw(img_path):
         np_img = get_np_from_raw(blob, params, postprocess_options["use_exif_rotation"])
-        return Image.fromarray(np_img)
+        return Image.fromarray(np_img), None, None
     else:
         pil_img = Image.open(blob)
+        ext = img_path[:-4].lower()
+        if try_simple_copy and pil_img.mode in ["RGB", "L"] and ext in [".jpg", "jpeg"]: # TODO: group4 compressed tiffs should work too
+            logging.info("use simple copy on %s" % img_path)
+            blob.seek(0)
+            jpg_bytes = blob.read()
+            blob = None
+            jpg_bytes = mozjpeg_lossless_optimization.optimize(jpg_bytes)
+            return None, jpg_bytes, ".jpg"
+        blob = None
         pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=postprocess_options["force_apply_icc"])
         if params and params != "auto" and postprocess_options["correct_non_raw"]:
             if not icc_applied:
@@ -474,7 +508,7 @@ def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, 
             wb_factors, exp_shift, orig_exif = params
             linear_factors = np.array(wb_factors) * exp_shift
             pil_img = apply_scale_factors_pil(pil_img, linear_factors)
-        return pil_img
+        return pil_img, None, None
 
 ROTATION_TO_CV2 = {
     -90: cv2.ROTATE_90_CLOCKWISE,
