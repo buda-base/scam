@@ -68,19 +68,26 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, qual
             logging.error("%s likely not an image" % file)
             continue
         file = file[len(archive_folder):]
-        img_pil = Image.open(archive_folder + file)
-        img, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
-        while len(img) > 800*1024:
-            shrink_factor = 0.8*shrink_factor
-            img, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
-        img_pil = None
-        if orig_shrink_factor != shrink_factor:
-            logging.warning("had to use %f instead of %f starting with %s" % (shrink_factor, orig_shrink_factor, file))
+        img_bytes, ext = None, None
+        file_stats = os.stat(file)
+        if file[-4] == ".jpg" and file_stats.st_size < 800*1024:
+            ext = ".jpg"
+            with open(archive_folder + file, "rb") as f:
+                img_bytes = f.read()
+        else:
+            img_pil = Image.open(archive_folder + file)
+            img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
+            while len(img_bytes) > 800*1024:
+                shrink_factor = 0.8*shrink_factor
+                img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
+            img_pil = None
+            if orig_shrink_factor != shrink_factor:
+                logging.warning("had to use %f instead of %f on %s" % (shrink_factor, orig_shrink_factor, file))
         filenoext = file[:file.rfind(".")]
         last4 = filenoext[-4:]
         dst_path = Path(images_folder) / Path(ilname+last4+ext)
         with dst_path.open("wb") as f:
-            f.write(img)
+            f.write(img_bytes)
 
 def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir):
     sources_dir = dst_dir + wlname+"/sources/"+wlname+"-"+ilname+"/"
