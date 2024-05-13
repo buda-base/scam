@@ -14,7 +14,7 @@ from PIL import Image
 WINFOS_CACHE = {}
 
 def sanitize_fname_for_archive(fpath, imgnum):
-    fpath = fpath.replace("/", "_")
+    fpath = fpath.replace("/", "_").replace(" ", "_").replace("'", "v").replace('"', "")
     suffix = "%04d" % imgnum
     fpathnoext = fpath[:fpath.rfind(".")]
     if not fpathnoext.endswith(suffix):
