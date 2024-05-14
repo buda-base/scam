@@ -527,10 +527,13 @@ def get_scaled_mar(file_info, page_info, img_w, img_h):
     returns the minAreaRect in the cv2 format ((cx, cy), (w, h), a)
     """
     c_x, c_y, w, h, a = page_info["minAreaRect"]
-    if img_w == file_info["width"] and img_h == file_info["height"]:
+    fi_width, fi_height = file_info["width"], file_info["height"]
+    if file_info["rotation"] in [90, -90, 270, -270]:
+        fi_width, fi_height = fi_height, fi_width
+    if img_w == fi_width and img_h == fi_height:
         return ((c_x, c_y), (w, h), a)
-    scale_factor_x = img_w / file_info["width"]
-    scale_factor_y = img_h / file_info["height"]
+    scale_factor_x = img_w / fi_width
+    scale_factor_y = img_h / fi_height
     return ((c_x*scale_factor_x, c_y*scale_factor_y), (w*scale_factor_x, h*scale_factor_y), a)
 
 def get_white_patch_corrections(scam_json, postprocess_options):
@@ -571,4 +574,4 @@ def postprocess_csv():
 
 if __name__ == '__main__':
     postprocess_csv()
-    #postprocess_folder("NLM1/W8LS32549/sources/W8LS32549-I8LS32588/", DEFAULT_POSTPROCESS_OPTIONS)
+    #postprocess_folder("NLM1/W4CZ302669/sources/W4CZ302669-I4CZ307322/", DEFAULT_POSTPROCESS_OPTIONS)
