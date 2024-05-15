@@ -144,7 +144,6 @@ def encode_img_uncompressed(img, try_grayscale=False) -> (bytes, str):
             img = img.convert("RGB")
         if img.mode == "RGB" and try_grayscale and not is_color_image(img):
             img = img.convert("L")
-            print("converted to L")
         try:
             img.save(output, icc_profile=img.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
         except:

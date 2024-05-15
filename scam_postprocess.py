@@ -203,7 +203,7 @@ def get_output_pages(file_info):
         r = (img_area - page_area) / img_area
         if r < 0.01:
             logging.info("remove full page")
-            return None
+            return []
     return res
 
 def order_pages(pages):
