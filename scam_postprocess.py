@@ -44,6 +44,7 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     # If ExposureTime is exposed in the exif data, the code will compare the value in the image with the color card and the value in the image and make a ratio
     # if no exposuretime is found, it's assumed that all the images have the same exposure
     "compensate_exposure": True,
+    "try_grayscale": True,
 }
 
 # pages are 
@@ -300,7 +301,7 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
         logging.info("  write to s3 key %s", s3key)
         if not postprocess_options["dryrun"]:
             if img_bytes is None:
-                img_bytes, img_ext = encode_img_uncompressed(extract)
+                img_bytes, img_ext = encode_img_uncompressed(extract, postprocess_options["try_grayscale"])
             if img_bytes is None:
                 output_file_info["error"] = "could not encode image"
                 logging.error(" got no resulting image for %s", json.dumps(page_info))
@@ -574,4 +575,4 @@ def postprocess_csv():
 
 if __name__ == '__main__':
     postprocess_csv()
-    #postprocess_folder("NLM1/W4CZ302669/sources/W4CZ302669-I4CZ307322/", DEFAULT_POSTPROCESS_OPTIONS)
+    #postprocess_folder("Sarah-Library/W3KG108/images/W3KG108-I3KG433/", DEFAULT_POSTPROCESS_OPTIONS)

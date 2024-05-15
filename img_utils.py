@@ -107,17 +107,50 @@ def extract_img(img_orig, ann_info, dst_fname = "", rotate=False):
     #return rotate_warp_perspective(img_orig, ann_info.minAreaRect)
     return rotate_warp_affine(img_orig, ann_info.minAreaRect)
 
-def encode_img_uncompressed(img) -> (bytes, str):
+def is_color_image(image: Image, colorness_threshold: int = 30, color_pixel_ratio_threshold: float = 0.01) -> bool:
+    """
+    Determine if an image should be kept in RGB to avoid loss of information.
+
+    Args:
+        image (Image): An RGB image in Pillow format.
+        colorness_threshold (int): Threshold to determine if a pixel is colored based on its "colorness".
+        color_pixel_ratio_threshold (float): Threshold ratio of color pixels to total pixels to decide if the image is colored.
+
+    Returns:
+        bool: True if the image contains significant color information, False otherwise.
+    """
+    # Convert image to numpy array
+    img_array = np.array(image)
+
+    # Calculate the colorness of each pixel
+    colorness = np.max(np.abs(img_array - np.mean(img_array, axis=2, keepdims=True)), axis=2)
+
+    # Determine colored pixels
+    colored_pixels = colorness > colorness_threshold
+
+    # Calculate ratio of colored pixels to total pixels
+    color_pixel_ratio = np.sum(colored_pixels) / img_array.size
+
+    # Determine if the image is color based on the threshold
+    return color_pixel_ratio > color_pixel_ratio_threshold
+
+def encode_img_uncompressed(img, try_grayscale=False) -> (bytes, str):
     """
     returns the bytes of the uncompressed tiff image
     AND the expected file extension
     """
     with io.BytesIO() as output:
+        if img.mode == "RGBA":
+            img = img.convert("RGB")
+        if img.mode == "RGB" and try_grayscale and not is_color_image(img):
+            img = img.convert("L")
+            print("converted to L")
         try:
             img.save(output, icc_profile=img.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
         except:
             try:
                 # https://github.com/python-pillow/Pillow/issues/7892
+                print("oops")
                 img = img.rotate(180).rotate(180)
                 img.save(output, icc_profile=img.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
             except:
