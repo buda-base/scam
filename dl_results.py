@@ -59,7 +59,7 @@ def get_nbintropages(wlname, ilname):
         return iginfo["volume_pages_bdrc_intro"]
     return 0
 
-def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, quality=85):
+def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, quality=85, harmonize_sf=False):
     files = glob(archive_folder+'/**/*', recursive = True)
     Path(images_folder).mkdir(parents=True, exist_ok=True)
     orig_shrink_factor = shrink_factor
@@ -83,6 +83,8 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, qual
             img_pil = None
             if orig_shrink_factor != shrink_factor:
                 logging.warning("had to use %f instead of %f on %s" % (shrink_factor, orig_shrink_factor, file))
+                if not harmonize_sf:
+                    shrink_factor = orig_shrink_factor
         filenoext = file[:file.rfind(".")]
         last4 = filenoext[-4:]
         dst_path = Path(images_folder) / Path(ilname+last4+ext)
