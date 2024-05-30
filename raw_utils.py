@@ -3,6 +3,8 @@ from PIL import Image, ImageFile
 import cv2
 import logging
 import statistics
+import io
+import numpy as np
 
 def is_likely_raw(fname):
     """
@@ -116,6 +118,21 @@ def get_factors_from_raw(raw, bbox, target_lnsrgb_mean=0.89):
     logging.info("get factors %s, %f from bbox %s" % (str(wb_factors), exp_shift, str(bbox)))
     return wb_factors, exp_shift
 
+def get_np_from_raw_thumbnail(raw):
+    try:
+        thumb = raw.extract_thumb()
+    except rawpy.LibRawNoThumbnailError:
+        logging.warning("could not find a thumbnail")
+        return None
+    except rawpy.LibRawUnsupportedThumbnailError:
+        logging.warning("unsupported thumbnail format")
+        return None
+    if thumb.format == rawpy.ThumbFormat.JPEG:
+        img = Image.open(io.BytesIO(thumb.data))
+        return np.array(img)
+    elif thumb.format == rawpy.ThumbFormat.BITMAP:
+        return thumb.data
+
 def get_np_from_raw(fp, params, use_exif_rotation):
     """
     returns an opencv image from a raw file-like object.
@@ -125,52 +142,56 @@ def get_np_from_raw(fp, params, use_exif_rotation):
     - "base" to get the untouched matrix (resulting in 16 bit sRGB encoded array, not currently handled by Pillow)
     - a set of two values: a list of 4 floats (channel correction factors) and an int (bps)
     """
+    raw = None
     array = None
     try:
         raw = rawpy.imread(fp)
-        # see https://letmaik.github.io/rawpy/api/rawpy.Params.html
-        # no auto_scale is a bit misleading a should always be False, it just casts camera rgb ints into 16 bit in a color space
-        postprocess_kwargs = {
-            "output_bps": 8,
-            "output_color": rawpy.ColorSpace.sRGB
-        }
-        if not use_exif_rotation:
-            postprocess_kwargs["user_flip"] = 0
-        if params == "pre":
-            # for the pre processing params we use very automatic settings and an 8-bit output:
-            postprocess_kwargs["use_camera_wb"] = True
-            postprocess_kwargs["no_auto_bright"] = False
-            array = raw.postprocess(**postprocess_kwargs)
-        elif params == "base":
-            # to get the more "raw" image and either store it as-is or compute the channel correction factors:
-            # supposedly better quality
-            postprocess_kwargs["demosaic_algorithm"] = rawpy.DemosaicAlgorithm.AAHD
-            postprocess_kwargs["output_bps"] = 16
-            postprocess_kwargs["no_auto_bright"] = True
-            postprocess_kwargs["use_camera_wb"] = False
-            postprocess_kwargs["use_auto_wb"] = False
-            array = raw.postprocess(**postprocess_kwargs)
-        elif params == "auto":
-            postprocess_kwargs["demosaic_algorithm"] = rawpy.DemosaicAlgorithm.AAHD
-            postprocess_kwargs["no_auto_bright"] = False
-            postprocess_kwargs["use_camera_wb"] = True
-            postprocess_kwargs["use_auto_wb"] = False
-            array = raw.postprocess(**postprocess_kwargs)
-        else:
-            user_wb, exp_shift, _ = params
-            logging.info("open raw with user_wb = %s, exp_shift=%s" % (str(user_wb), str(exp_shift)))
-            postprocess_kwargs["demosaic_algorithm"] = rawpy.DemosaicAlgorithm.AAHD
-            postprocess_kwargs["use_camera_wb"] = False
-            postprocess_kwargs["use_auto_wb"] = False
-            postprocess_kwargs["user_wb"] = user_wb
-            if exp_shift is not None:
-                postprocess_kwargs["exp_shift"] = exp_shift
-                postprocess_kwargs["no_auto_bright"] = True
-            else:
-                postprocess_kwargs["auto_bright_thr"] = 0.0001
-            array = raw.postprocess(**postprocess_kwargs)
     except:
         raise TypeError("Not a RAW file")
+    # see https://letmaik.github.io/rawpy/api/rawpy.Params.html
+    # no auto_scale is a bit misleading a should always be False, it just casts camera rgb ints into 16 bit in a color space
+    postprocess_kwargs = {
+        "output_bps": 8,
+        "output_color": rawpy.ColorSpace.sRGB
+    }
+    if not use_exif_rotation:
+        postprocess_kwargs["user_flip"] = 0
+    if params == "pre":
+        # for the pre processing params we use very automatic settings and an 8-bit output:
+        postprocess_kwargs["use_camera_wb"] = True
+        postprocess_kwargs["no_auto_bright"] = False
+    elif params == "base":
+        # to get the more "raw" image and either store it as-is or compute the channel correction factors:
+        # supposedly better quality
+        postprocess_kwargs["demosaic_algorithm"] = rawpy.DemosaicAlgorithm.AAHD
+        postprocess_kwargs["output_bps"] = 16
+        postprocess_kwargs["no_auto_bright"] = True
+        postprocess_kwargs["use_camera_wb"] = False
+        postprocess_kwargs["use_auto_wb"] = False
+    elif params == "auto":
+        postprocess_kwargs["demosaic_algorithm"] = rawpy.DemosaicAlgorithm.AAHD
+        postprocess_kwargs["no_auto_bright"] = False
+        postprocess_kwargs["use_camera_wb"] = True
+        postprocess_kwargs["use_auto_wb"] = False
+    else:
+        user_wb, exp_shift, _ = params
+        logging.info("open raw with user_wb = %s, exp_shift=%s" % (str(user_wb), str(exp_shift)))
+        postprocess_kwargs["demosaic_algorithm"] = rawpy.DemosaicAlgorithm.AAHD
+        postprocess_kwargs["use_camera_wb"] = False
+        postprocess_kwargs["use_auto_wb"] = False
+        postprocess_kwargs["user_wb"] = user_wb
+        if exp_shift is not None:
+            postprocess_kwargs["exp_shift"] = exp_shift
+            postprocess_kwargs["no_auto_bright"] = True
+        else:
+            postprocess_kwargs["auto_bright_thr"] = 0.0001
+    try:
+        array = raw.postprocess(**postprocess_kwargs)
+    except:
+        logging.error("could not read RAW matrix, try thumbnail")
+        fp.seek(0)
+        raw = rawpy.imread(fp)
+        array = get_np_from_raw_thumbnail(raw)
     return array
 
 
