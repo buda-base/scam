@@ -11,12 +11,12 @@ import { useClearCache } from "react-clear-cache"
 import { ColorButton } from "./theme";
 import * as state from "../state"
 import { SaveButtons } from "./BottomBar";
-import { ConfigData, LocalData, ScamData } from "../types";
+import { ConfigData, LocalData, ScamData, ScamImageData } from "../types";
 
 const debug = debugFactory("scam:tbar")
 
-export const TopBar = (props: { folder:string, config: ConfigData, error: string, json:ScamData|boolean, jsonPath:string, setFolder:(s:string) => void }) => {
-  const { folder, config, error, json, jsonPath, setFolder } = props;
+export const TopBar = (props: { images:ScamImageData[], folder:string, config: ConfigData, error: string, json:ScamData|boolean, jsonPath:string, setFolder:(s:string) => void }) => {
+  const { images, folder, config, error, json, jsonPath, setFolder } = props;
 
   const [ path, setPath ] = useState(folder)
   
@@ -205,6 +205,12 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
   
   const [numWarn] = useAtom(state.numWarn)
 
+  const [allScamData, ] = useAtom(state.allScamDataAtom)
+
+  const numNotDone = images.filter(im => allScamData[im.thumbnail_path]?.data ? !allScamData[im.thumbnail_path].data.pages : !im.pages).length
+
+  //debug("nnd:",numNotDone, images, allScamData)
+
   return <nav className="top">
     {readyDialog}
     {confirmDialog}
@@ -225,7 +231,7 @@ export const TopBar = (props: { folder:string, config: ConfigData, error: string
           <div>
             <div>{jsonPath}</div>
             {typeof json === "object" && <div style={{color:"#6b6b6b"}}>
-               {json.files?.length} images { !numWarn ? <> | No warning</> : <> | {numWarn} warning{numWarn > 1 ? "s" : ""}</>}
+               {json.files?.length} images { !numWarn ? <> | No warning</> : <> | {numWarn} warning{numWarn > 1 ? "s" : ""}</>} | {numNotDone ? numNotDone + " files not done": "All files done"}
               { json.checked && <span title="already marked as ready to process"><CheckCircle sx={{color:"green", verticalAlign:"-8px", marginLeft:"10px"}} /></span> }
             </div> }
           </div>

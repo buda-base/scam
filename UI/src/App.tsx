@@ -153,7 +153,7 @@ function App() {
       document.querySelectorAll(".scam-image:not(.not-visible)").forEach((e) => {
         const bbox = e.getBoundingClientRect()        
         if(!ev.shiftKey) {
-          if(!next && bbox.top < window.innerHeight && bbox.bottom > window.innerHeight ) {
+          if(!next && (bbox.top < window.innerHeight && bbox.bottom > window.innerHeight || bbox.top > window.innerHeight) ) {
             //debug(i, bbox.y, bbox.x, e)
             next = e
             nextBB = bbox
@@ -162,7 +162,7 @@ function App() {
             nextBB = bbox
           }
         } else {
-          if(!next && bbox.bottom > 0 && bbox.top < 0 ) {
+          if(!next && (bbox.bottom > 0 && bbox.top < 0 || bbox.bottom < 0)) {
             //debug(i, bbox.y, bbox.x, e)
             next = e
             nextBB = bbox
@@ -174,7 +174,7 @@ function App() {
       })
       if(next) next.scrollIntoView()
     }
-  }, [showSettings])
+  }, [setKeyDown, showSettings])
 
   const handleKeyUp = useCallback(() => {
     //debug("up", showSettings)
@@ -561,7 +561,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       {reloadDialog}
-      <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, config, error, json, jsonPath, setFolder }}/></header>
+      <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ images, folder, config, error, json, jsonPath, setFolder }}/></header>
       <main onClick={checkDeselectMain} className={"main-grid-"+grid}>{
         images.map((image,i) => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ 
           isNotDone: !image.pages, isOutliar:outliar[i] || false, isRandom:random[i] || false, folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem 
