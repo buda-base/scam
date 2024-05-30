@@ -146,7 +146,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   left:0;
 }
 
-.scam-image.filter-not_done.not_done-false:not(.grid-mozaic),
+.scam-image.filter-not_done.not_done-false:not(.grid-mozaic):not(.focus-true),
 .scam-image.filter-outliar.outliar-false:not(.grid-mozaic),
 .scam-image.filter-random.random-false:not(.grid-mozaic),
 .scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic),
@@ -164,7 +164,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 }
 */
 
-.scam-image.filter-not_done.not_done-false:not(.grid-mozaic) > figure > div,
+.scam-image.filter-not_done.not_done-false:not(.focus-true):not(.grid-mozaic) > figure > div,
 .scam-image.filter-outliar.outliar-false:not(.grid-mozaic) > figure > div,
 .scam-image.filter-random.random-false:not(.grid-mozaic) > figure > div,
 .scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic) > figure > div,

@@ -443,10 +443,9 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
 
   const selectWithWarnings = useCallback((hasWarn = true) => {
     const postproc = (b:boolean|undefined) => hasWarn ? b : !b
-    const selected = images.filter(im => postproc(calcHasWarning(im))
-    ).map(im => im.thumbnail_path)
+    const selected = images.filter(im => postproc(calcHasWarning(im))).map(im => im.thumbnail_path)
     setSelectedItems(selected)
-  }, [selectedItems, allScamData, nbPages, images])
+  }, [images, setSelectedItems, calcHasWarning])
 
   const [scamQueue, setScamQueue] = useAtom(state.scamQueue)  
 
@@ -457,6 +456,40 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   useEffect(() => {
     setNumWarn(hasWarning.length)
   }, [hasWarning.length])
+
+  const [random, setRandom] = useAtom(state.random)
+  const [outliar, setOutliar] = useAtom(state.outliar)
+
+  const calcIsFilteredIn = useCallback((im:ScamImageData,i:number) => { 
+    const image = allScamData[im.thumbnail_path] ?? im
+    debug("f?",filter,image)
+    if(filter === "unchecked") return !image?.checked
+    else if(filter === "outliar") return outliar[i]
+    else if(filter === "random") return random[i]
+    else if(filter === "not_done") return image.data ? !image.data.pages : !im.pages
+  }, [allScamData, filter, random, outliar])
+
+
+  const selectFromFilter = useCallback(() => {
+    const selected = images.filter((im,i) => calcIsFilteredIn(im,i)).map(im => im.thumbnail_path)
+    setSelectedItems(selected)
+  }, [images, setSelectedItems, calcIsFilteredIn])
+
+
+  const updateCheckRestrict = useCallback(()=> {
+
+    if(selectedItems.length >= 1) {
+      setCheckedRestrict(true)
+    } else {      
+      setCheckedRestrict(false)
+      setRestrictRun(false)
+      setOptions(scamOptions)
+    }
+  }, [scamOptions, selectedItems, setCheckedRestrict, setOptions, setRestrictRun])
+
+  useEffect(() => {
+    updateCheckRestrict()
+  }, [selectedItems])
 
   const handleScamQueue = useCallback(async () => {    
 
@@ -595,9 +628,6 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
       if(padding !== state.defaultPadding) setPadding(state.defaultPadding)
     }
   }, [grid, padding])
-
-  const [random, setRandom] = useAtom(state.random)
-  const [outliar, setOutliar] = useAtom(state.outliar)
 
   const handleRandom = useCallback(() => {    
     if(typeof json == "object") {
@@ -828,10 +858,11 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
       >
         <MenuItem value={0} disabled>{"..."}</MenuItem>
         <hr/>
-        { hasWarning.length != 0 && <MenuItem value={1} onClick={() => selectWithWarnings(false)}>{"Select images with no warning"}</MenuItem> }
-        { hasWarning.length != 0 && <MenuItem value={2} onClick={() => selectWithWarnings()}>{"Select images with warning"}</MenuItem> }
         <MenuItem value={3} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>        
         <MenuItem value={4} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
+        <MenuItem value={1} disabled={!hasWarning.length} onClick={() => selectWithWarnings(false)}>{"Select images with no warning"}</MenuItem> 
+        <MenuItem value={2} disabled={!hasWarning.length}  onClick={() => selectWithWarnings()}>{"Select images with warning"}</MenuItem> 
+        <MenuItem value={5} disabled={["all","warning"].includes(filter)} onClick={() => selectFromFilter()} >{"Select images from filter"}</MenuItem> 
         <hr/>
         <MenuItem value={61} disabled={!selectedItems.length} onClick={handleDeleteAnnotations}>Remove annotations in selected images</MenuItem>
         <hr/>

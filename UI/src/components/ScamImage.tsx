@@ -1229,8 +1229,8 @@ const ScamImage = (props: { isNotDone:boolean, isOutliar:boolean, isRandom:boole
   const showCheckbox = true
 
   return (<div data-title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)|(_)/g,(_m,_g1,_g2,g3) => g3?"-":"" )} title={image.img_path.replace(/(^[^/]+[/])|([.][^.]+$)/g,"") } ref={divRef} className={"scam-image" + (loading ? " loading" : "") 
-      + ( scamData != true && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && visible ? " has-warning" : "") 
-      + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
+      + ( scamData != true && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && visible ? " has-warning" : "") +(" filter-" + filter) 
+      + (typeof scamData === "object" ? (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
       + (" random-" + isRandom) + (" outliar-" + isOutliar) + ( " showCheckbox-"+showCheckbox ) + ( " hasThumb-" + (typeof konvaImg === 'object' && loadThumbnails)) 
       + (" focused-"+ (focused === image.thumbnail_path) ) + (" not_done-" + (isNotDone && !loading && typeof scamData !== "object"))
     }
