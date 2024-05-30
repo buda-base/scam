@@ -462,7 +462,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
 
   const calcIsFilteredIn = useCallback((im:ScamImageData,i:number) => { 
     const image = allScamData[im.thumbnail_path] ?? im
-    debug("f?",filter,image)
+    //debug("f?",filter,image)
     if(filter === "unchecked") return !image?.checked
     else if(filter === "outliar") return outliar[i]
     else if(filter === "random") return random[i]
