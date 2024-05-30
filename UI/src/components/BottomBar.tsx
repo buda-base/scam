@@ -801,7 +801,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         label="Filter images"
         onChange={(r) => r.target.value != "load" ? setFilter(r.target.value) : null}
       >
-        { ["all", "warning", "unchecked", "random", "outliar" ].map(f => <MenuItem value={f} {...funcs[f] ? {onClick:() => (funcs[f])()}:{}}>{f}</MenuItem>) }
+        { ["all", "warning", "unchecked", "random", "outliar", "not_done" ].map(f => <MenuItem value={f} {...funcs[f] ? {onClick:() => (funcs[f])()}:{}}>{f.replace(/_/g," ")}</MenuItem>) }
       </TextField>
       <TextField
         SelectProps={{ 
@@ -830,7 +830,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         <hr/>
         { hasWarning.length != 0 && <MenuItem value={1} onClick={() => selectWithWarnings(false)}>{"Select images with no warning"}</MenuItem> }
         { hasWarning.length != 0 && <MenuItem value={2} onClick={() => selectWithWarnings()}>{"Select images with warning"}</MenuItem> }
-        <MenuItem value={3} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>
+        <MenuItem value={3} onClick={() => setSelectedItems(images.map(im => im.thumbnail_path))}>{"Select all"}</MenuItem>        
         <MenuItem value={4} onClick={handleDeselectAll}>{"Deselect all"}</MenuItem>
         <hr/>
         <MenuItem value={61} disabled={!selectedItems.length} onClick={handleDeleteAnnotations}>Remove annotations in selected images</MenuItem>

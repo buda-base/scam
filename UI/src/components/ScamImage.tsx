@@ -262,9 +262,9 @@ const TransformableRect = (props: { shapeProps: KonvaPage, isSelected: boolean, 
 }
 
 
-export const ScamImageContainer = (props: { isOutliar:boolean, isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, selected:boolean,
+export const ScamImageContainer = (props: { isNotDone:boolean, isOutliar:boolean, isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, draft: SavedScamData, loadDraft: boolean|undefined, selected:boolean,
     setImageData: (data:ScamImageData|ScamImageData[]) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
-  const { isOutliar, isRandom, image, selected, handleSelectItem } = props;
+  const { isNotDone, isOutliar, isRandom, image, selected, handleSelectItem } = props;
 
   const [grid, setGrid] = useAtom(state.grid)  
   const [filter, setFilter] = useAtom(state.filter)  
@@ -297,10 +297,9 @@ export const ScamImageContainer = (props: { isOutliar:boolean, isRandom:boolean,
 
   if (inView) { 
     
-    return <ScamImage {...props} divRef={ref} {...{isRandom, isOutliar, visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
+    return <ScamImage {...props} divRef={ref} {...{isNotDone, isRandom, isOutliar, visible, checked, selected, setVisible, setChecked, handleSelectItem}}/>
   }
   else {    
-
     
     let w = (grid === "mozaic" ? Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * mozaicFactor : image.thumbnail_info.width )
     let h = Math.max(minThumbWidth, (figureRef?.current?.parentElement?.offsetWidth || 0) - 2 * padding) * (grid === "mozaic" ? mozaicFactor : 1) * image.thumbnail_info.height / image.thumbnail_info.width
@@ -310,7 +309,7 @@ export const ScamImageContainer = (props: { isOutliar:boolean, isRandom:boolean,
     }
 
     return (
-      <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid) + (" filter-" + filter) + (" random-" + isRandom) + (" outliar-" + isOutliar) }
+      <div ref={ref} className={"scam-image not-visible" + (" grid-" + grid) + (" filter-" + filter) + (" random-" + isRandom) + (" outliar-" + isOutliar) + (" not_done-" + isNotDone)}
         style={{ 
           height: h + 2 * padding, 
           maxWidth: w + 2 * padding
@@ -438,10 +437,10 @@ function useWindowSize() {
   return windowSize;
 }
 
-const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
+const ScamImage = (props: { isNotDone:boolean, isOutliar:boolean, isRandom:boolean, folder: string, image: ScamImageData, config: ConfigData, divRef: any, draft: SavedScamData, visible: boolean, 
     loadDraft: boolean | undefined, checked: boolean, selected:boolean,
     setImageData:(data:ScamImageData|ScamImageData[])=>void, setVisible:(b:boolean) => void, setChecked:(b:boolean) => void, handleSelectItem: (ev:React.SyntheticEvent, v:boolean, s:string) => void }) => {
-  const { isOutliar, isRandom, folder, config, image, divRef, draft, loadDraft, visible, checked, selected, setImageData, setVisible, setChecked, handleSelectItem } = props;
+  const { isNotDone, isOutliar, isRandom, folder, config, image, divRef, draft, loadDraft, visible, checked, selected, setImageData, setVisible, setChecked, handleSelectItem } = props;
 
   const [shouldRunAfter, setShouldRunAfter] = useAtom(state.shouldRunAfterAtom)
 
@@ -1233,7 +1232,8 @@ const ScamImage = (props: { isOutliar:boolean, isRandom:boolean, folder: string,
       + ( scamData != true && warning && (!checked || expectedNumAnno && numAnno > expectedNumAnno) && visible ? " has-warning" : "") 
       + (typeof scamData === "object" ? (" filter-" + filter) + (" checked-"+checked) + (" warning-" + warning) : "" ) + (" grid-" + grid) + (" focus-" + (focused === image.thumbnail_path)) 
       + (" random-" + isRandom) + (" outliar-" + isOutliar) + ( " showCheckbox-"+showCheckbox ) + ( " hasThumb-" + (typeof konvaImg === 'object' && loadThumbnails)) 
-      + (" focused-"+ (focused === image.thumbnail_path) ) }
+      + (" focused-"+ (focused === image.thumbnail_path) ) + (" not_done-" + (isNotDone && !loading && typeof scamData !== "object"))
+    }
     style={{ 
       height: visible ? actualH + 2 * padding : 80, 
       maxWidth: (grid === "mozaic" ? (actualW < actualH ? Math.round(minThumbWidth * mozaicFactor) : actualW) : image.thumbnail_info[portrait ? "height":"width"]) + 2*padding 

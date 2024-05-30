@@ -563,7 +563,9 @@ function App() {
       {reloadDialog}
       <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ folder, config, error, json, jsonPath, setFolder }}/></header>
       <main onClick={checkDeselectMain} className={"main-grid-"+grid}>{
-        images.map((image,i) => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ isOutliar:outliar[i] || false, isRandom:random[i] || false, folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem }}/>)
+        images.map((image,i) => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ 
+          isNotDone: !image.pages, isOutliar:outliar[i] || false, isRandom:random[i] || false, folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem 
+        }}/>)
       }</main>
       { typeof json == "object" && <footer><BottomBar {...{ ...loadDraft?{drafts}:{}, folder, config, ...typeof json === 'object'?{json, setJson}:{}, selectedItems, images, setSelectedItems, markChecked, markHidden, options, setOptions, batchRotate }}/></footer>}
     </ThemeProvider>

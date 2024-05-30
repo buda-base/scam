@@ -146,6 +146,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   left:0;
 }
 
+.scam-image.filter-not_done.not_done-false:not(.grid-mozaic),
 .scam-image.filter-outliar.outliar-false:not(.grid-mozaic),
 .scam-image.filter-random.random-false:not(.grid-mozaic),
 .scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic),
@@ -163,6 +164,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 }
 */
 
+.scam-image.filter-not_done.not_done-false:not(.grid-mozaic) > figure > div,
 .scam-image.filter-outliar.outliar-false:not(.grid-mozaic) > figure > div,
 .scam-image.filter-random.random-false:not(.grid-mozaic) > figure > div,
 .scam-image.filter-warning.warning-true.checked-true:not(.grid-mozaic) > figure > div,
@@ -172,6 +174,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   visibility: hidden; height:45px;
 }
 
+.scam-image.filter-not_done.not_done-false.grid-mozaic > figure > div,
 .scam-image.filter-outliar.outliar-false.grid-mozaic > figure > div,
 .scam-image.filter-random.random-false.grid-mozaic > figure > div,
 .scam-image.filter-warning.warning-true.checked-true.grid-mozaic > figure > div,
@@ -181,6 +184,7 @@ main .select-folder { background-color: white; align-self: center; justify-self:
   pointer-events: none;
 }
 
+.scam-image.filter-not_done.not_done-false > figure figcaption label > span:last-child,
 .scam-image.filter-outliar.outliar-false > figure figcaption label > span:last-child,
 .scam-image.filter-random.random-false > figure figcaption label > span:last-child,
 .scam-image.filter-warning.warning-true.checked-true > figure figcaption label > span:last-child,
