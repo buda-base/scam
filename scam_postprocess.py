@@ -18,6 +18,7 @@ import rawpy
 from datetime import datetime
 import json
 from functools import cmp_to_key
+import re
 
 #logging.basicConfig(level=logging.INFO)
 
@@ -44,7 +45,7 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     # If ExposureTime is exposed in the exif data, the code will compare the value in the image with the color card and the value in the image and make a ratio
     # if no exposuretime is found, it's assumed that all the images have the same exposure
     "compensate_exposure": True,
-    "try_grayscale": True,
+    "try_grayscale": False,
 }
 
 # pages are 
@@ -54,7 +55,25 @@ DEFAULT_POSTPROCESS_OPTIONS = {
 #   }
 # ]
 
-def get_sequence_info(scam_json, apply_resequence=True, sort_key=None):
+def parse_filename_im(filename):
+    """Parse the filename into components: base, number, and suffix."""
+    # Regular expression to match the required components
+    match = re.match(r"([a-zA-Z0-9\W]*?)(\d{1,2})?(-[a-zA-Z]{3}-\d{4})", filename)
+    if match:
+        base = match.group(1)
+        number = match.group(2)
+        suffix = match.group(3)
+        number = int(number) if number is not None else None
+        return (base, number, suffix)
+    else:
+        raise ValueError(f"Filename '{filename}' does not match the expected pattern.")
+
+def sort_key_im(filename):
+    """Convert the parsed filename into a sort key."""
+    base, number, suffix = parse_filename(filename)
+    return (base, (number if number is not None else -1), suffix)
+
+def get_sequence_info(scam_json, apply_resequence=True, sort_key=sort_key_im):
     """
     returns two values, first:
 
@@ -412,7 +431,7 @@ def get_raw_corrections(folder_path, img_path, page_info, file_info, postprocess
     blob.seek(0)
     tags = exifread.process_file(blob, details=False)
     blob.seek(0)
-    raw = raw = rawpy.imread(blob)
+    raw = rawpy.imread(blob)
     bbox = get_bbox(page_info, file_info, raw.sizes.width, raw.sizes.height, add_file_info_rotation=True)
     logging.error("getting correction factors from %s" % img_path)
     target_lnsrgb_mean = sRGB_inverse_gamma(postprocess_options["wb_patch_nsrgb_target"][0])
