@@ -66,12 +66,13 @@ def parse_filename_im(filename):
         number = int(number) if number is not None else None
         return (base, number, suffix)
     else:
-        raise ValueError(f"Filename '{filename}' does not match the expected pattern.")
+        print(f"Filename '{filename}' does not match the expected pattern.")
+        return (filename)
 
 def sort_key_im(filename):
     """Convert the parsed filename into a sort key."""
     base, number, suffix = parse_filename(filename)
-    return (base, (number if number is not None else -1), suffix)
+    return (base.lower(), (number if number is not None else -1), suffix)
 
 def get_sequence_info(scam_json, apply_resequence=True, sort_key=sort_key_im):
     """
@@ -402,6 +403,8 @@ def postprocess_folder(folder_path, postprocess_options):
         else:
             add_prefix = True
     for file_info in tqdm(scam_json["files"]):
+        if "M0054341_01_00005.CR2" not in file_info["img_path"]:
+            continue
         if not add_prefix:
             derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, None, img_path_to_corr[file_info["img_path"]])
         elif file_info["img_path"] in sequence_info:
@@ -593,5 +596,5 @@ def postprocess_csv():
             postprocess_folder(folder, postprocess_options)
 
 if __name__ == '__main__':
-    postprocess_csv()
-    #postprocess_folder("Sarah-Library/W3KG108/images/W3KG108-I3KG433/", DEFAULT_POSTPROCESS_OPTIONS)
+    #postprocess_csv()
+    postprocess_folder("NLMv1corr/W8LS32569/sources/W8LS32569-I8LS32660/", DEFAULT_POSTPROCESS_OPTIONS)

@@ -133,7 +133,7 @@ def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir):
             sources_dir += lastpart
     archive_dir = dst_dir + wlname+"/archive/"+wlname+"-"+ilname+"/"
     images_dir = dst_dir + wlname+"/images/"+wlname+"-"+ilname+"/"
-    download_folder_into(s3prefix, sources_dir)
+    #download_folder_into(s3prefix, sources_dir)
     download_folder_into("scam_logs/"+s3prefix, sources_dir)
     nbintropages = get_nbintropages(wlname, ilname)
     nb_archive_imgs = download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages, ilname)
