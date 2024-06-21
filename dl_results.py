@@ -166,7 +166,7 @@ def postprocess_csv():
                 folder += "/"
             wlname = row[1]
             ilname = row[2]
-            shrink_factor = 1.0
+            shrink_factor = 0.4
             if len(row) > 3:
                 shrink_factor = float(row[3])
             download_prefix(folder, wlname, ilname, shrink_factor, dest_dir)
