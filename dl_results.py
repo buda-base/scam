@@ -10,11 +10,32 @@ import os
 from pathlib import Path
 import logging
 from PIL import Image
+import re
 
 WINFOS_CACHE = {}
 
+def parse_filename_im(filename):
+    """Parse the filename into components: base, number, and suffix."""
+    # Regular expression to match the required components
+    match = re.match(r"([a-zA-Z0-9\W]*?)(\d{1,2})?(-[a-zA-Z]{3}-\d{4})", filename)
+    if match:
+        base = match.group(1)
+        number = match.group(2)
+        suffix = match.group(3)
+        number = int(number) if number is not None else None
+        return (base, number, suffix)
+    else:
+        print(f"Filename '{filename}' does not match the expected pattern.")
+        return (filename)
+
+def sort_key_im(filename):
+    """Convert the parsed filename into a sort key."""
+    base, number, suffix = parse_filename(filename)
+    return (base.lower(), (number if number is not None else -1), suffix)
+
 def sanitize_fname_for_archive(fpath, imgnum):
     fpath = fpath.replace("/", "_").replace(" ", "_").replace("'", "v").replace('"', "")
+    fpath = re.replace(r"-\d{4}\.tif", ".tif", fpath)
     suffix = "%04d" % imgnum
     fpathnoext = fpath[:fpath.rfind(".")]
     if not fpathnoext.endswith(suffix):
@@ -22,7 +43,7 @@ def sanitize_fname_for_archive(fpath, imgnum):
     return fpath
 
 def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, bucket=BUCKET_NAME):
-    obj_keys = natsorted(list_obj_keys(s3prefix, bucket), alg=ns.IC|ns.INT)
+    obj_keys = sorted(list_obj_keys(s3prefix, bucket), key=sort_key_im)
     fnum = 1
     for obj_key in obj_keys:
         if nb_intro_pages > 0 and (obj_key.endswith(ilname+"0001.tif") or obj_key.endswith(ilname+"0002.tif")):
