@@ -216,7 +216,7 @@ def order_pages(pages):
         return sorted(pages, key=(lambda x: x["minAreaRect"][1]))
 
 def can_simple_copy(file_info, pages):
-    ext = file_info["img_path"][:-4].lower()
+    ext = file_info["img_path"][-4:].lower()
     if ext not in ["jpeg", ".jpg"]: # TODO: tiffs too?
         return False
     if len(pages) > 1:
@@ -493,7 +493,7 @@ def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, 
         return Image.fromarray(np_img), None, None
     else:
         pil_img = Image.open(blob)
-        ext = img_path[:-4].lower()
+        ext = img_path[-4:].lower()
         if try_simple_copy and pil_img.mode in ["RGB", "L"] and ext in [".jpg", "jpeg"]: # TODO: group4 compressed tiffs should work too
             logging.info("use simple copy on %s" % img_path)
             blob.seek(0)
