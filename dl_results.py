@@ -70,7 +70,7 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, qual
         file = file[len(archive_folder):]
         img_bytes, ext = None, None
         file_stats = os.stat(archive_folder + file)
-        if file[-4] == ".jpg" and file_stats.st_size < 800*1024:
+        if (file[-4:] == ".jpg" or file[-4:] == "jpeg") and file_stats.st_size < 800*1024:
             ext = ".jpg"
             with open(archive_folder + file, "rb") as f:
                 img_bytes = f.read()
