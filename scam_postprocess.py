@@ -44,7 +44,7 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     # If ExposureTime is exposed in the exif data, the code will compare the value in the image with the color card and the value in the image and make a ratio
     # if no exposuretime is found, it's assumed that all the images have the same exposure
     "compensate_exposure": True,
-    "try_grayscale": True,
+    "try_grayscale": False,
 }
 
 # pages are 

@@ -63,6 +63,7 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, qual
     files = glob(archive_folder+'/**/*', recursive = True)
     Path(images_folder).mkdir(parents=True, exist_ok=True)
     orig_shrink_factor = shrink_factor
+    files = sorted(files)
     for file in files:
         if not is_img(file):
             logging.error("%s likely not an image" % file)
