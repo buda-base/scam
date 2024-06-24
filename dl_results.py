@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import logging
 from PIL import Image
+import mozjpeg_lossless_optimization
 
 WINFOS_CACHE = {}
 
@@ -75,6 +76,7 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, qual
             ext = ".jpg"
             with open(archive_folder + file, "rb") as f:
                 img_bytes = f.read()
+            img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes)
         else:
             img_pil = Image.open(archive_folder + file)
             img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
