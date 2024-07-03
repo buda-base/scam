@@ -51,17 +51,38 @@ def get_median_cam_nrgb(raw, bbox):
         median_cam_nrgb_per_c.append(median_cam_nrgb)
     return median_cam_nrgb_per_c
 
-def get_wb_factors_from_median_cam_nrgb(median_cam_nrgb_per_c):
+def get_median_cam_rgb2(raw, bbox):
+    """
+    same signature as get_median_cam_nrgb but uses a different technique, copied from
+
+    https://github.com/letmaik/rawpy-notebooks/blob/master/colour-negative/colour-negative.ipynb
+
+    see
+
+    https://github.com/letmaik/rawpy/issues/221 
+    """
+    rgb_base_linear = raw.postprocess(output_color=rawpy.ColorSpace.raw, gamma=(1, 1),
+                                       user_wb=[1.0, 1.0, 1.0, 1.0], no_auto_bright=True, user_flip=0)
+    # cropping
+    rgb_base_linear = rgb_base_linear[bbox[1]:bbox[1]+bbox[3],bbox[0]:bbox[0]+bbox[2]]
+    med_r = np.median(rgb_base_linear[..., 0])
+    med_g = np.median(rgb_base_linear[..., 1])
+    med_b = np.median(rgb_base_linear[..., 2])
+    return [med_r, med_g, med_b, med_g]
+
+def get_wb_factors_from_median_cam_rgb(median_cam_nrgb_per_c):
     """
     given the median nrgb per channel, give the white balance correction per channel,
     normalized so that the lowest factor is 1.0.
 
     For instance if the median nrgb per channel is [0.12, 0.34, 0.18, 0.33], return [ 2.8, 1.0, 1.9, 1.03]
+
+    Note that this function works in any rgb representation
     """
     highest_median = max(median_cam_nrgb_per_c)
     return [highest_median / m for m in median_cam_nrgb_per_c]
 
-def get_exposure_factor(raw, median_cam_nrgb_per_c, target_lnrgb=0.89, inverse_cam_rgb_xyz=False):
+def get_exposure_factor(raw, wb_factors, bbox, target_lnrgb=0.89, inverse_cam_rgb_xyz=False):
     """
     This function gets the exposure factor based on:
     - the raw file
@@ -74,28 +95,13 @@ def get_exposure_factor(raw, median_cam_nrgb_per_c, target_lnrgb=0.89, inverse_c
     We assume that the rgb level for gray areas is the same in camera normalized rgb and linear rgb. It might
     not be true under some circumstances so more advanced computation is made if inverse_cam_rgb_xyz is True.
     """
-    highest_median = max(median_cam_nrgb_per_c)
-    if not inverse_cam_rgb_xyz:
-        # this case is quite straightforward
-        return target_lnrgb / highest_median
-    # camera normalized RGB to XYZ
-    cam_nrgb_to_XYZ = np.array(raw.rgb_xyz_matrix[0:n_colors, :], dtype=np.double)
-    # XYZ to linear (de-gammaified) normalized sRGB, well known matrix
-    XYZ_to_lnsRGB = np.array([[3.2404542, -1.5371385, -0.4985314],
-                              [-0.9692660, 1.8760108, 0.0415560],
-                              [0.0556434, -0.2040259, 1.0572252]], dtype=np.double)
-    # multiplying the two matrices gives camera normalized rgb to linear normalized sRGB
-    cam_to_lnsRGB = np.dot(cam_nrgb_to_XYZ, XYZ_to_lnsRGB)
-    # we inverse the matrix to get linear normalized sRGB to camera normalized RGB
-    lnsRGB_to_cam = np.linalg.inv(cam_to_lnsRGB)
-    # we normalize the matrix to keep values in [0:1]
-    norm_m = np.tile(np.sum(lnsRGB_to_cam, 1), (3, 1)).transpose()
-    lnsRGB_to_cam = lnsRGB_to_cam / norm_m
-    # we get the camera normalized RGB value for the target:
-    cam_nrgb_target = lnsRGB_to_cam.dot(np.array([target_lnrgb, target_lnrgb, target_lnrgb]))
-    # we take the average:
-    cam_nrgb_target_mean = statistics.mean(cam_nrgb_target)
-    return cam_nrgb_target_mean / highest_median
+    # gamma means we have a linearized rgb
+    lrgb_base_linear = raw.postprocess(output_color=rawpy.ColorSpace.sRGB, gamma=(1, 1),
+                                       user_wb=wb_factors, no_auto_bright=True, user_flip=0)
+    # cropping
+    lrgb_base_linear = lrgb_base_linear[bbox[1]:bbox[1]+bbox[3],bbox[0]:bbox[0]+bbox[2]]
+    med_lrgb = np.median(lrgb_base_linear)
+    return target_lnrgb * 255 / med_lrgb
 
 def get_factors_from_raw(raw, bbox, target_lnsrgb_mean=0.89):
     """
@@ -111,10 +117,10 @@ def get_factors_from_raw(raw, bbox, target_lnsrgb_mean=0.89):
     by default we assume that the target linear normalized sRGB target is 0.89,
     corresponding to the white patch on usual color cards.
     """
-    medians = get_median_cam_nrgb(raw, bbox)
+    medians = get_median_cam_rgb2(raw, bbox)
     logging.info("get medians %s", str(medians))
-    wb_factors = get_wb_factors_from_median_cam_nrgb(medians)
-    exp_shift = get_exposure_factor(raw, medians, target_lnsrgb_mean)
+    wb_factors = get_wb_factors_from_median_cam_rgb(medians)
+    exp_shift = get_exposure_factor(raw, wb_factors, bbox, target_lnsrgb_mean)
     logging.info("get factors %s, %f from bbox %s" % (str(wb_factors), exp_shift, str(bbox)))
     return wb_factors, exp_shift
 
