@@ -415,7 +415,7 @@ def get_raw_corrections(folder_path, img_path, page_info, file_info, postprocess
     try:
         raw = rawpy.imread(blob)
     except:
-        logger.error("could not read "+img_path+" for raw corrections")
+        logging.error("could not read "+img_path+" for raw corrections")
         return None
     bbox = get_bbox(page_info, file_info, raw.sizes.width, raw.sizes.height, add_file_info_rotation=True)
     logging.error("getting correction factors from %s" % img_path)
