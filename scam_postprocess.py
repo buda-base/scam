@@ -241,7 +241,11 @@ def derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, p
     try_simple_copy = can_simple_copy(file_info, pages)
     if postprocess_options["src_storage"] == "s3":
         if not postprocess_options["dryrun"]:
-            pil_img, img_bytes, img_ext = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], correction, postprocess_options, output_file_info, try_simple_copy)
+            try:
+                pil_img, img_bytes, img_ext = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], correction, postprocess_options, output_file_info, try_simple_copy)
+            except:
+                logging.error("exception trying to open "+file_info["img_path"]+", ignoring")
+                return
     else:
         local_path = postprocess_options["local_src_folder"]
         if not postprocess_options["skip_folder_local_input"]:
