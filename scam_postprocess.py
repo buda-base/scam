@@ -412,7 +412,11 @@ def get_raw_corrections(folder_path, img_path, page_info, file_info, postprocess
     blob.seek(0)
     tags = exifread.process_file(blob, details=False)
     blob.seek(0)
-    raw = raw = rawpy.imread(blob)
+    try:
+        raw = rawpy.imread(blob)
+    except:
+        logger.error("could not read "+img_path+" for raw corrections")
+        return None
     bbox = get_bbox(page_info, file_info, raw.sizes.width, raw.sizes.height, add_file_info_rotation=True)
     logging.error("getting correction factors from %s" % img_path)
     target_lnsrgb_mean = sRGB_inverse_gamma(postprocess_options["wb_patch_nsrgb_target"][0])
@@ -554,8 +558,9 @@ def get_white_patch_corrections(scam_json, postprocess_options):
                     corrs = get_raw_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info, postprocess_options)
                 else:
                     corrs = get_cv2_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info, postprocess_options)
-                res[img_path] = corrs
-                break
+                if corrs is not None:
+                    res[img_path] = corrs
+                    break
     return res
 
 def postprocess_csv():
