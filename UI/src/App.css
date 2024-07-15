@@ -342,11 +342,11 @@ main .select-folder { background-color: white; align-self: center; justify-self:
 
 .scam-image .visible-false .mini {
   width:80px; height: 60px; object-fit: contain; object-position: center;  
-  position: absolute; right:46px;
+  /* position: absolute; right:46px; */
 }
 .scam-image .visible-false .mini.rotated {
   width:60px; height: 80px; transform-origin: calc(50% - 5px) calc(50% - 5px);
-  right:20px;
+  /* right:20px; */
 }
 .scam-image.filter-unchecked.checked-true:hover .image-menu,
 .scam-image:hover .image-menu { 
