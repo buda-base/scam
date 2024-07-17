@@ -337,7 +337,7 @@ def multiply_linear_srgb_pil(img, lum_factor):
     multiplied_cv2 = multiply_linear_srgb(np.asarray(img), [lum_factor, lum_factor, lum_factor, lum_factor])
     return Image.fromarray(multiplied_cv2)
 
-def multiply_linear_srgb(srgb_img, rgb_factors):
+def multiply_linear_srgb(img, factors):
     """
     This function converts the image in linear sRGB, applies a linear transformation on
     each color channel and then transforms the result in regular sRGB.
