@@ -156,7 +156,7 @@ def encode_img_uncompressed(img, try_grayscale=False) -> (bytes, str):
                 return None, ".tiff"
         return output.getvalue(), ".tiff"
 
-def encode_img(img, target_mode=None, mozjpeg_optimize=True, shrink_factor=1.0, quality=85):
+def encode_img(img, target_mode=None, mozjpeg_optimize=True, shrink_factor=1.0, lum_factor=1.0, quality=85):
     """
     returns the bytes of the encoded image (jpg or g4 tiff if binary)
     """
@@ -169,6 +169,8 @@ def encode_img(img, target_mode=None, mozjpeg_optimize=True, shrink_factor=1.0, 
         img = img.resize((int(img.width*shrink_factor), int(img.height*shrink_factor)), Image.Resampling.LANCZOS)
     if target_mode != "1":
         jpg_bytes = None
+        if lum_factor != 1.0:
+            img = multiply_linear_srgb_pil(img, lum_factor)
         with io.BytesIO() as output:
             img.save(output, format="JPEG", quality=quality, optimize=True, progressive=True, subsampling="4:2:2", comment="")
             jpg_bytes = output.getvalue()
@@ -327,6 +329,13 @@ def sRGB_gamma(value):
         return 12.92 * value
     else:
         return 1.055 * (value ** (1.0 / 2.4)) - 0.055
+
+def multiply_linear_srgb_pil(img, lum_factor):
+    """
+    wrapper for multiply_linear_srgb for PIL images
+    """
+    multiplied_cv2 = multiply_linear_srgb(np.asarray(im_pil), [lum_factor, lum_factor, lum_factor, lum_factor])
+    return Image.fromarray(multiplied_cv2)
 
 def multiply_linear_srgb(srgb_img, rgb_factors):
     """

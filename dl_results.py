@@ -60,7 +60,7 @@ def get_nbintropages(wlname, ilname):
         return iginfo["volume_pages_bdrc_intro"]
     return 0
 
-def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, quality=85, harmonize_sf=False):
+def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, lum_factor=1.0, quality=85, harmonize_sf=False):
     files = glob(archive_folder+'/**/*', recursive = True)
     Path(images_folder).mkdir(parents=True, exist_ok=True)
     orig_shrink_factor = shrink_factor
@@ -79,10 +79,10 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, qual
             img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes)
         else:
             img_pil = Image.open(archive_folder + file)
-            img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
+            img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality, lum_factor=lum_factor)
             while len(img_bytes) > 800*1024:
                 shrink_factor = 0.8*shrink_factor
-                img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
+                img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality, lum_factor=lum_factor)
             img_pil = None
             if orig_shrink_factor != shrink_factor:
                 logging.warning("had to use %f instead of %f on %s" % (shrink_factor, orig_shrink_factor, file))
@@ -94,7 +94,7 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, qual
         with dst_path.open("wb") as f:
             f.write(img_bytes)
 
-def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir):
+def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir, lum_factor=1.0):
     sources_dir = dst_dir + wlname+"/sources/"+wlname+"-"+ilname+"/"
     if not s3prefix.endswith(wlname+"-"+ilname+"/"):
         lastpart = s3prefix
@@ -122,7 +122,7 @@ def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir):
     if nb_archive_imgs < 1:
         logging.warning("%s-%s has no archive or image files" % (wlname, ilname))
         return
-    encode_folder(archive_dir, images_dir, ilname)
+    encode_folder(archive_dir, images_dir, ilname, shrink_factor, lum_factor)
     if nbintropages > 0:
         shutil.copyfile("tbrcintropages/1.tif", archive_dir+ilname+"0001.tif")
         shutil.copyfile("tbrcintropages/2.tif", archive_dir+ilname+"0002.tif")
@@ -149,9 +149,10 @@ def postprocess_csv():
             wlname = row[1]
             ilname = row[2]
             shrink_factor = 1.0
+            lum_factor = 1.0
             if len(row) > 3:
                 shrink_factor = float(row[3])
-            download_prefix(folder, wlname, ilname, shrink_factor, dest_dir)
+            download_prefix(folder, wlname, ilname, shrink_factor, dest_dir, lum_factor)
 
 if __name__ == '__main__':
     postprocess_csv()
