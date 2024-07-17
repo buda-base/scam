@@ -334,7 +334,7 @@ def multiply_linear_srgb_pil(img, lum_factor):
     """
     wrapper for multiply_linear_srgb for PIL images
     """
-    multiplied_cv2 = multiply_linear_srgb(np.asarray(im_pil), [lum_factor, lum_factor, lum_factor, lum_factor])
+    multiplied_cv2 = multiply_linear_srgb(np.asarray(img), [lum_factor, lum_factor, lum_factor, lum_factor])
     return Image.fromarray(multiplied_cv2)
 
 def multiply_linear_srgb(srgb_img, rgb_factors):
