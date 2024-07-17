@@ -97,7 +97,7 @@ def get_exposure_factor(raw, wb_factors, bbox, target_lnrgb=0.89, inverse_cam_rg
     """
     # gamma means we have a linearized rgb
     lrgb_base_linear = raw.postprocess(output_color=rawpy.ColorSpace.sRGB, gamma=(1, 1),
-                                       user_wb=wb_factors, no_auto_bright=True, user_flip=0)
+                                       user_wb=wb_factors, no_auto_bright=True, user_flip=0, output_bps=8)
     # cropping
     lrgb_base_linear = lrgb_base_linear[bbox[1]:bbox[1]+bbox[3],bbox[0]:bbox[0]+bbox[2]]
     med_lrgb = np.median(lrgb_base_linear)
