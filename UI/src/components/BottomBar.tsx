@@ -403,7 +403,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   const hasChecked = selectedImages.some(im => allScamData[im.thumbnail_path]?.checked)
   const hasUnchecked = selectedImages.some(im => !allScamData[im.thumbnail_path]?.checked)
   const hasHidden = selectedImages.some(im => allScamData[im.thumbnail_path]?.visible === false)
-  const hasVisible = selectedImages.some(im => allScamData[im.thumbnail_path]?.visible)
+  const hasVisible = selectedImages.some(im => allScamData[im.thumbnail_path]?.visible != false)
 
   const handleDeselectAll = () => {
     setCheckedRestrict(false)
