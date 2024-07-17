@@ -367,6 +367,7 @@ def multiply_linear_srgb_one(img, factor, no_crop=True):
         # Adjust the factor if the max value exceeds the max possible value for the bit depth
         if max_val > 255:
             adjustment_factor = 255.0 / max_val
+            logging.error("had to adjust lum_factor by %f" % adjustment_factor)
             lut = (lut * adjustment_factor).astype(img.dtype)
 
     # Apply the LUT to each channel of the image
