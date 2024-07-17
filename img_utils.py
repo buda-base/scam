@@ -170,7 +170,7 @@ def encode_img(img, target_mode=None, mozjpeg_optimize=True, shrink_factor=1.0, 
     if target_mode != "1":
         jpg_bytes = None
         if lum_factor != 1.0:
-            img = multiply_linear_srgb_pil(img, lum_factor)
+            img = multiply_linear_srgb_one_pil(img, lum_factor)
         with io.BytesIO() as output:
             img.save(output, format="JPEG", quality=quality, optimize=True, progressive=True, subsampling="4:2:2", comment="")
             jpg_bytes = output.getvalue()
@@ -330,12 +330,52 @@ def sRGB_gamma(value):
     else:
         return 1.055 * (value ** (1.0 / 2.4)) - 0.055
 
-def multiply_linear_srgb_pil(img, lum_factor):
+def multiply_linear_srgb_one_pil(img, lum_factor, no_crop=True):
     """
     wrapper for multiply_linear_srgb for PIL images
     """
-    multiplied_cv2 = multiply_linear_srgb(np.asarray(img), [lum_factor, lum_factor, lum_factor, lum_factor])
+    multiplied_cv2 = multiply_linear_srgb_one(np.asarray(img), lum_factor, no_crop)
     return Image.fromarray(multiplied_cv2)
+
+def multiply_linear_srgb_one(img, factor, no_crop=True):
+    """
+    This function converts the image in linear sRGB, applies a linear transformation on
+    each color channel using the same factor, and then transforms the result back to sRGB.
+    If no_crop is True, adjusts the factor so the highest value is 255.
+    """
+    bit_depth = img.dtype.itemsize * 8  # Determine bit depth per channel
+    num_channels = img.shape[2] if len(img.shape) > 2 else 1  # Determine number of channels
+
+    # Generate LUT for the given factor
+    lut = np.zeros((1 << bit_depth, 1), dtype=np.float32)  # Initialize LUT based on bit depth
+    for i in range(lut.shape[0]):
+        normalized_val = i / float(lut.shape[0] - 1)  # Normalize to [0, 1]
+        # Apply inverse sRGB gamma, multiply by factor, and apply sRGB gamma
+        val = sRGB_inverse_gamma(normalized_val)
+        val = val * factor
+        val = sRGB_gamma(val)
+        lut[i] = np.clip(val * (lut.shape[0] - 1), 0, lut.shape[0] - 1)  # Scale back and clip
+    
+    lut = lut.astype(img.dtype)
+
+    if no_crop:
+        # Find the maximum value after applying the factor
+        max_val = 0
+        for i in range(lut.shape[0]):
+            if lut[i] > max_val:
+                max_val = lut[i]
+        # Adjust the factor if the max value exceeds the max possible value for the bit depth
+        if max_val > 255:
+            adjustment_factor = 255.0 / max_val
+            lut = (lut * adjustment_factor).astype(img.dtype)
+
+    # Apply the LUT to each channel of the image
+    if num_channels > 1:
+        result_img = cv2.merge([cv2.LUT(img[:, :, c], lut) for c in range(num_channels)])
+    else:
+        result_img = cv2.LUT(img, lut)
+
+    return result_img
 
 def multiply_linear_srgb(img, factors):
     """
