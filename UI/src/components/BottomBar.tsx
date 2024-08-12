@@ -202,6 +202,10 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
         if(obj.visible) hidden = undefined
         let checked:boolean|undefined = data.checked || obj.checked
         if(obj.checked === false) checked = undefined
+        if(allScamData[j.thumbnail_path] && !allScamData[j.thumbnail_path].data?.pages && data.pages) { 
+          delete data.pages
+          if(data.rects) delete data.rects
+        }
         
         if(data.hidden != undefined) delete data.hidden
         if(data.checked != undefined) delete data.checked        
@@ -528,7 +532,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
               //signal: controller.signal
             })
           
-            debug("json:", response.data.thumbnail_path);
+            //debug("json:", response.data.thumbnail_path);
             
             if (response.data) {
               
@@ -772,9 +776,10 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   }, [allScamData, clipboardWithCorner, images, json, selectedItems, grid, dispatch])
 
   const handleDeleteAnnotations = useCallback(() => {  
-
+    
     for(const image of selectedItems) {  
       const newData = allScamData[image]?.data 
+        ?? (drafts && drafts[image]?.data)
         ?? (typeof json === "object" && json.files.find((im) => im?.thumbnail_path === image))
         ?? {}
       
