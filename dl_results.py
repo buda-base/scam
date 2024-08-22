@@ -11,8 +11,13 @@ from pathlib import Path
 import logging
 from PIL import Image
 import mozjpeg_lossless_optimization
+from datetime import datetime
+import random
+import statistics
 
 WINFOS_CACHE = {}
+DEFAULT_NBINTROPAGES = 0
+DOWNLOAD_FROM_S3 = True
 
 def sanitize_fname_for_archive(fpath, imgnum):
     fpath = fpath.replace("/", "_").replace(" ", "_").replace("'", "v").replace('"', "")
@@ -60,11 +65,34 @@ def get_nbintropages(wlname, ilname):
         return iginfo["volume_pages_bdrc_intro"]
     return 0
 
+def get_shrink_factor_one_img(img_pil, base_shrink_factor=1.0, max_size=800, step=0.1, target_max_dimension=3500):
+    """
+    get a good shrink factor for one image
+    """
+    shrink_factor = base_shrink_factor
+    if max(image.width, image.height) > target_max_dimension:
+        shrink_factor = min(shrink_factor, target_max_dimension / max_dimension)
+    img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
+    while len(img_bytes) > max_size*1024:
+        shrink_factor = (1-step)*shrink_factor
+        img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
+    return shrink_factor
+
+def get_shrink_factor_for_files(files, base_srink_factor, sample_size=3):
+    sample_paths = random.sample(file_paths, min(sample_size, len(file_paths)))
+    sample_shrink_factors = []
+    for sample_path in sample_paths:
+        img_pil = Image.open(file)
+        sample_shrink_factors.append(get_shrink_factor_one_img(img_pil, base_srink_factor))
+    return statistics.mean(sample_shrink_factors)
+
 def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, lum_factor=1.0, quality=85, harmonize_sf=False):
     files = glob(archive_folder+'/**/*', recursive = True)
     Path(images_folder).mkdir(parents=True, exist_ok=True)
     orig_shrink_factor = shrink_factor
     files = sorted(files)
+    orig_shrink_factor = get_shrink_factor_for_files(files, base_srink_factor)
+    logging.file("computed shrink factor %f for %s" % (orig_shrink_factor, archive_folder))
     for file in files:
         if not is_img(file):
             logging.error("%s likely not an image" % file)
@@ -80,7 +108,7 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, lum_
         else:
             img_pil = Image.open(archive_folder + file)
             img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality, lum_factor=lum_factor)
-            while len(img_bytes) > 800*1024:
+            while len(img_bytes) > 1200*1024:
                 shrink_factor = 0.8*shrink_factor
                 img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality, lum_factor=lum_factor)
             img_pil = None
@@ -94,7 +122,8 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, lum_
         with dst_path.open("wb") as f:
             f.write(img_bytes)
 
-def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir, lum_factor=1.0):
+def download_prefix(arglist):
+    s3prefix, wlname, ilname, shrink_factor, dst_dir, lum_factor = argslist[0], argslist[1], argslist[2], argslist[3], argslist[4], argslist[5]
     sources_dir = dst_dir + wlname+"/sources/"+wlname+"-"+ilname+"/"
     if not s3prefix.endswith(wlname+"-"+ilname+"/"):
         lastpart = s3prefix
@@ -115,19 +144,21 @@ def download_prefix(s3prefix, wlname, ilname, shrink_factor, dst_dir, lum_factor
             sources_dir += lastpart
     archive_dir = dst_dir + wlname+"/archive/"+wlname+"-"+ilname+"/"
     images_dir = dst_dir + wlname+"/images/"+wlname+"-"+ilname+"/"
-    download_folder_into(s3prefix, sources_dir)
-    download_folder_into("scam_logs/"+s3prefix, sources_dir)
     nbintropages = get_nbintropages(wlname, ilname)
-    nb_archive_imgs = download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages, ilname)
-    if nb_archive_imgs < 1:
-        logging.warning("%s-%s has no archive or image files" % (wlname, ilname))
-        return
+    if DOWNLOAD_FROM_S3:
+        download_folder_into(s3prefix, sources_dir)
+        download_folder_into("scam_logs/"+s3prefix, sources_dir)
+        nb_archive_imgs = download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages, ilname)
+        if nb_archive_imgs < 1:
+            logging.warning("%s-%s has no archive or image files" % (wlname, ilname))
+            return return [s3prefix, "noarchive"]
     encode_folder(archive_dir, images_dir, ilname, shrink_factor, lum_factor)
     if nbintropages > 0:
         shutil.copyfile("tbrcintropages/1.tif", archive_dir+ilname+"0001.tif")
         shutil.copyfile("tbrcintropages/2.tif", archive_dir+ilname+"0002.tif")
         shutil.copyfile("tbrcintropages/1.tif", images_dir+ilname+"0001.tif")
         shutil.copyfile("tbrcintropages/2.tif", images_dir+ilname+"0002.tif")
+    return [s3prefix, "ok"]
 
 
 def postprocess_csv():
@@ -139,6 +170,8 @@ def postprocess_csv():
         dest_dir = sys.argv[2]
         if not dest_dir.endswith("/"):
             dest_dir += "/"
+
+    normalized_todo_lines = []
 
     with open(sys.argv[1], newline='') as csvfile:
         reader = csv.reader(csvfile)
@@ -152,7 +185,11 @@ def postprocess_csv():
             lum_factor = 1.0
             if len(row) > 3:
                 shrink_factor = float(row[3])
-            download_prefix(folder, wlname, ilname, shrink_factor, dest_dir, lum_factor)
+            normalized_todo_lines.append([folder, wlname, ilname, shrink_factor, lum_factor])
+
+    filesuffix = datetime.now().strftime("%Y%m%d-%H%M%S")
+    ex = ParallelTaskExecutor(normalized_todo_lines, "done-process-"+filesuffix+".csv", download_prefix)
+    ex.run()
 
 if __name__ == '__main__':
     postprocess_csv()
