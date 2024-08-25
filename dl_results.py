@@ -13,11 +13,13 @@ from PIL import Image
 import mozjpeg_lossless_optimization
 from datetime import datetime
 import random
+from parallel_executor import ParallelTaskExecutor
 import statistics
+from tqdm import tqdm
 
 WINFOS_CACHE = {}
 DEFAULT_NBINTROPAGES = 0
-DOWNLOAD_FROM_S3 = True
+DOWNLOAD_FROM_S3 = False
 
 def sanitize_fname_for_archive(fpath, imgnum):
     fpath = fpath.replace("/", "_").replace(" ", "_").replace("'", "v").replace('"', "")
@@ -65,12 +67,13 @@ def get_nbintropages(wlname, ilname):
         return iginfo["volume_pages_bdrc_intro"]
     return 0
 
-def get_shrink_factor_one_img(img_pil, base_shrink_factor=1.0, max_size=800, step=0.1, target_max_dimension=3500):
+def get_shrink_factor_one_img(img_pil, base_shrink_factor=1.0, max_size=800, step=0.1, target_max_dimension=3500, quality=85):
     """
     get a good shrink factor for one image
     """
     shrink_factor = base_shrink_factor
-    if max(image.width, image.height) > target_max_dimension:
+    max_dimension = max(img_pil.width, img_pil.height)
+    if max_dimension > target_max_dimension:
         shrink_factor = min(shrink_factor, target_max_dimension / max_dimension)
     img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
     while len(img_bytes) > max_size*1024:
@@ -78,20 +81,20 @@ def get_shrink_factor_one_img(img_pil, base_shrink_factor=1.0, max_size=800, ste
         img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
     return shrink_factor
 
-def get_shrink_factor_for_files(files, base_srink_factor, sample_size=3):
-    sample_paths = random.sample(file_paths, min(sample_size, len(file_paths)))
+def get_shrink_factor_for_files(files, base_srink_factor, sample_size=3, quality=85):
+    sample_paths = random.sample(files, min(sample_size, len(files)))
     sample_shrink_factors = []
     for sample_path in sample_paths:
-        img_pil = Image.open(file)
-        sample_shrink_factors.append(get_shrink_factor_one_img(img_pil, base_srink_factor))
+        img_pil = Image.open(sample_path)
+        sample_shrink_factors.append(get_shrink_factor_one_img(img_pil, base_srink_factor, quality=quality))
     return statistics.mean(sample_shrink_factors)
 
 def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0, lum_factor=1.0, quality=85, harmonize_sf=False):
     files = glob(archive_folder+'/**/*', recursive = True)
     Path(images_folder).mkdir(parents=True, exist_ok=True)
     files = sorted(files)
-    orig_shrink_factor = get_shrink_factor_for_files(files, base_srink_factor)
-    logging.file("computed shrink factor %f for %s" % (orig_shrink_factor, archive_folder))
+    orig_shrink_factor = get_shrink_factor_for_files(files, orig_shrink_factor, quality=quality)
+    logging.info("computed shrink factor %f for %s" % (orig_shrink_factor, archive_folder))
     for file in files:
         if not is_img(file):
             logging.error("%s likely not an image" % file)
@@ -122,8 +125,8 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
         with dst_path.open("wb") as f:
             f.write(img_bytes)
 
-def download_prefix(arglist):
-    s3prefix, wlname, ilname, shrink_factor, dst_dir, lum_factor = argslist[0], argslist[1], argslist[2], argslist[3], argslist[4], argslist[5]
+def download_prefix(argslist):
+    dst_dir, s3prefix, wlname, ilname, shrink_factor, lum_factor = argslist[0], argslist[1], argslist[2], argslist[3], argslist[4], argslist[5]
     sources_dir = dst_dir + wlname+"/sources/"+wlname+"-"+ilname+"/"
     if not s3prefix.endswith(wlname+"-"+ilname+"/"):
         lastpart = s3prefix
@@ -183,13 +186,15 @@ def postprocess_csv():
             ilname = row[2]
             shrink_factor = 1.0
             lum_factor = 1.0
-            if len(row) > 3:
+            if len(row) > 3 and row[3]:
                 shrink_factor = float(row[3])
-            normalized_todo_lines.append([folder, wlname, ilname, shrink_factor, lum_factor])
+            normalized_todo_lines.append([dest_dir, folder, wlname, ilname, shrink_factor, lum_factor])
 
-    filesuffix = datetime.now().strftime("%Y%m%d-%H%M%S")
-    ex = ParallelTaskExecutor(normalized_todo_lines, "done-process-"+filesuffix+".csv", download_prefix)
-    ex.run()
+    for tl in tqdm(normalized_todo_lines):
+        download_prefix(tl)
+    #filesuffix = datetime.now().strftime("%Y%m%d-%H%M%S")
+    #ex = ParallelTaskExecutor(normalized_todo_lines, "done-process-"+filesuffix+".csv", download_prefix)
+    #ex.run()
 
 if __name__ == '__main__':
     postprocess_csv()

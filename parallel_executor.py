@@ -6,7 +6,7 @@ import logging
 class ParallelTaskExecutor():
     def __init__(self, todos, done_csv_filename, func, max_workers=4):
         self.done_csv_filename = done_csv_filename
-        self.todos = self._get_todos()
+        self.todos = todos
         self.fileslock = threading.Lock()
         self.max_workers = max_workers
         self.func = func
