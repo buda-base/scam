@@ -86,10 +86,9 @@ def get_shrink_factor_for_files(files, base_srink_factor, sample_size=3):
         sample_shrink_factors.append(get_shrink_factor_one_img(img_pil, base_srink_factor))
     return statistics.mean(sample_shrink_factors)
 
-def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, lum_factor=1.0, quality=85, harmonize_sf=False):
+def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0, lum_factor=1.0, quality=85, harmonize_sf=False):
     files = glob(archive_folder+'/**/*', recursive = True)
     Path(images_folder).mkdir(parents=True, exist_ok=True)
-    orig_shrink_factor = shrink_factor
     files = sorted(files)
     orig_shrink_factor = get_shrink_factor_for_files(files, base_srink_factor)
     logging.file("computed shrink factor %f for %s" % (orig_shrink_factor, archive_folder))
@@ -107,6 +106,7 @@ def encode_folder(archive_folder, images_folder, ilname, shrink_factor=1.0, lum_
             img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes)
         else:
             img_pil = Image.open(archive_folder + file)
+            shrink_factor = orig_shrink_factor
             img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality, lum_factor=lum_factor)
             while len(img_bytes) > 1200*1024:
                 shrink_factor = 0.8*shrink_factor
@@ -151,7 +151,7 @@ def download_prefix(arglist):
         nb_archive_imgs = download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages, ilname)
         if nb_archive_imgs < 1:
             logging.warning("%s-%s has no archive or image files" % (wlname, ilname))
-            return return [s3prefix, "noarchive"]
+            return [s3prefix, "noarchive"]
     encode_folder(archive_dir, images_dir, ilname, shrink_factor, lum_factor)
     if nbintropages > 0:
         shutil.copyfile("tbrcintropages/1.tif", archive_dir+ilname+"0001.tif")
