@@ -73,7 +73,8 @@ def get_shrink_factor_one_img(img_pil, base_shrink_factor=1.0, max_size=800, ste
     """
     shrink_factor = base_shrink_factor
     max_dimension = max(img_pil.width, img_pil.height)
-    if max_dimension > target_max_dimension:
+    # we don't cut if it's too close to 1.0
+    if max_dimension > target_max_dimension and (target_max_dimension / max_dimension) < (1-step):
         shrink_factor = min(shrink_factor, target_max_dimension / max_dimension)
     img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
     while len(img_bytes) > max_size*1024:
@@ -91,6 +92,9 @@ def get_shrink_factor_for_files(files, base_srink_factor, sample_size=3, quality
 
 def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0, lum_factor=1.0, quality=85, harmonize_sf=False):
     files = glob(archive_folder+'/**/*', recursive = True)
+    if len(files) == 0:
+        logging.error("no file to encode in %s" % archive_folder)
+        return
     Path(images_folder).mkdir(parents=True, exist_ok=True)
     files = sorted(files)
     orig_shrink_factor = get_shrink_factor_for_files(files, orig_shrink_factor, quality=quality)
