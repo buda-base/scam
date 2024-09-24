@@ -105,24 +105,18 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
             logging.error("%s likely not an image" % file)
             continue
         file = file[len(archive_folder):]
-        img_bytes, ext = None, None
+        img_bytes, ext, img_pil = None, None
         file_stats = os.stat(archive_folder + file)
         lastfour = file[-4:].lower()
+        with open(archive_folder + file, "rb") as f:
+            img_bytes = f.read()
+            img_pil = Image.open(io.BytesIO(img_bytes))
         if (lastfour == ".jpg" or lastfour == "jpeg") and file_stats.st_size < 800*1024:
             ext = ".jpg"
-            with open(archive_folder + file, "rb") as f:
-                img_bytes = f.read()
             img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes)
-        elif (lastfour == ".tif" or lastfour == "tiff") and file_stats.st_size < 800*1024:
-            with open(archive_folder + file, "rb") as f:
-                img_bytes = f.read()
-                img_pil = Image.open(io.BytesIO(img_bytes))
-                if img_pil.mode == "1" and img.info.get('compression', 'None') == "group4":
-                    ext = ".tif"
-                else:
-                    print("problem")
+        elif (lastfour == ".tif" or lastfour == "tiff") and file_stats.st_size < 800*1024 and img_pil.mode == "1" and img_pil.info.get('compression', 'None') == "group4":
+            ext = ".tif"
         else:
-            img_pil = Image.open(archive_folder + file)
             shrink_factor = orig_shrink_factor
             img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality, lum_factor=lum_factor)
             while len(img_bytes) > 1200*1024:
