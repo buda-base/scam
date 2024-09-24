@@ -16,6 +16,7 @@ import random
 from parallel_executor import ParallelTaskExecutor
 import statistics
 from tqdm import tqdm
+import io
 
 WINFOS_CACHE = {}
 DEFAULT_NBINTROPAGES = 0
@@ -106,11 +107,20 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
         file = file[len(archive_folder):]
         img_bytes, ext = None, None
         file_stats = os.stat(archive_folder + file)
-        if (file[-4:] == ".jpg" or file[-4:] == "jpeg") and file_stats.st_size < 800*1024:
+        lastfour = file[-4:].lower()
+        if (lastfour == ".jpg" or lastfour == "jpeg") and file_stats.st_size < 800*1024:
             ext = ".jpg"
             with open(archive_folder + file, "rb") as f:
                 img_bytes = f.read()
             img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes)
+        elif (lastfour == ".tif" or lastfour == "tiff") and file_stats.st_size < 800*1024:
+            with open(archive_folder + file, "rb") as f:
+                img_bytes = f.read()
+                img_pil = Image.open(io.BytesIO(img_bytes))
+                if img_pil.mode == "1" and img.info.get('compression', 'None') == "group4":
+                    ext = ".tif"
+                else:
+                    print("problem")
         else:
             img_pil = Image.open(archive_folder + file)
             shrink_factor = orig_shrink_factor
