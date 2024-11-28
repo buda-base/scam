@@ -49,6 +49,9 @@ def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, buck
 
 def download_folder_into(s3prefix, dst_dir, bucket=BUCKET_NAME):
     for obj_key in list_obj_keys(s3prefix, bucket):
+        if obj_key.endswith("/"):
+            # some upload software use a 0 size file to create directories
+            continue
         obj_key_afterprefix = obj_key[len(s3prefix):]
         dest_fname = dst_dir+obj_key_afterprefix
         if not os.path.exists(os.path.dirname(dest_fname)):
@@ -105,7 +108,7 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
             logging.error("%s likely not an image" % file)
             continue
         file = file[len(archive_folder):]
-        img_bytes, ext, img_pil = None, None
+        img_bytes, ext, img_pil = None, None, None
         file_stats = os.stat(archive_folder + file)
         lastfour = file[-4:].lower()
         with open(archive_folder + file, "rb") as f:
