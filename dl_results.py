@@ -30,7 +30,7 @@ def sanitize_fname_for_archive(fpath, imgnum):
         fpath = fpathnoext+"_"+suffix+fpath[fpath.rfind("."):]
     return fpath
 
-def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, bucket=BUCKET_NAME):
+def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, prefix, bucket=BUCKET_NAME):
     obj_keys = natsorted(list_obj_keys(s3prefix, bucket), alg=ns.IC|ns.INT)
     fnum = 1
     for obj_key in obj_keys:
@@ -40,6 +40,8 @@ def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, buck
         obj_key_afterprefix = obj_key[len(s3prefix):]
         obj_key_afterprefix = sanitize_fname_for_archive(obj_key_afterprefix, fnum+nb_intro_pages)
         dest_fname = dst_dir+obj_key_afterprefix
+        if prefix:
+            dest_fname = dst_dir+prefix+"_"+obj_key_afterprefix
         if not os.path.exists(os.path.dirname(dest_fname)):
             os.makedirs(os.path.dirname(dest_fname))
         S3.download_file(bucket, obj_key, dest_fname)
@@ -138,6 +140,11 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
 
 def download_prefix(argslist):
     dst_dir, s3prefix, wlname, ilname, shrink_factor, lum_factor = argslist[0], argslist[1], argslist[2], argslist[3], argslist[4], argslist[5]
+    prefix = None
+    if '-' in ilname and not ilname.endswith('-'):
+        ilnameparts = ilname.split('-')
+        ilname = ilnameparts[0]
+        prefix = ilnameparts[1]
     sources_dir = dst_dir + wlname+"/sources/"+wlname+"-"+ilname+"/"
     if not s3prefix.endswith(wlname+"-"+ilname+"/"):
         lastpart = s3prefix
@@ -162,7 +169,7 @@ def download_prefix(argslist):
     if DOWNLOAD_FROM_S3:
         download_folder_into(s3prefix, sources_dir)
         download_folder_into("scam_logs/"+s3prefix, sources_dir)
-        nb_archive_imgs = download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages, ilname)
+        nb_archive_imgs = download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages, ilname, prefix)
         if nb_archive_imgs < 1:
             logging.warning("%s-%s has no archive or image files" % (wlname, ilname))
             return [s3prefix, "noarchive"]
