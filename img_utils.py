@@ -8,6 +8,8 @@ import numpy as np
 import math
 import logging
 
+Image.MAX_IMAGE_PIXELS = 900000000
+
 def rotate_warp_perspective(pil_img, rect):
     """
     rotate function based on warpPerspective, from

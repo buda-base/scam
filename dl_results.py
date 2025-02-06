@@ -21,6 +21,7 @@ import io
 WINFOS_CACHE = {}
 DEFAULT_NBINTROPAGES = 0
 DOWNLOAD_FROM_S3 = False
+OVERWRITE_IMG_FILES = False
 
 def sanitize_fname_for_archive(fpath, imgnum):
     fpath = fpath.replace("/", "_").replace(" ", "_").replace("'", "v").replace('"', "")
@@ -110,6 +111,11 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
             logging.error("%s likely not an image" % file)
             continue
         file = file[len(archive_folder):]
+        filenoext = file[:file.rfind(".")]
+        last4 = filenoext[-4:]
+        dst_path = Path(images_folder) / Path(ilname+last4+ext)
+        if (not OVERWRITE_IMG_FILES) and dst_path.is_file():
+            continue
         img_bytes, ext, img_pil = None, None, None
         file_stats = os.stat(archive_folder + file)
         lastfour = file[-4:].lower()
@@ -132,9 +138,6 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
                 logging.warning("had to use %f instead of %f on %s" % (shrink_factor, orig_shrink_factor, file))
                 if not harmonize_sf:
                     shrink_factor = orig_shrink_factor
-        filenoext = file[:file.rfind(".")]
-        last4 = filenoext[-4:]
-        dst_path = Path(images_folder) / Path(ilname+last4+ext)
         with dst_path.open("wb") as f:
             f.write(img_bytes)
 
