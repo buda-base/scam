@@ -502,13 +502,16 @@ def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, 
     else:
         pil_img = Image.open(blob)
         ext = img_path[-4:].lower()
-        if try_simple_copy and pil_img.mode in ["RGB", "L"] and ext in [".jpg", "jpeg"]: # TODO: group4 compressed tiffs should work too
+        if try_simple_copy and pil_img.mode in ["RGB", "L", "1"] and ext in [".jpg", "jpeg", "tiff", ".tif"]:
             logging.info("use simple copy on %s" % img_path)
             blob.seek(0)
-            jpg_bytes = blob.read()
+            img_bytes = blob.read()
             blob = None
-            jpg_bytes = mozjpeg_lossless_optimization.optimize(jpg_bytes)
-            return None, jpg_bytes, ".jpg"
+            if ext in [".jpg", "jpeg"]:
+                img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes)
+                return None, img_bytes, ".jpg"
+            else:
+                return None, img_bytes, ".tiff"
         blob = None
         pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=postprocess_options["force_apply_icc"])
         if params and params != "auto" and postprocess_options["correct_non_raw"]:
