@@ -217,7 +217,7 @@ def order_pages(pages):
 
 def can_simple_copy(file_info, pages):
     ext = file_info["img_path"][-4:].lower()
-    if ext not in ["jpeg", ".jpg"]: # TODO: tiffs too?
+    if ext not in ["jpeg", ".jpg", "tiff", ".tif"]:
         return False
     if len(pages) > 1:
         return False
