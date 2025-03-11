@@ -136,6 +136,14 @@ def get_sequence_info(scam_json, apply_resequence=True, sort_key=None):
                     res[img_path].append(cur_seq)
                     cur_seq += 1
             recto_img_path = None
+        
+        # Fix for when the last page is a recto without a matching verso
+        if recto_img_path:
+            res[recto_img_path] = []
+            for i in range(img_path_to_nb_output_pages[recto_img_path]):
+                res[recto_img_path].append(cur_seq)
+                cur_seq += 1
+
     return res, apply_resequence
 
 def get_direction(pages):
