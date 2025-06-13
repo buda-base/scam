@@ -5,6 +5,7 @@ import io
 import botocore
 import gzip
 import pickle
+import json
 
 BUCKET_NAME = "image-processing.bdrc.io"
 
