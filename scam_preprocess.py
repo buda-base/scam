@@ -107,7 +107,7 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
             pil_img = get_pil_img(folder_path, img_path)
             orig_height = pil_img.height
             orig_width = pil_img.width
-            thumbnail_path, w, h = save_thumbnail(folder_path, img_path, pil_img, preprocess_options)
+            thumbnail_path, thumbnail_w, thumbnail_h = save_thumbnail(folder_path, img_path, pil_img, preprocess_options)
             if preprocess_options["use_exif_rotation"]:
                 pil_img, rotation = apply_exif_rotation(pil_img)
             # TODO: handle preprocess_options["pre_rotate]
