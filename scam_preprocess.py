@@ -52,14 +52,12 @@ def get_pil_img(folder_path, img_path):
     return img
 
 def save_thumbnail(folder_path, img_path, pil_img, preprocess_options):
-    ratio = max(preprocess_options["thumbnail_resize"] / pil_img.width, preprocess_options["thumbnail_resize"] / pil_img.height)
+    ratio = min(preprocess_options["thumbnail_resize"] / pil_img.width, preprocess_options["thumbnail_resize"] / pil_img.height)
     new_width = int(pil_img.width * ratio)
     new_height = int(pil_img.height * ratio)
     pil_img = pil_img.resize((new_width, new_height), Image.LANCZOS)
     ext = ".png" if get_best_mode(pil_img) == "1" else ".jpg"
     path = "thumbnails/"+folder_path+img_path+ext
-    if preprocess_options["pre_rotate"] != 0:
-        pil_img = pil_img.rotate(preprocess_options["pre_rotate"], expand=True)
     try:
         byts, ext = encode_thumbnail_img(pil_img, mozjpeg_optimize=True)
         upload_to_s3(byts, path)
