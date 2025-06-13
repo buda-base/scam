@@ -100,10 +100,14 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
         rotation = 0
         orig_height = None
         orig_width = None
+        thumbnail_path = None
+        thumbnail_w = None
+        thumbnail_h = None
         try:
             pil_img = get_pil_img(folder_path, img_path)
             orig_height = pil_img.height
             orig_width = pil_img.width
+            thumbnail_path, w, h = save_thumbnail(folder_path, img_path, pil_img, preprocess_options)
             if preprocess_options["use_exif_rotation"]:
                 pil_img, rotation = apply_exif_rotation(pil_img)
             # TODO: handle preprocess_options["pre_rotate]
@@ -117,7 +121,7 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
         if sam_res:
             save_sam_pickle(pickle_path, sam_res)
         # thumbnail will get rotated
-        thumbnail_path, w, h = save_thumbnail(folder_path, img_path, pil_img, preprocess_options)
+        
         files.append({
             "img_path": img_path,
             "pickle_path": pickle_path if sam_res else None,
@@ -126,9 +130,9 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
             "rotation": rotation, # can be modified by users
             "thumbnail_path": thumbnail_path,
             "thumbnail_info": {
-                "width": w,
-                "height": h,
-                "rotation": rotation # inherent to the image, cannot be modified
+                "width": thumbnail_w,
+                "height": thumbnail_h,
+                "rotation": 0
             }
         })
     save_scam_json(folder_path, scam_json)
