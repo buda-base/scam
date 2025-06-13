@@ -97,11 +97,16 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
         # pil_img is not rotated
         pil_img = None
         sam_res = None
-        rotation = preprocess_options["pre_rotate"]
+        rotation = 0
+        orig_height = None
+        orig_width = None
         try:
             pil_img = get_pil_img(folder_path, img_path)
+            orig_height = pil_img.height
+            orig_width = pil_img.width
             if preprocess_options["use_exif_rotation"]:
                 pil_img, rotation = apply_exif_rotation(pil_img)
+            # TODO: handle preprocess_options["pre_rotate]
             #pil_img = sanitize_for_preprocessing(pil_img)
             if preprocess_options["run_sam"]:
                 sam_res = run_sam(pil_img, preprocess_options)
@@ -116,8 +121,8 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
         files.append({
             "img_path": img_path,
             "pickle_path": pickle_path if sam_res else None,
-            "width": pil_img.width,
-            "height": pil_img.height,
+            "width": orig_width,
+            "height": orig_height,
             "rotation": rotation, # can be modified by users
             "thumbnail_path": thumbnail_path,
             "thumbnail_info": {
