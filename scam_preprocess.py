@@ -103,7 +103,7 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
         try:
             pil_img = get_pil_img(folder_path, img_path)
             if preprocess_options["use_exif_rotation"]:
-                pil_img, rotation = apply_exif_rotation(img)
+                pil_img, rotation = apply_exif_rotation(pil_img)
             #pil_img = sanitize_for_preprocessing(pil_img)
             if preprocess_options["run_sam"]:
                 sam_res = run_sam(pil_img, preprocess_options)
