@@ -23,7 +23,6 @@ from functools import cmp_to_key
 
 DEFAULT_POSTPROCESS_OPTIONS = {
     "rotation_in_derivation": True, # derive tiffs with the small rotation
-    "use_exif_rotation": False,
     "src_storage": "s3", # s3 or local
     "dst_storage": "s3", # s3 or local
     "skip_folder_local_output": False, # 
@@ -505,7 +504,7 @@ def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, 
         output_file_info["wb_factors"] = wb_factors
         output_file_info["exp_shift"] = exp_shift
     if is_likely_raw(img_path):
-        np_img = get_np_from_raw(blob, params, postprocess_options["use_exif_rotation"])
+        np_img = get_np_from_raw(blob, params, False)
         return Image.fromarray(np_img), None, None
     else:
         pil_img = Image.open(blob)

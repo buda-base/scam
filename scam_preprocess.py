@@ -1,7 +1,6 @@
 import csv
 import sys
-from scaapi import VERSION, save_scam_json
-from utils import list_img_keys, gets3blob, upload_to_s3, get_gzip_picked_bytes
+from utils import list_img_keys, gets3blob, upload_to_s3, get_gzip_picked_bytes, VERSION, save_scam_json
 from datetime import datetime
 import logging
 from PIL import Image
@@ -16,6 +15,7 @@ DEFAULT_PREPROCESS_OPTIONS = {
     "sam_resize": 1024,
     "thumbnail_resize": 512,
     "pre_rotate": 0,
+    "run_sam": True,
     "use_exif_rotation": False,
     "grayscale_thumbnail": False
 }
@@ -44,7 +44,7 @@ def get_pil_img(folder_path, img_path):
     blob = gets3blob(folder_path+img_path)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
-    if not RAW_OPENER_REGISTERED and img_path[-4:].lower() in [".nef", ".cr2", ".dng", ".arw"]:
+    if not RAW_OPENER_REGISTERED and img_path[-4:].lower() in [".nef", ".cr2", ".dng", ".arw", ".cr3"]:
         print("register raw opener")
         register_raw_opener()
         RAW_OPENER_REGISTERED = True
@@ -99,30 +99,33 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
         # pil_img is not rotated
         pil_img = None
         sam_res = None
+        rotation = preprocess_options["pre_rotate"]
         try:
             pil_img = get_pil_img(folder_path, img_path)
             if preprocess_options["use_exif_rotation"]:
-                pil_img = apply_exif_rotation(img)
+                pil_img, rotation = apply_exif_rotation(img)
             #pil_img = sanitize_for_preprocessing(pil_img)
-            sam_res = run_sam(pil_img, preprocess_options)
+            if preprocess_options["run_sam"]:
+                sam_res = run_sam(pil_img, preprocess_options)
         except Exception as e:
             logging.error("error on %s/%s" % (folder_path, img_path), e)
             continue
         pickle_path = get_pickle_path(folder_path, img_path)
-        save_sam_pickle(pickle_path, sam_res)
+        if sam_res:
+            save_sam_pickle(pickle_path, sam_res)
         # thumbnail will get rotated
         thumbnail_path, w, h = save_thumbnail(folder_path, img_path, pil_img, preprocess_options)
         files.append({
             "img_path": img_path,
-            "pickle_path": pickle_path,
+            "pickle_path": pickle_path if sam_res else None,
             "width": pil_img.width,
             "height": pil_img.height,
-            "rotation": preprocess_options["pre_rotate"], # can be modified by users
+            "rotation": rotation, # can be modified by users
             "thumbnail_path": thumbnail_path,
             "thumbnail_info": {
                 "width": w,
                 "height": h,
-                "rotation": preprocess_options["pre_rotate"] # inherent to the image, cannot be modified
+                "rotation": rotation # inherent to the image, cannot be modified
             }
         })
     save_scam_json(folder_path, scam_json)

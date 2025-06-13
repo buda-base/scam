@@ -265,17 +265,17 @@ def apply_exif_rotation(img):
     try:
         exif = img._getexif()
     except:
-        return img
+        return img, 0
     if exif is None:
-        return img
+        return img, 0
 
     if exif[orientation] == 3:
-        return img.rotate(180, expand=True)
+        return img.rotate(180, expand=True), 180
     elif exif[orientation] == 6:
-        return img.rotate(270, expand=True)
+        return img.rotate(270, expand=True), 270
     elif exif[orientation] == 8:
-        return img.rotate(90, expand=True)
-    return img
+        return img.rotate(90, expand=True), 90
+    return img, 0
 
 def extract_encode_img(img_orig, sam_annotation, dst_fname, rotate=False):
     cropped_img = extract_img(img_orig, sam_annotation, dst_fname, rotate)

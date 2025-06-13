@@ -7,11 +7,10 @@ from sam_annotation_utils import add_scam_results
 import logging
 from flask_cachecontrol import cache
 from flask_cors import CORS
+from utils import VERSION, save_scam_json
 
 api = Flask("SCAM-QC")
 CORS(api)
-
-VERSION = "0.0.1"
 
 def get_gz_pickle(pickle_path):
     blob = gets3blob(pickle_path)
@@ -68,11 +67,6 @@ def run_scam_image(folder_path, file_info, scam_options):
     sam_anns = get_gz_pickle(file_info["pickle_path"])
     add_scam_results(file_info, sam_anns, scam_options)
     return file_info
-
-def save_scam_json(folder_path, scam_json_obj):
-    scam_json_str = json.dumps(scam_json_obj, indent=2)
-    json_file_path = folder_path+"scam.json"
-    return upload_to_s3(scam_json_str.encode('utf-8'), json_file_path)
 
 def get_scam_json(folder_path):
     json_file_path = folder_path+"scam.json"

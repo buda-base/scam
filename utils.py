@@ -8,8 +8,15 @@ import pickle
 
 BUCKET_NAME = "image-processing.bdrc.io"
 
+VERSION = "0.0.1"
+
 SESSION = boto3.Session(profile_name='image_processing')
 S3 = SESSION.client('s3')
+
+def save_scam_json(folder_path, scam_json_obj):
+    scam_json_str = json.dumps(scam_json_obj, indent=2)
+    json_file_path = folder_path+"scam.json"
+    return upload_to_s3(scam_json_str.encode('utf-8'), json_file_path)
 
 def gets3blob(s3Key, bucket=BUCKET_NAME):
     f = io.BytesIO()
