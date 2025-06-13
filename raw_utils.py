@@ -11,7 +11,7 @@ def is_likely_raw(fname):
     simple function to check if a file path is likely for a raw file
     """
     fname = fname.lower()
-    return fname.endswith(".arw") or fname.endswith(".nef") or fname.endswith(".dng") or fname.endswith(".cr2")
+    return fname.endswith(".arw") or fname.endswith(".nef") or fname.endswith(".dng") or fname.endswith(".cr2")  or fname.endswith(".cr3")
 
 def get_visible_cam_rgb(raw, x, y):
     """
@@ -249,12 +249,25 @@ def register_raw_opener(use_exif_rotation=False):
     print("register raw opener")
     Image.register_open('RAW', RawImageFile)
     Image.register_decoder('RAW', RawDecoder)
-    Image.register_extensions(RawImageFile.format, ['nef', 'cr2', 'dng', 'arw'])
+    Image.register_extensions(RawImageFile.format, ['nef', 'cr2', 'dng', 'arw', 'cr3'])
 
 def test():
     register_raw_opener()
-    img = Image.open("I1EAP100000001.ARW")
-    print("dims: %dx%d" % (img.width, img.height))
-    img.save("/tmp/India_001.jpg")
+    files = {
+        "/tmp/11_IMG_2065.CR3": "/tmp/11_IMG_2065_converted.jpg",
+        "/tmp/12_IMG_2073.CR3": "/tmp/12_IMG_2073_converted.jpg",
+        "/tmp/13_IMG_2076.CR3": "/tmp/13_IMG_2076_converted.jpg",
+        "/tmp/14_IMG_2085.CR3": "/tmp/14_IMG_2085_converted.jpg",
+        "dorc/IMG_2023.CR3": "dorc/IMG_2023.jpg",
+        "dorc/IMG_2024.CR3": "dorc/IMG_2024.jpg",
+        "dorc/IMG_2025.CR3": "dorc/IMG_2025.jpg",
+        "dorc/IMG_2026.CR3": "dorc/IMG_2026.jpg",
+        "dorc/IMG_2027.CR3": "dorc/IMG_2027.jpg",
+    }
+    for raw, jpg in files.items():
+        img = Image.open(raw)
+        print("dims: %dx%d" % (img.width, img.height))
+        img.save(jpg)
 
-#test()
+if __name__ == "__main__":
+    test()
