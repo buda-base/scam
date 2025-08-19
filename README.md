@@ -80,7 +80,7 @@ The web interface will update the file `s3://examplebucket/thumbnails/images/to_
 Once you have used the web interface and saved the results, run
 
 ```sh
-python scam_preprocess.py to_crop_1.csv
+python scam_postprocess.py to_crop_1.csv
 ```
 
 The file format should be the same as the one in step 1, but this step does not require a GPU and can be run on a different machine.
