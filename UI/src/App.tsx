@@ -259,6 +259,7 @@ function App() {
                 
         let toRotate = angle ;
         newData.rotation = rotation
+        newData.thumbnail_info.rotation = rotation
         if(newData.pages) do { 
           const handleX = portrait ? image.height/2 : image.width/2
           const handleY = portrait ? image.width/2 : image.height/2
