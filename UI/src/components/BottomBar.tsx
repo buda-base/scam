@@ -849,6 +849,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         <Settings />
       </IconButton> */}
       <TextField
+        key={"TF-1"}
         SelectProps={{ 
           MenuProps : { disableScrollLock: true }
         }}
@@ -859,9 +860,10 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         label="Filter images"
         onChange={(r) => r.target.value != "load" ? setFilter(r.target.value) : null}
       >
-        { ["all", "warning", "unchecked", "random", "outliar", "not_done" ].map(f => <MenuItem value={f} {...funcs[f] ? {onClick:() => (funcs[f])()}:{}}>{f.replace(/_/g," ")}</MenuItem>) }
+        { ["all", "warning", "unchecked", "random", "outliar", "not_done" ].map(f => <MenuItem key={"TF-1-"+f} value={f} {...funcs[f] ? {onClick:() => (funcs[f])()}:{}}>{f.replace(/_/g," ")}</MenuItem>) }
       </TextField>
       <TextField
+        key={"TF-2"}
         SelectProps={{ 
           MenuProps : { disableScrollLock: true }
         }}
@@ -872,9 +874,10 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         label="Display grid"
         onChange={(r) => setGrid(r.target.value)}
       >
-        { ["1x1", "2x1", "3x2", "4x3", "5x3", "mozaic" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+        { ["1x1", "2x1", "3x2", "4x3", "5x3", "mozaic" ].map(f => <MenuItem key={"TF-2-"+f} value={f}>{f}</MenuItem>) }
       </TextField>
       <TextField
+        key={"TF-3"}
         SelectProps={{ 
           MenuProps : { disableScrollLock: true }
         }}
@@ -911,6 +914,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         <MenuItem value={4} disabled={!selectedItems.length} onClick={() => setShowSettings(true)}>{"Run SCAM on selection"}</MenuItem>
       </TextField>
       <TextField
+        key={"TF-4"}
         SelectProps={{ 
           MenuProps : { disableScrollLock: true }
         }}

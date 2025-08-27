@@ -185,7 +185,7 @@ export const TopBar = (props: { images:ScamImageData[], folder:string, config: C
           <InputLabel shrink={true}>Previously open folders</InputLabel>
           <div style={{ marginLeft: -9, marginTop:-4 }}>
             <div style={{ maxHeight:"250px", overflow:"auto" }}>
-            { sessions.map(s => <Button sx={{ fontSize:16, textTransform: "none", padding:"0px 8px", display:"flex" }}>
+            { sessions.map(s => <Button key={"button-"+s} sx={{ fontSize:16, textTransform: "none", padding:"0px 8px", display:"flex" }}>
                 <Link style={{color:theme.palette.primary.main}} to={"/?folder="+s} onClick={handleClose}>{s}</Link>
               </Button>)}
             </div>

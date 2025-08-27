@@ -564,7 +564,7 @@ function App() {
       {reloadDialog}
       <header className={"folder-empty-"+(typeof json != "object")}><TopBar {...{ images, folder, config, error, json, jsonPath, setFolder }}/></header>
       <main onClick={checkDeselectMain} className={"main-grid-"+grid}>{
-        images.map((image,i) => <ScamImageContainer selected={selectedItems.includes(image.thumbnail_path)} {...{ 
+        images.map((image,i) => <ScamImageContainer key={"scamImageContainer-"+i} selected={selectedItems.includes(image.thumbnail_path)} {...{ 
           isNotDone: !image.pages, isOutliar:outliar[i] || false, isRandom:random[i] || false, folder, image, config, loadDraft, draft: drafts[image.thumbnail_path], setImageData, handleSelectItem 
         }}/>)
       }</main>
