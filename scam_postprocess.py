@@ -6,9 +6,8 @@ import mozjpeg_lossless_optimization
 from PIL import Image
 from tqdm import tqdm
 from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma, rotate_mar
-from scaapi import get_scam_json
 from scam_preprocess import get_pil_img
-from utils import upload_to_s3, gets3blob, get_sha256
+from utils import upload_to_s3, gets3blob, get_sha256, get_scam_json
 from raw_utils import register_raw_opener, is_likely_raw, get_np_from_raw, get_factors_from_raw
 from natsort import natsort_keygen, natsorted, ns
 import numpy as np
@@ -444,10 +443,11 @@ def get_cv2_corrections(folder_path, img_path, page_info, file_info, postprocess
     blob.seek(0)
     pil_img = Image.open(blob)
     pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=True)
-    bbox = get_bbox(page_info, file_info, raw.sizes.width, raw.sizes.height, add_file_info_rotation=True)
+    bbox = get_bbox(page_info, file_info, pil_img.width, pil_img.height, add_file_info_rotation=True)
     linear_factors = get_linear_factors(np.array(pil_img), bbox, postprocess_options["wb_patch_nsrgb_target"])
     exp_shift = min(linear_factors)
     wb_factors = np.array(linear_factors) / exp_shift
+    logging.debug("factors: (%f,%f,%f)" % (linear_factors[0], linear_factors[1], linear_factors[2]))
     return wb_factors, exp_shift, tags
 
 def get_cv2_img(folder_path, img_path):

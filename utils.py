@@ -19,6 +19,14 @@ def save_scam_json(folder_path, scam_json_obj):
     json_file_path = folder_path+"scam.json"
     return upload_to_s3(scam_json_str.encode('utf-8'), json_file_path)
 
+def get_scam_json(folder_path):
+    json_file_path = folder_path+"scam.json"
+    blob = gets3blob(json_file_path)
+    if blob is None:
+        return None
+    blob.seek(0)
+    return json.loads(blob.read().decode("utf-8"))
+
 def gets3blob(s3Key, bucket=BUCKET_NAME):
     f = io.BytesIO()
     try:

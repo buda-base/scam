@@ -151,7 +151,6 @@ def encode_img_uncompressed(img, try_grayscale=False) -> (bytes, str):
         except:
             try:
                 # https://github.com/python-pillow/Pillow/issues/7892
-                print("oops")
                 img = img.rotate(180).rotate(180)
                 img.save(output, icc_profile=img.info.get('icc_profile'), format="TIFF", compression="tiff_deflate")
             except:
@@ -410,22 +409,60 @@ def multiply_linear_srgb(img, factors):
 
     return result_img
 
-def srgb_to_lnsrgb(rgb_array, bps):
-    res = []
-    for v in rgb_array:
-        if bps:
-            v = v / 2^bps
-        v = sRGB_inverse_gamma(v)
-    res.append(v)
-    return np.array(res)
+def srgb_to_lnsrgb(rgb_array, bps=None):
+    """
+    Convert sRGB values to linearized sRGB.
+    rgb_array: array-like of shape (..., 3)
+      - If bps is None, values are assumed to be already in [0, 1].
+      - If bps is 8 or 16, values are integer-coded in [0, 255]/[0, 65535].
+    """
+    rgb = np.asarray(rgb_array, dtype=np.float64)
+
+    if bps:  # 8 or 16
+        maxv = (1 << bps) - 1
+        rgb = rgb / maxv
+
+    # Ensure in [0,1] before inverse gamma (clamp to be safe)
+    rgb = np.clip(rgb, 0.0, 1.0)
+
+    # Vectorized inverse transfer (IEC 61966-2-1)
+    # If you already have sRGB_inverse_gamma that works on arrays, use it directly.
+    a = 0.055
+    cutoff = 0.04045
+    linear = np.where(
+        rgb <= cutoff,
+        rgb / 12.92,
+        ((rgb + a) / (1 + a)) ** 2.4
+    )
+    return linear
+
 
 def get_linear_factors(srgb_img, bbox, expected_nsRGB):
+    """
+    srgb_img: HxWx3 array (uint8/uint16 or float in [0,1])
+    bbox: (x_start, y_start, bbox_w, bbox_h)
+    expected_nsRGB: 3-vector of expected sRGB white in [0,1] (e.g., [1,1,1])
+    """
     x_start, y_start, bbox_w, bbox_h = bbox
-    white_patch = srgb_img[y_start:(y_start+bbox_h), x_start:(x_start+bbox_w)]
+    white_patch = srgb_img[y_start:y_start+bbox_h, x_start:x_start+bbox_w]
+
+    # median in the sRGB domain
     median_srgb = np.median(white_patch.reshape(-1, 3), axis=0)
-    median_lnsrgb = srgb_to_lnsrgb(median_srgb, 16 if img.dtype.itemsize == 2 else 8)
-    expected_lnsrgb = srgb_to_lnsrgb(expected_nsRGB, 0)
-    scale_factors = expected_lnsrgb / median_lnsrgb
+    #logging.debug(median_srgb)
+
+    # Determine bit depth: if integer image use its itemsize, otherwise already float
+    if np.issubdtype(srgb_img.dtype, np.integer):
+        bps = srgb_img.dtype.itemsize * 8  # 8 for uint8, 16 for uint16
+    else:
+        bps = None  # assume already [0,1]
+
+    median_lnsrgb = srgb_to_lnsrgb(median_srgb, bps=bps)
+    #logging.debug(median_lnsrgb)
+    expected_lnsrgb = srgb_to_lnsrgb(np.asarray(expected_nsRGB, dtype=np.float64), bps=None)
+
+    # Avoid divide-by-zero
+    eps = 1e-12
+    scale_factors = expected_lnsrgb / np.maximum(median_lnsrgb, eps)
     return scale_factors
 
 def apply_scale_factors_pil(pil_img, linear_rgb_factors):
