@@ -1121,6 +1121,7 @@ const ScamImage = (props: { isNotDone:boolean, isOutliar:boolean, isRandom:boole
         const handleX = portrait ? image.height/2 : image.width/2
         const handleY = portrait ? image.width/2 : image.height/2
         newData.rotation = rotation
+        newData.thumbnail_info.rotation = rotation
         newData.pages = newData.pages.map((p) => withRotatedHandle(rotatePage90(withoutRotatedHandle(p) as Page, angle, handleX, handleY), newData) as Page)
         if(newData.rects) delete newData.rects
       }

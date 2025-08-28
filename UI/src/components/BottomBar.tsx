@@ -479,6 +479,29 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
     setSelectedItems(selected)
   }, [images, setSelectedItems, calcIsFilteredIn])
 
+  const selectEveryOtherImage = useCallback(() => {
+    if (selectedItems.length === 0) return;
+    
+    // Find the index of the currently selected image (take the first one if multiple)
+    const currentImagePath = selectedItems[0];
+    const currentIndex = images.findIndex(img => img.thumbnail_path === currentImagePath);
+    
+    if (currentIndex === -1) return;
+    
+    // Select every other image starting from the next image after the current one
+    const newSelection: string[] = [];
+    
+    // Add the currently selected image to maintain it
+    newSelection.push(currentImagePath);
+    
+    // Start from the next image and select every other one
+    for (let i = currentIndex + 2; i < images.length; i += 2) {
+      newSelection.push(images[i].thumbnail_path);
+    }
+    
+    setSelectedItems(newSelection);
+  }, [images, selectedItems, setSelectedItems]);
+
 
   const updateCheckRestrict = useCallback(()=> {
 
@@ -826,6 +849,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         <Settings />
       </IconButton> */}
       <TextField
+        key={"TF-1"}
         SelectProps={{ 
           MenuProps : { disableScrollLock: true }
         }}
@@ -836,9 +860,10 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         label="Filter images"
         onChange={(r) => r.target.value != "load" ? setFilter(r.target.value) : null}
       >
-        { ["all", "warning", "unchecked", "random", "outliar", "not_done" ].map(f => <MenuItem value={f} {...funcs[f] ? {onClick:() => (funcs[f])()}:{}}>{f.replace(/_/g," ")}</MenuItem>) }
+        { ["all", "warning", "unchecked", "random", "outliar", "not_done" ].map(f => <MenuItem key={"TF-1-"+f} value={f} {...funcs[f] ? {onClick:() => (funcs[f])()}:{}}>{f.replace(/_/g," ")}</MenuItem>) }
       </TextField>
       <TextField
+        key={"TF-2"}
         SelectProps={{ 
           MenuProps : { disableScrollLock: true }
         }}
@@ -849,9 +874,10 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         label="Display grid"
         onChange={(r) => setGrid(r.target.value)}
       >
-        { ["1x1", "2x1", "3x2", "4x3", "5x3", "mozaic" ].map(f => <MenuItem value={f}>{f}</MenuItem>) }
+        { ["1x1", "2x1", "3x2", "4x3", "5x3", "mozaic" ].map(f => <MenuItem key={"TF-2-"+f} value={f}>{f}</MenuItem>) }
       </TextField>
       <TextField
+        key={"TF-3"}
         SelectProps={{ 
           MenuProps : { disableScrollLock: true }
         }}
@@ -868,6 +894,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         <MenuItem value={1} disabled={!hasWarning.length} onClick={() => selectWithWarnings(false)}>{"Select images with no warning"}</MenuItem> 
         <MenuItem value={2} disabled={!hasWarning.length}  onClick={() => selectWithWarnings()}>{"Select images with warning"}</MenuItem> 
         <MenuItem value={5} disabled={["all","warning"].includes(filter)} onClick={() => selectFromFilter()} >{"Select images from filter"}</MenuItem> 
+        <MenuItem value={6} disabled={!selectedItems.length} onClick={selectEveryOtherImage}>{"Select every other image from current"}</MenuItem>
         <hr/>
         <MenuItem value={61} disabled={!selectedItems.length} onClick={handleDeleteAnnotations}>Remove annotations in selected images</MenuItem>
         <hr/>
@@ -887,6 +914,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
         <MenuItem value={4} disabled={!selectedItems.length} onClick={() => setShowSettings(true)}>{"Run SCAM on selection"}</MenuItem>
       </TextField>
       <TextField
+        key={"TF-4"}
         SelectProps={{ 
           MenuProps : { disableScrollLock: true }
         }}
