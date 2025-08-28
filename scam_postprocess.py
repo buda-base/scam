@@ -447,6 +447,7 @@ def get_cv2_corrections(folder_path, img_path, page_info, file_info, postprocess
     linear_factors = get_linear_factors(np.array(pil_img), bbox, postprocess_options["wb_patch_nsrgb_target"])
     exp_shift = min(linear_factors)
     wb_factors = np.array(linear_factors) / exp_shift
+    wb_factors = wb_factors.tolist()
     logging.debug("factors: (%f,%f,%f)" % (linear_factors[0], linear_factors[1], linear_factors[2]))
     return wb_factors, exp_shift, tags
 
