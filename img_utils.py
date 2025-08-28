@@ -463,6 +463,7 @@ def get_linear_factors(srgb_img, bbox, expected_nsRGB):
     # Avoid divide-by-zero
     eps = 1e-12
     scale_factors = expected_lnsrgb / np.maximum(median_lnsrgb, eps)
+    scale_factors = scale_factors.tolist()
     return scale_factors
 
 def apply_scale_factors_pil(pil_img, linear_rgb_factors):
