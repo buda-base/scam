@@ -1,6 +1,7 @@
 
 export type ConfigData = {  
   auth: string[];
+  apiUrl: string;
 }
 
 export type MinAreaRect = [number, number, number, number, number];
