@@ -21,8 +21,6 @@ import * as state from "./state"
 
 const debug = debugFactory("scam:app")
 
-export const apiUrl = 'https://scamqcapi.bdrc.io/'        
-
 export const discardDraft = async (folder: string) => {
   const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
   if(local.drafts && local.drafts[folder]) delete local.drafts[folder] 
@@ -336,12 +334,13 @@ function App() {
 
   // load config file onstartup
   useEffect(() => {
+    const defaultConfig = { auth:[], apiUrl:"" }
     axios.get('/config.json')
       .then(response => {
-        setConfig(response.data)
+        setConfig({ ...defaultConfig, ...response.data??{} })        
       })
       .catch(error => {
-        console.error(error);
+        setError("Could not find /public/config.json (see README for more details)")
       });
   }, [])
 
@@ -360,12 +359,12 @@ function App() {
       }
 
       setJson(true)
-      axios.post(apiUrl + "get_scam_json", {
+      axios.post(config.apiUrl + "get_scam_json", {
         folder_path: folder,
       }, {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: "Basic " + encode(config.auth.join(":"))
+          ...config.auth?.length === 2 ? { Authorization: "Basic " + encode(config.auth.join(":"))}:{}
         },
       })
       .then(response => {

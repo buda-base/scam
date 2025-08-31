@@ -19,7 +19,7 @@ import { ConfigData, LocalData, Orientation, Page, SavedScamData, ScamData, Scam
 import SettingsMenu from "./SettingsMenu";
 import * as state from "../state"
 import { ColorButton } from "./theme"
-import { apiUrl, discardDraft, scam_options } from "../App";
+import { discardDraft, scam_options } from "../App";
 import axios from "axios";
 import { withRotatedHandle, withoutRotatedHandle, recomputeCoords, samePage } from "./ScamImage";
 import CircularProgressWithLabel from "./CircularProgressWithLabel"
@@ -224,13 +224,13 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
     
     debug("publish", json, allScamData, toSave, configs)
 
-    axios.post(apiUrl + "save_scam_json", {
+    axios.post(config.apiUrl + "save_scam_json", {
       folder_path: folder,
       scam_json_obj: toSave
     }, {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: "Basic " + encode(config.auth.join(":"))
+        ...config.auth?.length === 2 ? { Authorization: "Basic " + encode(config.auth.join(":"))}:{}
       },
     })
     .then(response => {
@@ -543,14 +543,14 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
           }          
           try {
                       
-            const response = await axios.post(apiUrl + "run_scam_file", {
+            const response = await axios.post(config.apiUrl + "run_scam_file", {
               folder_path: folder,
               scam_options: options,
               file_info: image
             }, {
               headers: {
                 'Content-Type': 'application/json',
-                Authorization: "Basic " + encode(config.auth.join(":"))
+                ...config.auth?.length === 2 ? { Authorization: "Basic " + encode(config.auth.join(":"))}:{}
               },
               //signal: controller.signal
             })

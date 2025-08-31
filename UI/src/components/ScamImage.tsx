@@ -13,7 +13,7 @@ import { Checkbox, FormControlLabel, IconButton, MenuItem, Paper } from "@mui/ma
 import _ from "lodash";
 import useImage from "use-image";
 import { ConfigData, ScamImageData, KonvaPage, Page, ScamDataState, ScamData, SavedScamData, ScamOptionsMap, MinAreaRect } from "../types";
-import { apiUrl, scam_options } from "../App";
+import { scam_options } from "../App";
 import ImageMenu from "./ImageMenu";
 import * as state from "../state"
 
@@ -630,10 +630,10 @@ const ScamImage = (props: { isNotDone:boolean, isOutliar:boolean, isRandom:boole
 
       setKonvaImg(true)
 
-      const url = apiUrl + "get_thumbnail_bytes?thumbnail_path=" + encodeURIComponent(image.thumbnail_path)
+      const url = config.apiUrl + "get_thumbnail_bytes?thumbnail_path=" + encodeURIComponent(image.thumbnail_path)
       const conf: AxiosRequestConfig = {
         headers: {
-          Authorization: "Basic " + encode(config.auth.join(":"))
+          ...config.auth?.length === 2 ? { Authorization: "Basic " + encode(config.auth.join(":"))}:{}
         },
         responseType: 'blob',
         signal: controller.signal
@@ -787,14 +787,14 @@ const ScamImage = (props: { isNotDone:boolean, isOutliar:boolean, isRandom:boole
       }
       
 
-      axios.post(apiUrl + "run_scam_file", {
+      axios.post(config.apiUrl + "run_scam_file", {
         folder_path: folder,
         scam_options: opts,
         file_info: image
       }, {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: "Basic " + encode(config.auth.join(":"))
+          ...config.auth?.length === 2 ? { Authorization: "Basic " + encode(config.auth.join(":"))}:{}
         },
         signal: controller.signal
       })
