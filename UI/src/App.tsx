@@ -371,7 +371,7 @@ function App() {
         debug("get:",response.data);
 
         setJson(response.data)
-        setSearchParams({ folder })
+        setSearchParams({ folder: response.data.folder_path })
         setError("")
 
         if(response.data.options_list?.length >= 1) { 
