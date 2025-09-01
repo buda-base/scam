@@ -339,7 +339,7 @@ function App() {
       .then(response => {
         setConfig({ ...defaultConfig, ...response.data??{} })        
       })
-      .catch(error => {
+      .catch(() => {
         setError("Could not find /public/config.json (see README for more details)")
       });
   }, [])
