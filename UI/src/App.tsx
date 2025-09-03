@@ -13,7 +13,7 @@ import { useAtom } from 'jotai';
 
 import { ScamImageContainer, recomputeCoords, rotatePage90, withRotatedHandle, withoutRotatedHandle } from "./components/ScamImage"
 import './App.css'
-import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData, ScamOptions, ScamOptionsMap } from './types';
+import { ConfigData, LocalData, Page, SavedScamData, SavedScamDataMap, ScamData, ScamImageData, ScamOptions, ScamOptionsMap } from './types';
 import { BottomBar } from './components/BottomBar';
 import { TopBar } from './components/TopBar';
 import { ColorButton, theme } from "./components/theme"
@@ -241,6 +241,7 @@ function App() {
 
   const batchRotate = useCallback((angle:number) => {
     const newImages = [...images]
+    const tmpNewData:{[k:string]:ScamImageData} = {} 
     for(const im in newImages) {
       const image = newImages[im]
       if(selectedItems.includes(image.thumbnail_path)) {
@@ -280,12 +281,14 @@ function App() {
           }
         })
 
+        tmpNewData[image.thumbnail_path] = newData
       }
     }
+    if(typeof json === "object") setJson({ ...json, files:json.files.map(m => tmpNewData[m.thumbnail_path] ?? m) })
     setImages(newImages)
     setModified(true)
     setDrafted(false)
-  }, [selectedItems, images, allScamData, dispatch])
+  }, [selectedItems, images, allScamData, dispatch, json])
 
   useEffect(() => {
     debug("loca?",paramFolder,location)
