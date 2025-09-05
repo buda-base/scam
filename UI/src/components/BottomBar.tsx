@@ -525,7 +525,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
       go = true
       abort = false
 
-      let todo = json?.files.filter(m => (!m.checked || allScamData[m.thumbnail_path] && !allScamData[m.thumbnail_path].checked) && (!allScamData[m.thumbnail_path] || !allScamData[m.thumbnail_path]?.checked) && (!m.hidden || allScamData[m.thumbnail_path]?.visible)).map(m => allScamData[m.thumbnail_path]?.data ?? m)
+      let todo = json?.files.filter(m => (!m.checked || allScamData[m.thumbnail_path] && !allScamData[m.thumbnail_path].checked) && (!allScamData[m.thumbnail_path] || !allScamData[m.thumbnail_path]?.checked) && (!m.hidden || allScamData[m.thumbnail_path]?.visible)).map(m => allScamData[m.thumbnail_path]?.image ?? m)
       if(checkedRestrict) todo = todo.filter(m => selectedItems.includes(m.thumbnail_path))
       if(checkedRestrictWarning && hasWarning.length > 0) todo = todo.filter(m => hasWarning.find(im => im.thumbnail_path === m.thumbnail_path))
 

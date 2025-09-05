@@ -1112,6 +1112,7 @@ const ScamImage = (props: { isNotDone:boolean, isOutliar:boolean, isRandom:boole
     
     const rotation = (image.rotation + angle + 360) % 360    
     const newImage = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
+    if(newImage.pages) delete newImage.pages // #81
     //if(newImage.pages) delete newImage.pages
     setImageData(newImage)
     
@@ -1125,13 +1126,13 @@ const ScamImage = (props: { isNotDone:boolean, isOutliar:boolean, isRandom:boole
         newData.pages = newData.pages.map((p) => withRotatedHandle(rotatePage90(withoutRotatedHandle(p) as Page, angle, handleX, handleY), newData) as Page)
         if(newData.rects) delete newData.rects
       }
-      setTimeout(() => dispatch({
+      dispatch({
         type: 'UPDATE_DATA',
         payload: {
           id: image.thumbnail_path,
           val: { state: 'modified', data: newData }
         }
-      }), 150)
+      })
     }  
 
     setDrafted(false) 

@@ -239,6 +239,8 @@ function App() {
     setModified(true)
   }, [selectedItems, images])
 
+  const [ drafts, setDrafts ] = useState({} as  { [str:string] : SavedScamData })
+
   const batchRotate = useCallback((angle:number) => {
     const newImages = [...images]
     const tmpNewData:{[k:string]:ScamImageData} = {} 
@@ -250,9 +252,11 @@ function App() {
         const rotation = (image.rotation + angle + 360) % 360    
         
         newImages[im] = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
+        if(newImages[im].pages) delete newImages[im].pages // #81
         
-        // #55
+        // #55 then #81
         const newData = allScamData[image.thumbnail_path]?.data 
+          ?? (drafts && drafts[image.thumbnail_path]?.data)
           ?? (typeof json === "object" && json.files.find((im) => im?.thumbnail_path === image.thumbnail_path))
           ?? {}
                 
@@ -271,24 +275,23 @@ function App() {
           } else {
             toRotate = 0
           }
-        } while(toRotate);
-        
+        } while(toRotate);        
+
         dispatch({
           type: 'UPDATE_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { state: "modified", data: newData }
+            val: { state: "modified", data: newData, image: newImages[im] } // #81
           }
         })
 
         tmpNewData[image.thumbnail_path] = newData
       }
     }
-    if(typeof json === "object") setJson({ ...json, files:json.files.map(m => tmpNewData[m.thumbnail_path] ?? m) })
     setImages(newImages)
     setModified(true)
     setDrafted(false)
-  }, [selectedItems, images, allScamData, dispatch, json])
+  }, [selectedItems, images, allScamData, dispatch, json, drafts])
 
   useEffect(() => {
     debug("loca?",paramFolder,location)
@@ -304,7 +307,6 @@ function App() {
 
   const [ error, setError ] = useState("")
 
-  const [ drafts, setDrafts ] = useState({} as  { [str:string] : SavedScamData })
   const [ loadDraft, setLoadDraft ] = useState<boolean|undefined>(false)
 
   const [modified, setModified] = useAtom(state.modified)
