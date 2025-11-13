@@ -13,7 +13,7 @@ import { useAtom } from 'jotai';
 
 import { ScamImageContainer, recomputeCoords, rotatePage90, withRotatedHandle, withoutRotatedHandle } from "./components/ScamImage"
 import './App.css'
-import { ConfigData, LocalData, Page, SavedScamData, ScamData, ScamImageData, ScamOptions, ScamOptionsMap } from './types';
+import { ConfigData, LocalData, Page, SavedScamData, SavedScamDataMap, ScamData, ScamImageData, ScamOptions, ScamOptionsMap } from './types';
 import { BottomBar } from './components/BottomBar';
 import { TopBar } from './components/TopBar';
 import { ColorButton, theme } from "./components/theme"
@@ -239,8 +239,11 @@ function App() {
     setModified(true)
   }, [selectedItems, images])
 
+  const [ drafts, setDrafts ] = useState({} as  { [str:string] : SavedScamData })
+
   const batchRotate = useCallback((angle:number) => {
     const newImages = [...images]
+    const tmpNewData:{[k:string]:ScamImageData} = {} 
     for(const im in newImages) {
       const image = newImages[im]
       if(selectedItems.includes(image.thumbnail_path)) {
@@ -249,9 +252,11 @@ function App() {
         const rotation = (image.rotation + angle + 360) % 360    
         
         newImages[im] = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
+        if(newImages[im].pages) delete newImages[im].pages // #81
         
-        // #55
+        // #55 then #81
         const newData = allScamData[image.thumbnail_path]?.data 
+          ?? (drafts && drafts[image.thumbnail_path]?.data)
           ?? (typeof json === "object" && json.files.find((im) => im?.thumbnail_path === image.thumbnail_path))
           ?? {}
                 
@@ -270,22 +275,23 @@ function App() {
           } else {
             toRotate = 0
           }
-        } while(toRotate);
-        
+        } while(toRotate);        
+
         dispatch({
           type: 'UPDATE_DATA',
           payload: {
             id: image.thumbnail_path,
-            val: { state: "modified", data: newData }
+            val: { state: "modified", data: newData, image: newImages[im] } // #81
           }
         })
 
+        tmpNewData[image.thumbnail_path] = newData
       }
     }
     setImages(newImages)
     setModified(true)
     setDrafted(false)
-  }, [selectedItems, images, allScamData, dispatch])
+  }, [selectedItems, images, allScamData, dispatch, json, drafts])
 
   useEffect(() => {
     debug("loca?",paramFolder,location)
@@ -301,7 +307,6 @@ function App() {
 
   const [ error, setError ] = useState("")
 
-  const [ drafts, setDrafts ] = useState({} as  { [str:string] : SavedScamData })
   const [ loadDraft, setLoadDraft ] = useState<boolean|undefined>(false)
 
   const [modified, setModified] = useAtom(state.modified)
@@ -339,7 +344,7 @@ function App() {
       .then(response => {
         setConfig({ ...defaultConfig, ...response.data??{} })        
       })
-      .catch(error => {
+      .catch(() => {
         setError("Could not find /public/config.json (see README for more details)")
       });
   }, [])
@@ -371,7 +376,7 @@ function App() {
         debug("get:",response.data);
 
         setJson(response.data)
-        setSearchParams({ folder })
+        setSearchParams({ folder: response.data.folder_path })
         setError("")
 
         if(response.data.options_list?.length >= 1) { 

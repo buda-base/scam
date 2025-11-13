@@ -1112,8 +1112,9 @@ const ScamImage = (props: { isNotDone:boolean, isOutliar:boolean, isRandom:boole
     
     const rotation = (image.rotation + angle + 360) % 360    
     const newImage = {...image, thumbnail_info:{ ...image.thumbnail_info, rotation }, rotation }
+    if(newImage.pages) delete newImage.pages // #81
     //if(newImage.pages) delete newImage.pages
-    setImageData(newImage)    
+    setImageData(newImage)
     
     if(typeof scamData === "object") {      
       const newData = { ...scamData }
@@ -1139,7 +1140,7 @@ const ScamImage = (props: { isNotDone:boolean, isOutliar:boolean, isRandom:boole
     setLastRun(1)
     //if(!checked) setChecked(true)
     
-  }, [ modified, image, shouldRunAfter, checked, portrait, dimensions, scamData ])
+  }, [ modified, image, shouldRunAfter, checked, portrait, dimensions, scamData])
 
   const toggleVisible = useCallback(() => {
     dispatch({
