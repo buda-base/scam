@@ -72,37 +72,62 @@ def get_sequence_info(scam_json, apply_resequence=True, sort_key=None):
         pages = get_output_pages(file_info)
         if pages is None:
             continue
-        nb_pages = max(1, len(pages)) # 0 counts for 1
+        nb_pages = max(1, len(pages))  # 0 counts for 1
         img_path_to_nb_output_pages[img_path] = nb_pages
         max_nb_pages = max(max_nb_pages, nb_pages)
+
     if sort_key is None:
-        sort_key = natsort_keygen(alg=ns.IC|ns.INT)
+        sort_key = natsort_keygen(alg=ns.IC | ns.INT)
+
     sorted_img_paths = sorted(list(img_path_to_nb_output_pages.keys()), key=sort_key)
+
+    # NEW: detect local 3-up pairs, only used in "auto" mode
+    pair_starts = set()  # indices in sorted_img_paths where a 3-up recto is followed by a 3-up verso
+    resequenced_in_auto = False
+
     if apply_resequence == "auto":
         if max_nb_pages < 3:
             apply_resequence = False
-            logging.info("no image has more than 3 pages, no need to apply resequencing")
+            logging.info("no image has more than 2 pages, no need to apply resequencing")
         else:
-            # check if we can find at least two consecutive images with the same number of pages > 3:
-            previous_nb_pages = 0
-            for img_path in sorted_img_paths:
-                nb_pages = img_path_to_nb_output_pages[img_path]
-                if nb_pages > 2 and nb_pages == previous_nb_pages:
-                    logging.info("applying resequencing because of same number of images %d > 2 for %s and previous one", nb_pages, img_path)
-                    apply_resequence = True
-                    break
-                previous_nb_pages = nb_pages
-            logging.info("not applying resequencing")
+            i = 0
+            while i < len(sorted_img_paths) - 1:
+                a = sorted_img_paths[i]
+                b = sorted_img_paths[i + 1]
+                na = img_path_to_nb_output_pages[a]
+                nb = img_path_to_nb_output_pages[b]
+                # Only pair when BOTH are 3-up-or-more AND they match (typical 3-up rectos then versos)
+                if na >= 3 and nb == na:
+                    pair_starts.add(i)
+                    resequenced_in_auto = True
+                    i += 2  # consume the pair
+                else:
+                    i += 1
+            apply_resequence = resequenced_in_auto
+            if apply_resequence:
+                logging.info("applying resequencing in AUTO mode for %d local pair(s)", len(pair_starts))
+            else:
+                logging.info("not applying resequencing")
+
     if not apply_resequence:
+        # Plain sequential numbering for every image
         cur_seq = 1
         for img_path in sorted_img_paths:
             seqs = []
             res[img_path] = seqs
-            for i in range(img_path_to_nb_output_pages[img_path]):
+            for _ in range(img_path_to_nb_output_pages[img_path]):
                 seqs.append(cur_seq)
                 cur_seq += 1
-    else:
-        cur_seq = 1
+        return res, False  # resequenced_in_auto is False in this branch
+
+    # Resequencing enabled:
+    # If we're here because of AUTO: only resequence the detected local pairs, keep everything else sequential.
+    # If apply_resequence is a plain True (explicit), we keep the old global behavior but improved to avoid
+    # disrupting 2-up unless explicitly desired. If you never call with True manually, you can simplify further.
+    cur_seq = 1
+
+    if apply_resequence == True and not pair_starts:
+        # Global behavior (legacy): interleave recto/verso for ALL images with nb_pages > 1
         recto_img_path = None
         for img_path in sorted_img_paths:
             nb_pages = img_path_to_nb_output_pages[img_path]
@@ -115,10 +140,8 @@ def get_sequence_info(scam_json, apply_resequence=True, sort_key=None):
                 continue
             nb_pages_recto = img_path_to_nb_output_pages[recto_img_path]
             if nb_pages_recto < nb_pages:
-                # we assume that there are always more rectos than versos. If we encounter the opposite, we just
-                # sequence normally and output a warning
                 res[recto_img_path] = []
-                for i in range(nb_pages_recto):
+                for _ in range(nb_pages_recto):
                     res[recto_img_path].append(cur_seq)
                     cur_seq += 1
                 recto_img_path = img_path
@@ -134,15 +157,45 @@ def get_sequence_info(scam_json, apply_resequence=True, sort_key=None):
                     res[img_path].append(cur_seq)
                     cur_seq += 1
             recto_img_path = None
-        
-        # Fix for when the last page is a recto without a matching verso
+
         if recto_img_path:
             res[recto_img_path] = []
-            for i in range(img_path_to_nb_output_pages[recto_img_path]):
+            for _ in range(img_path_to_nb_output_pages[recto_img_path]):
                 res[recto_img_path].append(cur_seq)
                 cur_seq += 1
+        return res, True
 
-    return res, apply_resequence
+    # AUTO local-pair resequencing:
+    i = 0
+    n = len(sorted_img_paths)
+    while i < n:
+        if i in pair_starts:
+            recto = sorted_img_paths[i]
+            verso = sorted_img_paths[i + 1]  # safe: pair_starts only contains valid starts
+            nr = img_path_to_nb_output_pages[recto]
+            nv = img_path_to_nb_output_pages[verso]
+            res[recto] = []
+            res[verso] = []
+            # Interleave within the pair only
+            for k in range(max(nr, nv)):
+                if k < nr:
+                    res[recto].append(cur_seq)
+                    cur_seq += 1
+                if k < nv:
+                    res[verso].append(cur_seq)
+                    cur_seq += 1
+            i += 2
+        else:
+            # Leave untouched (strictly sequential)
+            img_path = sorted_img_paths[i]
+            res[img_path] = []
+            for _ in range(img_path_to_nb_output_pages[img_path]):
+                res[img_path].append(cur_seq)
+                cur_seq += 1
+            i += 1
+
+    return res, resequenced_in_auto
+
 
 def get_direction(pages):
     """
