@@ -300,10 +300,16 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
             img_bytes = f.read()
         img_pil = Image.open(io.BytesIO(img_bytes))
 
+        file_size = file_stats.st_size
+        if (lastfour == ".jpg" or lastfour == "jpeg")
+            img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes, copy=mozjpeg_lossless_optimization.COPY_MARKERS.ICC)
+            file_size = len(img_bytes)
+
         try:
-            if (lastfour == ".jpg" or lastfour == "jpeg") and file_stats.st_size < 800 * 1024:
+            if (lastfour == ".jpg" or lastfour == "jpeg") and file_size < 800 * 1024:
                 ext = ".jpg"
-                img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes)
+                # img_bytes already set
+                logging.info("not reencoding %s" % file)
             elif (lastfour == ".tif" or lastfour == "tiff") and file_stats.st_size < 800 * 1024 and img_pil.mode == "1" and img_pil.info.get('compression', 'None') == "group4":
                 ext = ".tif"
             else:
