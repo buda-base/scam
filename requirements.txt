@@ -4,7 +4,7 @@ torchvision
 opencv-python
 boto3
 rawpy
-mozjpeg-lossless-optimization
+mozjpeg-lossless-optimization >= 1.3.0
 tqdm
 numpy
 flask
