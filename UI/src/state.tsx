@@ -105,3 +105,6 @@ export const loadThumbnails = atom(true);
 export const brighten = atom(0)
 export const contrast = atom(0)
 export const hideAnno = atom(false);
+
+// Add at the end of the file, before the exports
+export const migrationComplete = atom(false);

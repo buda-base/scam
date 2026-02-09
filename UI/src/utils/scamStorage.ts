@@ -64,28 +64,29 @@ export const setScamUIData = async (data: LocalData): Promise<boolean> => {
 /**
  * Migrate existing localStorage data to IndexedDB on first load
  * Call this once at app startup
+ * Returns true if migration was performed
  */
-export const migrateScamUIToIndexedDB = async (): Promise<void> => {
-  try {
-    // Check if we already have data in IndexedDB
-    const existingData = await scamStorage.getItem('scamUI');
-    if (existingData) {
-      console.log('scamUI data already in IndexedDB');
-      return;
-    }
-    
-    // Migrate from localStorage
-    const localStorageData = localStorage.getItem('scamUI');
-    if (localStorageData) {
-      const data = JSON.parse(localStorageData) as LocalData;
-      await scamStorage.setItem('scamUI', data);
-      console.log('✓ Successfully migrated scamUI data from localStorage to IndexedDB');
+export const migrateScamUIToIndexedDB = async (): Promise<boolean> => {
+    try {
+      // Check if we already have data in IndexedDB
+      const existingData = await scamStorage.getItem('scamUI');
+      if (existingData) {
+        console.log('scamUI data already in IndexedDB');
+        return false; // No migration needed
+      }
       
-      // Optional: keep localStorage as backup for now
-      // localStorage.removeItem('scamUI');
+      // Migrate from localStorage
+      const localStorageData = localStorage.getItem('scamUI');
+      if (localStorageData) {
+        const data = JSON.parse(localStorageData) as LocalData;
+        await scamStorage.setItem('scamUI', data);
+        console.log('✓ Successfully migrated scamUI data from localStorage to IndexedDB');
+        return true; // Migration performed
+      }
+      
+      return false; // No data to migrate
+    } catch (error) {
+      console.error('Error during migration:', error);
+      return false;
     }
-  } catch (error) {
-    console.error('Error during migration:', error);
-  }
 };
-

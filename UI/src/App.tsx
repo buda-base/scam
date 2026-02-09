@@ -19,6 +19,7 @@ import { TopBar } from './components/TopBar';
 import { ColorButton, theme } from "./components/theme"
 import * as state from "./state"
 import { getScamUIData, setScamUIData, migrateScamUIToIndexedDB } from './utils/scamStorage';
+import { migrationComplete } from "./state";
 
 const debug = debugFactory("scam:app")
 
@@ -63,6 +64,7 @@ function App() {
   const paramFolder = searchParams.get("folder") || "";
   const [ folder, setFolder ] = useState(paramFolder);
   
+  const [isMigrationComplete, setMigrationComplete] = useAtom(migrationComplete)
   const [keyDown, setKeyDown] = useAtom(state.keyDown)
 
   const [selectedItems, setSelectedItems] = useState<string[]>([])
@@ -338,6 +340,15 @@ function App() {
     await setScamUIData(local);
   }, [ folder ])
 
+  // Migrate localStorage to IndexedDB on startup
+  useEffect(() => {
+    const performMigration = async () => {
+      await migrateScamUIToIndexedDB();
+      setMigrationComplete(true);
+    };
+    performMigration();
+  }, []);
+
   // load config file onstartup
   useEffect(() => {
     const defaultConfig = { auth:[], apiUrl:"" }
@@ -348,9 +359,6 @@ function App() {
       .catch(() => {
         setError("Could not find /public/config.json (see README for more details)")
       });
-    
-    // Migrate localStorage data to IndexedDB on first load
-    migrateScamUIToIndexedDB();
   }, [])
 
   useEffect( () => {
@@ -437,6 +445,8 @@ function App() {
   
   useEffect(() => {
     const loadDraftData = async () => {
+      if (!isMigrationComplete) return; // Wait for migration
+      
       debug("folder!", folder, loadDraft)    
       setJson(false)
       setModified(false)
@@ -461,7 +471,7 @@ function App() {
       }
     };
     loadDraftData();
-  }, [folder])
+  }, [folder, isMigrationComplete])
 
   const setOptions = (options:ScamOptions) => {
     //debug("options:", options)
@@ -515,6 +525,8 @@ function App() {
 
   useEffect(() => {
     const loadDraftOptions = async () => {
+      if (!isMigrationComplete) return; // Wait for migration
+      
       const local = await getScamUIData();
       const hasDraft = local.drafts || {};
       if(loadDraft) {
@@ -526,7 +538,7 @@ function App() {
       }
     };
     loadDraftOptions();
-  }, [loadDraft])
+  }, [loadDraft, isMigrationComplete])
   
   useEffect(() => {
     if(typeof json === 'object' && jsonPath != json.folder_path) setJsonPath(json.folder_path)

@@ -13,6 +13,7 @@ import * as state from "../state"
 import { SaveButtons } from "./BottomBar";
 import { ConfigData, LocalData, ScamData, ScamImageData } from "../types";
 import { getScamUIData } from "../utils/scamStorage";
+import { migrationComplete } from "../state";
 
 const debug = debugFactory("scam:tbar")
 
@@ -27,6 +28,7 @@ export const TopBar = (props: { images:ScamImageData[], folder:string, config: C
   const [modified, setModified] = useAtom(state.modified)
   const [drafted, setDrafted] = useAtom(state.drafted)
   const [published, setPublished] = useAtom(state.published)
+  const [isMigrationComplete] = useAtom(migrationComplete)
     
   const theme = useTheme()
   
@@ -37,13 +39,15 @@ export const TopBar = (props: { images:ScamImageData[], folder:string, config: C
   const [sessions, setSessions] = useState<string[]>([])
 
   useEffect(() => {
+    if (!isMigrationComplete) return; // Wait for migration
+    
     const loadSessions = async () => {
       const local = await getScamUIData();
       const hasSessions = Object.keys(local.sessions || {});
       setSessions(hasSessions);
     };
     loadSessions();
-  }, [])
+  }, [isMigrationComplete])
 
   const handleOpen = useCallback(() => {    
     if(!jsonPath.match(new RegExp("^"+path+"/?$")) || error) {
