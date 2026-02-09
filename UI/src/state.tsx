@@ -6,6 +6,9 @@ import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction
 
 const debug = debugFactory("scam:state")
 
+// Initial load from localStorage (synchronous) for default values
+// After migration to IndexedDB, both sources will have the data
+// Future updates use IndexedDB via getScamUIData/setScamUIData
 const hasCustomOptions:ScamOptions|undefined = (JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).options
 
 // global settings

@@ -12,6 +12,7 @@ import { ColorButton } from "./theme";
 import * as state from "../state"
 import { SaveButtons } from "./BottomBar";
 import { ConfigData, LocalData, ScamData, ScamImageData } from "../types";
+import { getScamUIData } from "../utils/scamStorage";
 
 const debug = debugFactory("scam:tbar")
 
@@ -36,8 +37,12 @@ export const TopBar = (props: { images:ScamImageData[], folder:string, config: C
   const [sessions, setSessions] = useState<string[]>([])
 
   useEffect(() => {
-    const hasSessions = Object.keys(((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).sessions || {} ))
-    setSessions(hasSessions)
+    const loadSessions = async () => {
+      const local = await getScamUIData();
+      const hasSessions = Object.keys(local.sessions || {});
+      setSessions(hasSessions);
+    };
+    loadSessions();
   }, [])
 
   const handleOpen = useCallback(() => {    
