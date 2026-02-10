@@ -35,6 +35,17 @@ export const getScamUIData = async (): Promise<LocalData> => {
 export const setScamUIData = async (data: LocalData): Promise<boolean> => {
   try {
     await scamStorage.setItem('scamUI', data);
+    
+    // Also keep options in localStorage for synchronous initialization in state.tsx
+    // This ensures custom settings are restored on browser restart
+    try {
+      const optionsBackup = { options: data.options };
+      localStorage.setItem("scamUI_options", JSON.stringify(optionsBackup));
+    } catch (e) {
+      // If localStorage fails for options, it's not critical
+      console.warn('Could not backup options to localStorage:', e);
+    }
+    
     return true;
   } catch (error) {
     console.error('Error writing scamUI data to storage:', error);
@@ -67,26 +78,48 @@ export const setScamUIData = async (data: LocalData): Promise<boolean> => {
  * Returns true if migration was performed
  */
 export const migrateScamUIToIndexedDB = async (): Promise<boolean> => {
-    try {
-      // Check if we already have data in IndexedDB
-      const existingData = await scamStorage.getItem('scamUI');
-      if (existingData) {
-        console.log('scamUI data already in IndexedDB');
-        return false; // No migration needed
+  try {
+    // Check if we already have data in IndexedDB
+    const existingData = await scamStorage.getItem<LocalData>('scamUI');
+    if (existingData) {
+      console.log('scamUI data already in IndexedDB');
+      
+      // Still ensure options are in localStorage for sync initialization
+      if (existingData.options) {
+        try {
+          const optionsBackup = { options: existingData.options };
+          localStorage.setItem("scamUI_options", JSON.stringify(optionsBackup));
+        } catch (e) {
+          console.warn('Could not backup options to localStorage:', e);
+        }
       }
       
-      // Migrate from localStorage
-      const localStorageData = localStorage.getItem('scamUI');
-      if (localStorageData) {
-        const data = JSON.parse(localStorageData) as LocalData;
-        await scamStorage.setItem('scamUI', data);
-        console.log('✓ Successfully migrated scamUI data from localStorage to IndexedDB');
-        return true; // Migration performed
-      }
-      
-      return false; // No data to migrate
-    } catch (error) {
-      console.error('Error during migration:', error);
-      return false;
+      return false; // No migration needed
     }
+    
+    // Migrate from localStorage
+    const localStorageData = localStorage.getItem('scamUI');
+    if (localStorageData) {
+      const data = JSON.parse(localStorageData) as LocalData;
+      await scamStorage.setItem('scamUI', data);
+      
+      // Keep options in localStorage for synchronous initialization
+      if (data.options) {
+        try {
+          const optionsBackup = { options: data.options };
+          localStorage.setItem("scamUI_options", JSON.stringify(optionsBackup));
+        } catch (e) {
+          console.warn('Could not backup options to localStorage:', e);
+        }
+      }
+      
+      console.log('✓ Successfully migrated scamUI data from localStorage to IndexedDB');
+      return true; // Migration performed
+    }
+    
+    return false; // No data to migrate
+  } catch (error) {
+    console.error('Error during migration:', error);
+    return false;
+  }
 };

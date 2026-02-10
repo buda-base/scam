@@ -7,9 +7,10 @@ import { ScamImageData, SavedScamDataMap, ScamOptionsMap, ScamOptions, Direction
 const debug = debugFactory("scam:state")
 
 // Initial load from localStorage (synchronous) for default values
-// After migration to IndexedDB, both sources will have the data
-// Future updates use IndexedDB via getScamUIData/setScamUIData
-const hasCustomOptions:ScamOptions|undefined = (JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).options
+// We keep a backup of options in localStorage for this synchronous initialization
+// The full data (drafts, sessions, etc.) is in IndexedDB
+const localStorageBackup = localStorage.getItem("scamUI_options") || localStorage.getItem("scamUI") || "{}";
+const hasCustomOptions: ScamOptions | undefined = (JSON.parse(localStorageBackup) as LocalData).options;
 
 // global settings
 export const orientAtom = atom<Orientation>(hasCustomOptions?.orient || "horizontal") 
