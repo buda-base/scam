@@ -18,13 +18,15 @@ import { BottomBar } from './components/BottomBar';
 import { TopBar } from './components/TopBar';
 import { ColorButton, theme } from "./components/theme"
 import * as state from "./state"
+import { getScamUIData, setScamUIData, migrateScamUIToIndexedDB } from './utils/scamStorage';
+import { migrationComplete } from "./state";
 
 const debug = debugFactory("scam:app")
 
 export const discardDraft = async (folder: string) => {
-  const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+  const local = await getScamUIData();
   if(local.drafts && local.drafts[folder]) delete local.drafts[folder] 
-  localStorage.setItem("scamUI", JSON.stringify(local))
+  await setScamUIData(local);
 }
 
 export const scam_options: ScamOptionsMap = {
@@ -62,6 +64,7 @@ function App() {
   const paramFolder = searchParams.get("folder") || "";
   const [ folder, setFolder ] = useState(paramFolder);
   
+  const [isMigrationComplete, setMigrationComplete] = useAtom(migrationComplete)
   const [keyDown, setKeyDown] = useAtom(state.keyDown)
 
   const [selectedItems, setSelectedItems] = useState<string[]>([])
@@ -331,11 +334,20 @@ function App() {
   const [deselectAll, setDeselectAll] = useAtom(state.deselectAll)
 
   const saveSession = useCallback(async () => {
-    const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+    const local = await getScamUIData();
     if(!local.sessions) local.sessions = {}
     local.sessions[folder] = Date.now()
-    localStorage.setItem("scamUI", JSON.stringify(local))
+    await setScamUIData(local);
   }, [ folder ])
+
+  // Migrate localStorage to IndexedDB on startup
+  useEffect(() => {
+    const performMigration = async () => {
+      await migrateScamUIToIndexedDB();
+      setMigrationComplete(true);
+    };
+    performMigration();
+  }, []);
 
   // load config file onstartup
   useEffect(() => {
@@ -432,28 +444,34 @@ function App() {
 
   
   useEffect(() => {
-    debug("folder!", folder, loadDraft)    
-    setJson(false)
-    setModified(false)
-    setError("")
-    dispatch({ type: 'RESET_DATA' })
-    setImages([])
-    if(folder) {
-      const hasDraft = ((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) 
-      if(hasDraft[folder]?.images) setModified(true)
-      const theDraft = hasDraft[folder]?.images || {}
-      if(theDraft) { 
-        Object.values(theDraft).map(val => {
-          if(val.data?.pages) {
-            val.data.pages = val.data.pages.map(p => withRotatedHandle(p, val.data)) as Page[]      
-          }
-        })
+    const loadDraftData = async () => {
+      if (!isMigrationComplete) return; // Wait for migration
+      
+      debug("folder!", folder, loadDraft)    
+      setJson(false)
+      setModified(false)
+      setError("")
+      dispatch({ type: 'RESET_DATA' })
+      setImages([])
+      if(folder) {
+        const local = await getScamUIData();
+        const hasDraft = local.drafts || {};
+        if(hasDraft[folder]?.images) setModified(true)
+        const theDraft = hasDraft[folder]?.images || {}
+        if(theDraft) { 
+          Object.values(theDraft).map(val => {
+            if(val.data?.pages) {
+              val.data.pages = val.data.pages.map(p => withRotatedHandle(p, val.data)) as Page[]      
+            }
+          })
+        }
+        setConfigReady(hasDraft[folder]?.images ? false : undefined)
+        setDrafts( theDraft )
+        setLoadDraft( hasDraft[folder]?.images ? undefined : false )
       }
-      setConfigReady(hasDraft[folder]?.images ? false : undefined)
-      setDrafts( theDraft )
-      setLoadDraft( hasDraft[folder]?.images ? undefined : false )
-    }
-  }, [folder])
+    };
+    loadDraftData();
+  }, [folder, isMigrationComplete])
 
   const setOptions = (options:ScamOptions) => {
     //debug("options:", options)
@@ -506,15 +524,21 @@ function App() {
   }
 
   useEffect(() => {
-    const hasDraft = ((JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData ).drafts || {} ) 
-    if(loadDraft) {
-      const options = hasDraft[folder]?.options
-      if(options) {
-        setOptions(options)
-        setConfigReady(true)
+    const loadDraftOptions = async () => {
+      if (!isMigrationComplete) return; // Wait for migration
+      
+      const local = await getScamUIData();
+      const hasDraft = local.drafts || {};
+      if(loadDraft) {
+        const options = hasDraft[folder]?.options
+        if(options) {
+          setOptions(options)
+          setConfigReady(true)
+        }
       }
-    } 
-  }, [loadDraft])
+    };
+    loadDraftOptions();
+  }, [loadDraft, isMigrationComplete])
   
   useEffect(() => {
     if(typeof json === 'object' && jsonPath != json.folder_path) setJsonPath(json.folder_path)

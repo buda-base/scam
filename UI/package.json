@@ -23,6 +23,7 @@
     "jotai": "^2.2.2",
     "js-base64": "^3.7.5",
     "konva": "^9.2.0",
+    "localforage": "^1.10.0",
     "lodash": "^4.17.21",
     "prop-types": "^15.8.1",
     "react": "^18.2.0",

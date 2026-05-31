@@ -23,6 +23,7 @@ import { discardDraft, scam_options } from "../App";
 import axios from "axios";
 import { withRotatedHandle, withoutRotatedHandle, recomputeCoords, samePage } from "./ScamImage";
 import CircularProgressWithLabel from "./CircularProgressWithLabel"
+import { getScamUIData, setScamUIData } from "../utils/scamStorage";
 
 const debug = debugFactory("scam:bbar")
 
@@ -77,9 +78,9 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
     else setScamOptionsSelected(opts)    
     if(globalScamOptionsUpdate != false) setGlobalScamOptionsUpdate(false)
 
-    const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+    const local = await getScamUIData();
     local.options = { orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, expandToFixed }
-    localStorage.setItem("scamUI", JSON.stringify(local))
+    await setScamUIData(local);
 
   }, [orient, direc, minRatio, maxRatio, nbPages, minAreaRatio, maxAreaRatio, minSquarish, fixedWidth, fixedHeight, cutAtFixed, expandToFixed, selectedItems.length, checkedRestrict, globalScamOptionsUpdate, 
       setScamOptions, setScamOptionsSelected, setGlobalScamOptionsUpdate])   
@@ -99,7 +100,7 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
   */
  
   const saveDraft = useCallback(async () => {
-    const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+    const local = await getScamUIData();
     if(!local.drafts) local.drafts = {}
     const images = local.drafts[folder]?.images ?? {}
     local.drafts[folder] = { 
@@ -120,9 +121,11 @@ export const SaveButtons = (props: { drafts?:{ [str:string] : SavedScamData }, f
       }, {}) },
       options: orient != "custom" ? { orient: orient as Orientation} : scamOptions // better keep global options now that custom options saved to localStorage // { ...selectedItems.length>0?scamOptionsSelected:scamOptions }
     }
-    localStorage.setItem("scamUI", JSON.stringify(local))
+    const success = await setScamUIData(local);
     //setModified(false)
-    setDrafted(true)
+    if (success) {
+      setDrafted(true);
+    }
   }, [allScamData, folder, orient, scamOptions, scamOptionsSelected, selectedItems])
 
 
@@ -385,7 +388,7 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   const [grid, setGrid] = useAtom(state.grid)
   useEffect(() => {
     const restoreGrid = async () => {
-      const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+      const local = await getScamUIData();
       if(local.grid) setGrid(local.grid)
     }
     restoreGrid()
@@ -417,9 +420,9 @@ export const BottomBar = (props: { drafts?:{ [str:string] : SavedScamData }, fol
   }
 
   const saveGrid = useCallback(async () => {
-    const local: LocalData = await JSON.parse(localStorage.getItem("scamUI") || "{}") as LocalData
+    const local = await getScamUIData();
     local.grid = grid
-    localStorage.setItem("scamUI", JSON.stringify(local))
+    await setScamUIData(local);
   }, [ grid])
 
   useEffect(() => { 
