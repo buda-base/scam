@@ -1,5 +1,6 @@
 import argparse
 import csv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 import os
 import logging
@@ -404,7 +405,7 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
                 binary_file.write(b)
     output_file_info["output_img_path"] = output_path
 
-def postprocess_folder(folder_path, postprocess_options):
+def postprocess_folder(folder_path, postprocess_options, workers=1):
     """
     post-processes a folder for use with the API
 
@@ -456,11 +457,19 @@ def postprocess_folder(folder_path, postprocess_options):
             add_prefix = False
         else:
             add_prefix = True
-    for file_info in tqdm(scam_json["files"]):
-        if not add_prefix:
-            derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, None, img_path_to_corr[file_info["img_path"]])
-        elif file_info["img_path"] in sequence_info:
-            derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, sequence_info[file_info["img_path"]], img_path_to_corr[file_info["img_path"]])
+    def _process(file_info):
+        prefixes = None if not add_prefix else sequence_info.get(file_info["img_path"])
+        if not add_prefix or file_info["img_path"] in sequence_info:
+            derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, prefixes, img_path_to_corr[file_info["img_path"]])
+
+    if workers > 1:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_process, fi): fi for fi in scam_json["files"]}
+            for future in tqdm(as_completed(futures), total=len(futures)):
+                future.result()  # re-raise any exception from the worker
+    else:
+        for file_info in tqdm(scam_json["files"]):
+            _process(file_info)
     scam_log_s3_key = "scam_logs/"+scam_json["folder_path"]+"scam_log.json"
     logging.info("write scam log on %s", scam_log_s3_key)
     scam_log_json_str = json.dumps(scam_log_json, indent=2)
@@ -646,6 +655,7 @@ def postprocess_csv():
     parser = argparse.ArgumentParser(description="SCAM postprocessor")
     parser.add_argument("csv", help="path to the CSV file listing folders to process")
     parser.add_argument("--compress", action="store_true", help="output JPEG at quality 85 run through mozjpeg (binary images stay G4 TIFF)")
+    parser.add_argument("--workers", type=int, default=1, metavar="N", help="number of parallel worker threads (default: 1)")
     args = parser.parse_args()
 
     with open(args.csv, newline='') as csvfile:
@@ -659,7 +669,7 @@ def postprocess_csv():
                 postprocess_options["resequence"] = False
             if args.compress:
                 postprocess_options["compress_output"] = True
-            postprocess_folder(folder, postprocess_options)
+            postprocess_folder(folder, postprocess_options, workers=args.workers)
 
 if __name__ == '__main__':
     postprocess_csv()
