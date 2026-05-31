@@ -157,6 +157,28 @@ def encode_img_uncompressed(img, try_grayscale=False) -> (bytes, str):
                 return None, ".tiff"
         return output.getvalue(), ".tiff"
 
+def encode_img_compressed_simple(img, try_grayscale=False, quality=85) -> (bytes, str):
+    """
+    returns the bytes of a JPEG-encoded image run through mozjpeg at the given quality,
+    and the ".jpg" extension.
+    Binary (mode "1") images are encoded as G4 TIFF and return ".tif" instead.
+    """
+    if img.mode == "RGBA":
+        img = img.convert("RGB")
+    if img.mode == "RGB" and try_grayscale and not is_color_image(img):
+        img = img.convert("L")
+    if img.mode == "1":
+        with io.BytesIO() as output:
+            img.save(output, format="TIFF", compression="group4")
+            return output.getvalue(), ".tif"
+    if img.mode not in ["RGB", "L"]:
+        img = img.convert("RGB")
+    with io.BytesIO() as output:
+        img.save(output, format="JPEG", quality=quality, optimize=True, progressive=True, subsampling="4:2:2", comment="")
+        jpg_bytes = output.getvalue()
+    jpg_bytes = mozjpeg_lossless_optimization.optimize(jpg_bytes)
+    return jpg_bytes, ".jpg"
+
 def encode_img(img, target_mode=None, mozjpeg_optimize=True, shrink_factor=1.0, lum_factor=1.0, quality=85):
     """
     returns the bytes of the encoded image (jpg or g4 tiff if binary)

@@ -1,3 +1,4 @@
+import argparse
 import csv
 import sys
 import os
@@ -5,7 +6,7 @@ import logging
 import mozjpeg_lossless_optimization
 from PIL import Image
 from tqdm import tqdm
-from img_utils import encode_img_uncompressed, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma, rotate_mar
+from img_utils import encode_img_uncompressed, encode_img_compressed_simple, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma, rotate_mar
 from scam_preprocess import get_pil_img
 from utils import upload_to_s3, gets3blob, get_sha256, get_scam_json
 from raw_utils import register_raw_opener, is_likely_raw, get_np_from_raw, get_factors_from_raw
@@ -43,6 +44,7 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     # if no exposuretime is found, it's assumed that all the images have the same exposure
     "compensate_exposure": True,
     "try_grayscale": False,
+    "compress_output": False, # if True, output JPEG at quality 85 run through mozjpeg (binary images remain G4 TIFF)
 }
 
 # pages are 
@@ -331,7 +333,10 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
     # page_position starts at 1
     suffix_letter = chr(96+page_position)
     if img_ext is None:
-        img_ext = ".tiff"
+        if postprocess_options.get("compress_output") and (pil_img is None or pil_img.mode != "1"):
+            img_ext = ".jpg"
+        else:
+            img_ext = ".tiff"
     extract = pil_img
     output_file_info["scam_page_info"] = page_info
     output_file_info["page_in_file"] = page_position
@@ -364,7 +369,10 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
         logging.info("  write to s3 key %s", s3key)
         if not postprocess_options["dryrun"]:
             if img_bytes is None:
-                img_bytes, img_ext = encode_img_uncompressed(extract, postprocess_options["try_grayscale"])
+                if postprocess_options.get("compress_output"):
+                    img_bytes, img_ext = encode_img_compressed_simple(extract, postprocess_options["try_grayscale"])
+                else:
+                    img_bytes, img_ext = encode_img_uncompressed(extract, postprocess_options["try_grayscale"])
             if img_bytes is None:
                 output_file_info["error"] = "could not encode image"
                 logging.error(" got no resulting image for %s", json.dumps(page_info))
@@ -386,7 +394,10 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
         logging.info("  write to local file %s", local_path)
         if not postprocess_options["dryrun"]:
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            b, ext = encode_img_uncompressed(extract)
+            if postprocess_options.get("compress_output"):
+                b, ext = encode_img_compressed_simple(extract, postprocess_options["try_grayscale"])
+            else:
+                b, ext = encode_img_uncompressed(extract)
             sha256 = get_sha256(b)
             output_file_info["sha256"] = sha256
             with open(local_path, "wb") as binary_file:
@@ -632,18 +643,22 @@ def get_white_patch_corrections(scam_json, postprocess_options):
     return res
 
 def postprocess_csv():
-    if len(sys.argv) <= 1:
-        print("nothing to do, please pass the path to a csv file")
+    parser = argparse.ArgumentParser(description="SCAM postprocessor")
+    parser.add_argument("csv", help="path to the CSV file listing folders to process")
+    parser.add_argument("--compress", action="store_true", help="output JPEG at quality 85 run through mozjpeg (binary images stay G4 TIFF)")
+    args = parser.parse_args()
 
-    with open(sys.argv[1], newline='') as csvfile:
+    with open(args.csv, newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
             folder = row[0]
             if not folder.endswith('/'):
                 folder += "/"
-            postprocess_options=DEFAULT_POSTPROCESS_OPTIONS.copy()
+            postprocess_options = DEFAULT_POSTPROCESS_OPTIONS.copy()
             if len(row) > 1 and "keep in order" in row[1]:
                 postprocess_options["resequence"] = False
+            if args.compress:
+                postprocess_options["compress_output"] = True
             postprocess_folder(folder, postprocess_options)
 
 if __name__ == '__main__':
