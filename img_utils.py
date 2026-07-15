@@ -64,12 +64,60 @@ def rotate_warp_affine_cv2(opencv_img, rect):
         # for some reason warp affine doesn't work on boolean so we convert the matrix to integers
         opencv_img = opencv_img.astype(np.uint8)
     center, (width, height), angle = rect
+    out_w = int(width)
+    out_h = int(height)
     if angle > 45:
-        angle = angle-90
+        angle = angle - 90
+        out_w, out_h = int(height), int(width)
+
+    img_h, img_w = opencv_img.shape[:2]
+    box = cv2.boxPoints(rect)
+    pad = 4  # INTER_CUBIC neighbourhood
+    x_min = max(0, int(np.floor(np.min(box[:, 0]))) - pad)
+    y_min = max(0, int(np.floor(np.min(box[:, 1]))) - pad)
+    x_max = min(img_w, int(np.ceil(np.max(box[:, 0]))) + pad)
+    y_max = min(img_h, int(np.ceil(np.max(box[:, 1]))) + pad)
+
+    if x_max <= x_min or y_max <= y_min:
+        sub_img = opencv_img
+        center_local = center
+    else:
+        sub_img = opencv_img[y_min:y_max, x_min:x_max]
+        center_local = (center[0] - x_min, center[1] - y_min)
+
+    M = cv2.getRotationMatrix2D(center_local, angle, 1.0)
+    res = cv2.warpAffine(
+        sub_img,
+        M,
+        (sub_img.shape[1], sub_img.shape[0]),
+        flags=cv2.INTER_CUBIC,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0,
+    )
+    res = cv2.getRectSubPix(res, (out_w, out_h), center_local)
+    if binary:
+        res = res.astype(bool)
+    return res
+
+
+def rotate_warp_affine_cv2_full_frame(opencv_img, rect):
+    """Original full-frame warp path, kept for regression checks."""
+    binary = opencv_img.dtype == bool
+    if binary:
+        opencv_img = opencv_img.astype(np.uint8)
+    center, (width, height), angle = rect
+    if angle > 45:
+        angle = angle - 90
         width, height = height, width
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    # or cv2.INTER_LANCZOS4, but CUBIC looks slightly better(?)
-    res = cv2.warpAffine(opencv_img, M, (opencv_img.shape[1], opencv_img.shape[0]), flags=cv2.INTER_CUBIC)
+    res = cv2.warpAffine(
+        opencv_img,
+        M,
+        (opencv_img.shape[1], opencv_img.shape[0]),
+        flags=cv2.INTER_CUBIC,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0,
+    )
     res = cv2.getRectSubPix(res, (int(width), int(height)), center)
     if binary:
         res = res.astype(bool)
@@ -135,6 +183,42 @@ def is_color_image(image: Image, colorness_threshold: int = 30, color_pixel_rati
 
     # Determine if the image is color based on the threshold
     return color_pixel_ratio > color_pixel_ratio_threshold
+
+def pil_to_vips_image(pil_img):
+    import pyvips
+
+    if pil_img.mode not in ["RGB", "L", "RGBA"]:
+        pil_img = pil_img.convert("RGB")
+    arr = np.ascontiguousarray(pil_img)
+    bands = arr.shape[2] if arr.ndim == 3 else 1
+    height, width = arr.shape[0], arr.shape[1]
+    return pyvips.Image.new_from_memory(arr.tobytes(), width, height, bands, "uchar")
+
+
+def encode_img_jxl(img, try_grayscale=False) -> (bytes, str):
+    """
+    Lossless JPEG-XL via libvips. Binary images are not supported here.
+    """
+    if img.mode == "1":
+        raise ValueError("binary images are not encoded as JXL")
+    if img.mode == "RGBA":
+        img = img.convert("RGB")
+    if img.mode == "RGB" and try_grayscale and not is_color_image(img):
+        img = img.convert("L")
+    vips_img = pil_to_vips_image(img)
+    icc = img.info.get("icc_profile")
+    if icc:
+        try:
+            vips_img = vips_img.copy(interpretation="srgb")
+        except Exception:
+            pass
+    save_kwargs = {"lossless": True, "effort": 7}
+    if icc:
+        try:
+            return vips_img.write_to_buffer(".jxl", profile=icc, **save_kwargs), ".jxl"
+        except TypeError:
+            pass
+    return vips_img.write_to_buffer(".jxl", **save_kwargs), ".jxl"
 
 def encode_img_uncompressed(img, try_grayscale=False) -> (bytes, str):
     """
