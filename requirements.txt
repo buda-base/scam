@@ -10,6 +10,7 @@ numpy
 flask
 flask-cors
 pillow >= 10.2.0
+pyvips >= 2.2.0
 Flask-CacheControl
 exifread
 natsort

@@ -4,6 +4,7 @@ from utils import list_img_keys, gets3blob, upload_to_s3, get_gzip_picked_bytes,
 from datetime import datetime
 import logging
 from PIL import Image
+from image_decode import decode_blob_to_pil, get_image_size_from_blob
 #from cal_sam_pickles import get_sam_output
 from img_utils import apply_exif_rotation, encode_thumbnail_img, get_best_mode, apply_icc
 from tqdm import tqdm
@@ -39,7 +40,7 @@ def get_all_img_paths(folder_path):
     return img_keys
 
 RAW_OPENER_REGISTERED = False
-def get_pil_img(folder_path, img_path, prefetcher=None):
+def get_pil_img(folder_path, img_path, prefetcher=None, max_dimension=None):
     global RAW_OPENER_REGISTERED
     blob = gets3blob(folder_path+img_path, prefetcher=prefetcher)
     if blob is None:
@@ -48,14 +49,18 @@ def get_pil_img(folder_path, img_path, prefetcher=None):
         print("register raw opener")
         register_raw_opener()
         RAW_OPENER_REGISTERED = True
-    img = Image.open(blob)
-    return img
+    return decode_blob_to_pil(blob, max_dimension=max_dimension, img_path=img_path)
 
 def save_thumbnail(folder_path, img_path, pil_img, preprocess_options):
-    ratio = min(preprocess_options["thumbnail_resize"] / pil_img.width, preprocess_options["thumbnail_resize"] / pil_img.height)
-    new_width = int(pil_img.width * ratio)
-    new_height = int(pil_img.height * ratio)
-    pil_img = pil_img.resize((new_width, new_height), Image.LANCZOS)
+    max_dim = preprocess_options["thumbnail_resize"]
+    if max(pil_img.width, pil_img.height) > max_dim:
+        ratio = min(max_dim / pil_img.width, max_dim / pil_img.height)
+        new_width = int(pil_img.width * ratio)
+        new_height = int(pil_img.height * ratio)
+        pil_img = pil_img.resize((new_width, new_height), Image.LANCZOS)
+    else:
+        new_width = pil_img.width
+        new_height = pil_img.height
     ext = ".png" if get_best_mode(pil_img) == "1" else ".jpg"
     path = "thumbnails/"+folder_path+img_path+ext
     try:
@@ -112,16 +117,28 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
             thumbnail_w = None
             thumbnail_h = None
             try:
-                pil_img = get_pil_img(folder_path, img_path, prefetcher=prefetcher)
-                orig_height = pil_img.height
-                orig_width = pil_img.width
+                s3_key = folder_path + img_path
+                blob = prefetcher.get(s3_key)
+                orig_width, orig_height = get_image_size_from_blob(blob, img_path=img_path)
+                pil_img = decode_blob_to_pil(
+                    blob,
+                    max_dimension=preprocess_options["thumbnail_resize"],
+                    img_path=img_path,
+                )
                 thumbnail_path, thumbnail_w, thumbnail_h = save_thumbnail(folder_path, img_path, pil_img, preprocess_options)
                 if preprocess_options["use_exif_rotation"]:
                     pil_img, rotation = apply_exif_rotation(pil_img)
                 # TODO: handle preprocess_options["pre_rotate]
                 #pil_img = sanitize_for_preprocessing(pil_img)
                 if preprocess_options["run_sam"]:
-                    sam_res = run_sam(pil_img, preprocess_options)
+                    sam_img = decode_blob_to_pil(
+                        blob,
+                        max_dimension=preprocess_options["sam_resize"],
+                        img_path=img_path,
+                    )
+                    if preprocess_options["use_exif_rotation"]:
+                        sam_img, _ = apply_exif_rotation(sam_img)
+                    sam_res = run_sam(sam_img, preprocess_options)
             except Exception as e:
                 logging.error("error on %s/%s" % (folder_path, img_path), e)
                 continue

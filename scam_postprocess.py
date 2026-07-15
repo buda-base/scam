@@ -8,8 +8,8 @@ import threading
 import mozjpeg_lossless_optimization
 from PIL import Image
 from tqdm import tqdm
-from img_utils import encode_img_uncompressed, encode_img_compressed_simple, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma, rotate_mar
-from scam_preprocess import get_pil_img
+from img_utils import encode_img_uncompressed, encode_img_compressed_simple, encode_img_jxl, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma, rotate_mar
+from image_decode import decode_blob_to_pil
 from utils import upload_to_s3, gets3blob, get_sha256, get_scam_json, S3Prefetcher
 from raw_utils import register_raw_opener, is_likely_raw, get_np_from_raw, get_factors_from_raw
 from natsort import natsort_keygen, natsorted, ns
@@ -47,6 +47,7 @@ DEFAULT_POSTPROCESS_OPTIONS = {
     "compensate_exposure": True,
     "try_grayscale": False,
     "compress_output": False, # if True, output JPEG at quality 85 run through mozjpeg (binary images remain G4 TIFF)
+    "output_jxl": False, # if True, output lossless JPEG-XL via libvips (non-binary only, uncompressed path)
 }
 
 # pages are 
@@ -301,7 +302,7 @@ def derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, p
     if prefixes is not None and max(1, len(pages)) != len(prefixes):
         logging.error("len(pages) != len(prefixes):  %d != %d for %s", max(1, len(pages)), len(prefixes), file_info["img_path"])
         return
-    try_simple_copy = can_simple_copy(file_info, pages)
+    try_simple_copy = can_simple_copy(file_info, pages) and not postprocess_options.get("output_jxl")
     if postprocess_options["src_storage"] == "s3":
         if not postprocess_options["dryrun"]:
             try:
@@ -343,7 +344,9 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
     # page_position starts at 1
     suffix_letter = chr(96+page_position)
     if img_ext is None:
-        if postprocess_options.get("compress_output") and (pil_img is None or pil_img.mode != "1"):
+        if postprocess_options.get("output_jxl") and extract is not None and extract.mode != "1":
+            img_ext = ".jxl"
+        elif postprocess_options.get("compress_output") and (pil_img is None or pil_img.mode != "1"):
             img_ext = ".jpg"
         else:
             img_ext = ".tiff"
@@ -379,7 +382,9 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
         logging.info("  write to s3 key %s", s3key)
         if not postprocess_options["dryrun"]:
             if img_bytes is None:
-                if postprocess_options.get("compress_output"):
+                if postprocess_options.get("output_jxl") and extract.mode != "1":
+                    img_bytes, img_ext = encode_img_jxl(extract, postprocess_options["try_grayscale"])
+                elif postprocess_options.get("compress_output"):
                     img_bytes, img_ext = encode_img_compressed_simple(extract, postprocess_options["try_grayscale"])
                 else:
                     img_bytes, img_ext = encode_img_uncompressed(extract, postprocess_options["try_grayscale"])
@@ -404,7 +409,9 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
         logging.info("  write to local file %s", local_path)
         if not postprocess_options["dryrun"]:
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            if postprocess_options.get("compress_output"):
+            if postprocess_options.get("output_jxl") and extract.mode != "1":
+                b, ext = encode_img_jxl(extract, postprocess_options["try_grayscale"])
+            elif postprocess_options.get("compress_output"):
                 b, ext = encode_img_compressed_simple(extract, postprocess_options["try_grayscale"])
             else:
                 b, ext = encode_img_uncompressed(extract)
@@ -531,7 +538,7 @@ def get_cv2_corrections(folder_path, img_path, page_info, file_info, postprocess
     blob.seek(0)
     tags = exifread.process_file(blob, details=False)
     blob.seek(0)
-    pil_img = Image.open(blob)
+    pil_img = decode_blob_to_pil(blob, img_path=img_path)
     pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=True)
     bbox = get_bbox(page_info, file_info, pil_img.width, pil_img.height, add_file_info_rotation=True)
     linear_factors = get_linear_factors(np.array(pil_img), bbox, postprocess_options["wb_patch_nsrgb_target"])
@@ -598,18 +605,22 @@ def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, 
         np_img = get_np_from_raw(blob, params, False)
         return Image.fromarray(np_img), None, None
     else:
-        pil_img = Image.open(blob)
         ext = img_path[-4:].lower()
-        if try_simple_copy and pil_img.mode in ["RGB", "L", "1"] and ext in [".jpg", "jpeg", "tiff", ".tif"]:
-            logging.info("use simple copy on %s" % img_path)
+        if try_simple_copy and ext in [".jpg", "jpeg", "tiff", ".tif"]:
             blob.seek(0)
-            img_bytes = blob.read()
-            blob = None
-            if ext in [".jpg", "jpeg"]:
-                img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes)
-                return None, img_bytes, ".jpg"
-            else:
-                return None, img_bytes, ".tiff"
+            pil_probe = Image.open(blob)
+            if pil_probe.mode in ["RGB", "L", "1"]:
+                logging.info("use simple copy on %s" % img_path)
+                blob.seek(0)
+                img_bytes = blob.read()
+                blob = None
+                if ext in [".jpg", "jpeg"]:
+                    img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes)
+                    return None, img_bytes, ".jpg"
+                else:
+                    return None, img_bytes, ".tiff"
+        blob.seek(0)
+        pil_img = decode_blob_to_pil(blob, img_path=img_path)
         blob = None
         pil_img, icc_applied = sanitize_for_postprocessing(pil_img, force_apply_icc=postprocess_options["force_apply_icc"])
         if params and params != "auto" and postprocess_options["correct_non_raw"]:
@@ -672,6 +683,7 @@ def postprocess_csv():
     parser = argparse.ArgumentParser(description="SCAM postprocessor")
     parser.add_argument("csv", help="path to the CSV file listing folders to process")
     parser.add_argument("--compress", action="store_true", help="output JPEG at quality 85 run through mozjpeg (binary images stay G4 TIFF)")
+    parser.add_argument("--jxl", action="store_true", help="output lossless JPEG-XL for non-binary images (uncompressed path only)")
     parser.add_argument("--workers", type=int, default=1, metavar="N", help="number of parallel worker threads (default: 1)")
     args = parser.parse_args()
 
@@ -686,6 +698,8 @@ def postprocess_csv():
                 postprocess_options["resequence"] = False
             if args.compress:
                 postprocess_options["compress_output"] = True
+            if args.jxl:
+                postprocess_options["output_jxl"] = True
             postprocess_folder(folder, postprocess_options, workers=args.workers)
 
 if __name__ == '__main__':
