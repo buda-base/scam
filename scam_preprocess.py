@@ -1,10 +1,10 @@
 import csv
 import sys
-from utils import list_img_keys, gets3blob, upload_to_s3, get_gzip_picked_bytes, VERSION, save_scam_json
+from utils import list_img_keys, gets3blob, upload_to_s3, get_gzip_picked_bytes, VERSION, save_scam_json, S3Prefetcher
 from datetime import datetime
 import logging
 from PIL import Image
-from cal_sam_pickles import get_sam_output
+#from cal_sam_pickles import get_sam_output
 from img_utils import apply_exif_rotation, encode_thumbnail_img, get_best_mode, apply_icc
 from tqdm import tqdm
 from raw_utils import register_raw_opener
@@ -15,8 +15,8 @@ DEFAULT_PREPROCESS_OPTIONS = {
     "sam_resize": 1024,
     "thumbnail_resize": 512,
     "pre_rotate": 0,
-    "run_sam": True,
-    "use_exif_rotation": False,
+    "run_sam": False,
+    "use_exif_rotation": True,
     "grayscale_thumbnail": False
 }
 
@@ -39,9 +39,9 @@ def get_all_img_paths(folder_path):
     return img_keys
 
 RAW_OPENER_REGISTERED = False
-def get_pil_img(folder_path, img_path):
+def get_pil_img(folder_path, img_path, prefetcher=None):
     global RAW_OPENER_REGISTERED
-    blob = gets3blob(folder_path+img_path)
+    blob = gets3blob(folder_path+img_path, prefetcher=prefetcher)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
     if not RAW_OPENER_REGISTERED and img_path[-4:].lower() in [".nef", ".cr2", ".dng", ".arw", ".cr3"]:
@@ -93,48 +93,58 @@ def preprocess_folder(folder_path, preprocess_options=DEFAULT_PREPROCESS_OPTIONS
         "files": []
     }
     files = scam_json["files"]
-    for img_path in tqdm(img_paths):
-        # pil_img is not rotated
-        pil_img = None
-        sam_res = None
-        rotation = 0
-        orig_height = None
-        orig_width = None
-        thumbnail_path = None
-        thumbnail_w = None
-        thumbnail_h = None
-        try:
-            pil_img = get_pil_img(folder_path, img_path)
-            orig_height = pil_img.height
-            orig_width = pil_img.width
-            thumbnail_path, thumbnail_w, thumbnail_h = save_thumbnail(folder_path, img_path, pil_img, preprocess_options)
-            if preprocess_options["use_exif_rotation"]:
-                pil_img, rotation = apply_exif_rotation(pil_img)
-            # TODO: handle preprocess_options["pre_rotate]
-            #pil_img = sanitize_for_preprocessing(pil_img)
-            if preprocess_options["run_sam"]:
-                sam_res = run_sam(pil_img, preprocess_options)
-        except Exception as e:
-            logging.error("error on %s/%s" % (folder_path, img_path), e)
-            continue
-        pickle_path = get_pickle_path(folder_path, img_path)
-        if sam_res:
-            save_sam_pickle(pickle_path, sam_res)
-        # thumbnail will get rotated
-        
-        files.append({
-            "img_path": img_path,
-            "pickle_path": pickle_path if sam_res else None,
-            "width": orig_width,
-            "height": orig_height,
-            "rotation": rotation, # can be modified by users
-            "thumbnail_path": thumbnail_path,
-            "thumbnail_info": {
-                "width": thumbnail_w,
-                "height": thumbnail_h,
-                "rotation": 0
-            }
-        })
+    prefetcher = S3Prefetcher(max_workers=3)
+    lookahead = 3
+    try:
+        s3_keys = [folder_path + img_path for img_path in img_paths]
+        for i in range(min(lookahead, len(s3_keys))):
+            prefetcher.prefetch(s3_keys[i])
+        for i, img_path in enumerate(tqdm(img_paths)):
+            if i + lookahead < len(s3_keys):
+                prefetcher.prefetch(s3_keys[i + lookahead])
+            # pil_img is not rotated
+            pil_img = None
+            sam_res = None
+            rotation = 0
+            orig_height = None
+            orig_width = None
+            thumbnail_path = None
+            thumbnail_w = None
+            thumbnail_h = None
+            try:
+                pil_img = get_pil_img(folder_path, img_path, prefetcher=prefetcher)
+                orig_height = pil_img.height
+                orig_width = pil_img.width
+                thumbnail_path, thumbnail_w, thumbnail_h = save_thumbnail(folder_path, img_path, pil_img, preprocess_options)
+                if preprocess_options["use_exif_rotation"]:
+                    pil_img, rotation = apply_exif_rotation(pil_img)
+                # TODO: handle preprocess_options["pre_rotate]
+                #pil_img = sanitize_for_preprocessing(pil_img)
+                if preprocess_options["run_sam"]:
+                    sam_res = run_sam(pil_img, preprocess_options)
+            except Exception as e:
+                logging.error("error on %s/%s" % (folder_path, img_path), e)
+                continue
+            pickle_path = get_pickle_path(folder_path, img_path)
+            if sam_res:
+                save_sam_pickle(pickle_path, sam_res)
+            # thumbnail will get rotated
+            
+            files.append({
+                "img_path": img_path,
+                "pickle_path": pickle_path if sam_res else None,
+                "width": orig_width,
+                "height": orig_height,
+                "rotation": rotation, # can be modified by users
+                "thumbnail_path": thumbnail_path,
+                "thumbnail_info": {
+                    "width": thumbnail_w,
+                    "height": thumbnail_h,
+                    "rotation": 0
+                }
+            })
+    finally:
+        prefetcher.close()
     save_scam_json(folder_path, scam_json)
 
 

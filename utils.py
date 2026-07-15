@@ -6,6 +6,8 @@ import botocore
 import gzip
 import pickle
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 BUCKET_NAME = "image-processing.bdrc.io"
 
@@ -27,7 +29,9 @@ def get_scam_json(folder_path):
     blob.seek(0)
     return json.loads(blob.read().decode("utf-8"))
 
-def gets3blob(s3Key, bucket=BUCKET_NAME):
+def gets3blob(s3Key, bucket=BUCKET_NAME, prefetcher=None):
+    if prefetcher is not None:
+        return prefetcher.get(s3Key)
     f = io.BytesIO()
     try:
         S3.download_fileobj(bucket, s3Key, f)
@@ -37,6 +41,45 @@ def gets3blob(s3Key, bucket=BUCKET_NAME):
             return None
         else:
             raise
+
+
+class S3Prefetcher:
+    """Download S3 objects on background threads ahead of consumption."""
+
+    def __init__(self, bucket=BUCKET_NAME, max_workers=3):
+        self.bucket = bucket
+        self._executor = ThreadPoolExecutor(max_workers=max_workers)
+        self._futures = {}
+        self._lock = threading.Lock()
+
+    def _download(self, s3_key):
+        f = io.BytesIO()
+        try:
+            S3.download_fileobj(self.bucket, s3_key, f)
+            return f
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == '404':
+                return None
+            raise
+
+    def prefetch(self, s3_key):
+        with self._lock:
+            if s3_key not in self._futures:
+                self._futures[s3_key] = self._executor.submit(self._download, s3_key)
+
+    def schedule(self, s3_keys):
+        for s3_key in s3_keys:
+            self.prefetch(s3_key)
+
+    def get(self, s3_key):
+        with self._lock:
+            if s3_key not in self._futures:
+                self._futures[s3_key] = self._executor.submit(self._download, s3_key)
+            future = self._futures.pop(s3_key)
+        return future.result()
+
+    def close(self):
+        self._executor.shutdown(wait=True)
 
 def get_sha256(b):
     return sha256(b).hexdigest()

@@ -4,12 +4,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 import os
 import logging
+import threading
 import mozjpeg_lossless_optimization
 from PIL import Image
 from tqdm import tqdm
 from img_utils import encode_img_uncompressed, encode_img_compressed_simple, rotate_warp_affine, get_bounding_box, sanitize_for_postprocessing, apply_scale_factors_pil, get_linear_factors, sRGB_inverse_gamma, rotate_mar
 from scam_preprocess import get_pil_img
-from utils import upload_to_s3, gets3blob, get_sha256, get_scam_json
+from utils import upload_to_s3, gets3blob, get_sha256, get_scam_json, S3Prefetcher
 from raw_utils import register_raw_opener, is_likely_raw, get_np_from_raw, get_factors_from_raw
 from natsort import natsort_keygen, natsorted, ns
 import numpy as np
@@ -287,7 +288,7 @@ def can_simple_copy(file_info, pages):
         return False
     return len(pages) == 0
 
-def derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, prefixes, correction):
+def derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, prefixes, correction, prefetcher=None, log_lock=None):
     pages = get_output_pages(file_info)
     if pages is None:
         logging.info("do not derive from hidden image %s" % file_info["img_path"])
@@ -304,7 +305,7 @@ def derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, p
     if postprocess_options["src_storage"] == "s3":
         if not postprocess_options["dryrun"]:
             try:
-                pil_img, img_bytes, img_ext = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], correction, postprocess_options, output_file_info, try_simple_copy)
+                pil_img, img_bytes, img_ext = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], correction, postprocess_options, output_file_info, try_simple_copy, prefetcher=prefetcher)
             except:
                 logging.error("exception trying to open "+file_info["img_path"]+", ignoring")
                 return
@@ -321,12 +322,20 @@ def derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, p
         if not postprocess_options["dryrun"]:
             pil_img = pil_img.rotate(file_info["rotation"], expand=True)
     if len(pages) == 0:
-        scam_log_json["output_files"].append(output_file_info)
+        if log_lock:
+            with log_lock:
+                scam_log_json["output_files"].append(output_file_info)
+        else:
+            scam_log_json["output_files"].append(output_file_info)
         derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes, img_ext, None, 1, postprocess_options, None if prefixes is None else prefixes[0])
         return
     for i, page in enumerate(pages):
         ofi_p = output_file_info.copy()
-        scam_log_json["output_files"].append(ofi_p)
+        if log_lock:
+            with log_lock:
+                scam_log_json["output_files"].append(ofi_p)
+        else:
+            scam_log_json["output_files"].append(ofi_p)
         derive_from_page(scam_json, ofi_p, file_info, pil_img, img_bytes, img_ext, page, i+1, postprocess_options, None if prefixes is None else prefixes[i])
 
 def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes, img_ext, page_info, page_position, postprocess_options, prefix=None):
@@ -422,54 +431,62 @@ def postprocess_folder(folder_path, postprocess_options, workers=1):
     img_path_to_corr = {}
     img_paths = [file_info["img_path"] for file_info in scam_json["files"]]
     img_paths = natsorted(img_paths, alg=ns.IC|ns.INT)
-    if postprocess_options["rgb_correction"] == "auto":
-        corrs = get_white_patch_corrections(scam_json, postprocess_options)
-        if len(corrs) > 0:
-            scam_log_json["found_rgb_corrections"] = {}
-            for img_path, corr in corrs.items():
-                wb_factors, exp_shift, _ = corr
-                scam_log_json["found_rgb_corrections"][img_path] = { "wb_factors": wb_factors, "exp_shift": exp_shift }
-            # we potentially use the first correction for images that are
-            # before the first image with a color card
-            curr_corr = None
-            # just looking for the first color card
+    prefetcher = S3Prefetcher(max_workers=max(3, workers))
+    try:
+        prefetch_keys = [folder_path + img_path for img_path in img_paths]
+        prefetcher.schedule(prefetch_keys)
+        if postprocess_options["rgb_correction"] == "auto":
+            corrs = get_white_patch_corrections(scam_json, postprocess_options, prefetcher=prefetcher)
+            if len(corrs) > 0:
+                scam_log_json["found_rgb_corrections"] = {}
+                for img_path, corr in corrs.items():
+                    wb_factors, exp_shift, _ = corr
+                    scam_log_json["found_rgb_corrections"][img_path] = { "wb_factors": wb_factors, "exp_shift": exp_shift }
+                # we potentially use the first correction for images that are
+                # before the first image with a color card
+                curr_corr = None
+                # just looking for the first color card
+                for img_path in img_paths:
+                    if img_path in corrs:
+                        cur_corr = corrs[img_path]
+                        break
+                # then actually fill the corrections
+                for img_path in img_paths:
+                    if img_path in corrs:
+                        cur_corr = corrs[img_path]
+                    img_path_to_corr[img_path] = cur_corr
+        if len(img_path_to_corr) == 0:
             for img_path in img_paths:
-                if img_path in corrs:
-                    cur_corr = corrs[img_path]
-                    break
-            # then actually fill the corrections
-            for img_path in img_paths:
-                if img_path in corrs:
-                    cur_corr = corrs[img_path]
-                img_path_to_corr[img_path] = cur_corr
-    if len(img_path_to_corr) == 0:
-        for img_path in img_paths:
-            img_path_to_corr[img_path] = postprocess_options["rgb_correction_default"]
-    if not scam_json["checked"]:
-        logging.warning("warning: processing unchecked json %s" % folder_path)
-    add_prefix = postprocess_options["add_prefix"]
-    sequence_info = None
-    if add_prefix == "auto" and not postprocess_options["resequence"]:
-        add_prefix = False
-    if add_prefix: # "auto" or True
-        sequence_info, resequenced = get_sequence_info(scam_json, postprocess_options["resequence"])
-        if postprocess_options["resequence"] == "auto" and not resequenced and add_prefix == "auto":
+                img_path_to_corr[img_path] = postprocess_options["rgb_correction_default"]
+        if not scam_json["checked"]:
+            logging.warning("warning: processing unchecked json %s" % folder_path)
+        add_prefix = postprocess_options["add_prefix"]
+        sequence_info = None
+        if add_prefix == "auto" and not postprocess_options["resequence"]:
             add_prefix = False
-        else:
-            add_prefix = True
-    def _process(file_info):
-        prefixes = None if not add_prefix else sequence_info.get(file_info["img_path"])
-        if not add_prefix or file_info["img_path"] in sequence_info:
-            derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, prefixes, img_path_to_corr[file_info["img_path"]])
+        if add_prefix: # "auto" or True
+            sequence_info, resequenced = get_sequence_info(scam_json, postprocess_options["resequence"])
+            if postprocess_options["resequence"] == "auto" and not resequenced and add_prefix == "auto":
+                add_prefix = False
+            else:
+                add_prefix = True
+        log_lock = threading.Lock() if workers > 1 else None
 
-    if workers > 1:
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {pool.submit(_process, fi): fi for fi in scam_json["files"]}
-            for future in tqdm(as_completed(futures), total=len(futures)):
-                future.result()  # re-raise any exception from the worker
-    else:
-        for file_info in tqdm(scam_json["files"]):
-            _process(file_info)
+        def _process(file_info):
+            prefixes = None if not add_prefix else sequence_info.get(file_info["img_path"])
+            if not add_prefix or file_info["img_path"] in sequence_info:
+                derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, prefixes, img_path_to_corr[file_info["img_path"]], prefetcher=prefetcher, log_lock=log_lock)
+
+        if workers > 1:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {pool.submit(_process, fi): fi for fi in scam_json["files"]}
+                for future in tqdm(as_completed(futures), total=len(futures)):
+                    future.result()  # re-raise any exception from the worker
+        else:
+            for file_info in tqdm(scam_json["files"]):
+                _process(file_info)
+    finally:
+        prefetcher.close()
     scam_log_s3_key = "scam_logs/"+scam_json["folder_path"]+"scam_log.json"
     logging.info("write scam log on %s", scam_log_s3_key)
     scam_log_json_str = json.dumps(scam_log_json, indent=2)
@@ -484,11 +501,11 @@ def get_bbox(page_info, file_info, img_w, img_h, add_file_info_rotation=False):
         mar = rotate_mar(mar, file_info["rotation"], img_w, img_h)
     return get_bounding_box(mar, img_w, img_h)
 
-def get_raw_corrections(folder_path, img_path, page_info, file_info, postprocess_options):
+def get_raw_corrections(folder_path, img_path, page_info, file_info, postprocess_options, prefetcher=None):
     """
     returns the corrections for a raw file
     """
-    blob = gets3blob(folder_path+img_path)
+    blob = gets3blob(folder_path+img_path, prefetcher=prefetcher)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
         return
@@ -506,8 +523,8 @@ def get_raw_corrections(folder_path, img_path, page_info, file_info, postprocess
     wb_factors, exp_shift = get_factors_from_raw(raw, bbox, target_lnsrgb_mean)
     return wb_factors, exp_shift, tags
 
-def get_cv2_corrections(folder_path, img_path, page_info, file_info, postprocess_options):
-    blob = gets3blob(folder_path+img_path)
+def get_cv2_corrections(folder_path, img_path, page_info, file_info, postprocess_options, prefetcher=None):
+    blob = gets3blob(folder_path+img_path, prefetcher=prefetcher)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
         return
@@ -528,7 +545,7 @@ def get_cv2_img(folder_path, img_path):
     """
     returns a set with the cv2 image and exif data
     """
-    blob = gets3blob(folder_path+img_path)
+    blob = gets3blob(folder_path+img_path, prefetcher=prefetcher)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
     blob.seek(0)
@@ -565,8 +582,8 @@ def get_adjusted_correction(orig_corrections, dest_exif):
         return wb_factors, new_exp_shift, original_exif
     return orig_corrections
 
-def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, output_file_info, try_simple_copy=False):
-    blob = gets3blob(folder_path+img_path)
+def get_postprocess_pil_img(folder_path, img_path, params, postprocess_options, output_file_info, try_simple_copy=False, prefetcher=None):
+    blob = gets3blob(folder_path+img_path, prefetcher=prefetcher)
     if blob is None:
         logging.error("cannot find %s", (folder_path+img_path))
     blob.seek(0)
@@ -629,7 +646,7 @@ def get_scaled_mar(file_info, page_info, img_w, img_h):
     scale_factor_y = img_h / fi_height
     return ((c_x*scale_factor_x, c_y*scale_factor_y), (w*scale_factor_x, h*scale_factor_y), a)
 
-def get_white_patch_corrections(scam_json, postprocess_options):
+def get_white_patch_corrections(scam_json, postprocess_options, prefetcher=None):
     """
     returns an object with the keys being file paths and values being a set with:
             - wb correction factors derived from white patch annotations. These are not normalized so that the green channel is 1 and thus include some exposure compensation
@@ -643,9 +660,9 @@ def get_white_patch_corrections(scam_json, postprocess_options):
         for p in file_info["pages"]:
             if "tags" in p and "T1" in p["tags"]:
                 if is_likely_raw(file_info["img_path"]):
-                    corrs = get_raw_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info, postprocess_options)
+                    corrs = get_raw_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info, postprocess_options, prefetcher=prefetcher)
                 else:
-                    corrs = get_cv2_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info, postprocess_options)
+                    corrs = get_cv2_corrections(scam_json["folder_path"], file_info["img_path"], p, file_info, postprocess_options, prefetcher=prefetcher)
                 if corrs is not None:
                     res[img_path] = corrs
                     break

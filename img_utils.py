@@ -489,9 +489,9 @@ def get_linear_factors(srgb_img, bbox, expected_nsRGB):
     return scale_factors
 
 def apply_scale_factors_pil(pil_img, linear_rgb_factors):
-    np_img = np.array(img)
+    np_img = np.array(pil_img)
     np_transformed_img = multiply_linear_srgb(np_img, linear_rgb_factors)
-    pil_img.paste(Image.fromarray(np_transformed_img))
+    return Image.fromarray(np_transformed_img)
 
 def rotate_mar(rect, n, image_width, image_height):
     """
