@@ -343,6 +343,7 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
     # page_info is None means we take the whole image
     # page_position starts at 1
     suffix_letter = chr(96+page_position)
+    extract = pil_img
     if img_ext is None:
         if postprocess_options.get("output_jxl") and extract is not None and extract.mode != "1":
             img_ext = ".jxl"
@@ -350,7 +351,6 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
             img_ext = ".jpg"
         else:
             img_ext = ".tiff"
-    extract = pil_img
     output_file_info["scam_page_info"] = page_info
     output_file_info["page_in_file"] = page_position
     if page_info is not None:
