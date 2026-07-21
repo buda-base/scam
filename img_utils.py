@@ -212,7 +212,7 @@ def encode_img_jxl(img, try_grayscale=False) -> (bytes, str):
             vips_img = vips_img.copy(interpretation="srgb")
         except Exception:
             pass
-    save_kwargs = {"lossless": True, "effort": 7}
+    save_kwargs = {"lossless": True, "effort": 3}
     if icc:
         try:
             return vips_img.write_to_buffer(".jxl", profile=icc, **save_kwargs), ".jxl"
