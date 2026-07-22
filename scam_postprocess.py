@@ -1,6 +1,7 @@
 import argparse
 import csv
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 import sys
 import os
 import logging
@@ -20,6 +21,46 @@ import rawpy
 from datetime import datetime
 import json
 from functools import cmp_to_key
+
+
+class _ListLogHandler(logging.Handler):
+    """Collect WARNING+ log records (used for pyvips / decode warnings)."""
+
+    def __init__(self):
+        super().__init__(level=logging.WARNING)
+        self.messages = []
+
+    def emit(self, record):
+        try:
+            self.messages.append(self.format(record))
+        except Exception:
+            self.handleError(record)
+
+
+@contextmanager
+def capture_image_warnings():
+    """
+    Capture VIPS / image_decode warnings while decoding or encoding a file.
+    pyvips redirects libvips GLib logs to logging.getLogger('pyvips').
+    """
+    handler = _ListLogHandler()
+    handler.setFormatter(logging.Formatter("%(name)s: %(message)s"))
+    loggers = [logging.getLogger("pyvips"), logging.getLogger("image_decode")]
+    for lg in loggers:
+        lg.addHandler(handler)
+    try:
+        yield handler.messages
+    finally:
+        for lg in loggers:
+            lg.removeHandler(handler)
+
+
+def _append_scam_log_entry(scam_log_json, entry, log_lock=None):
+    if log_lock:
+        with log_lock:
+            scam_log_json["output_files"].append(entry)
+    else:
+        scam_log_json["output_files"].append(entry)
 
 #logging.basicConfig(level=logging.INFO)
 
@@ -296,47 +337,56 @@ def derive_from_file(scam_json, scam_log_json, file_info, postprocess_options, p
         return
     pil_img = None
     img_bytes = None
+    img_ext = None
     output_file_info = {
         "original_file_info": file_info,
     }
     if prefixes is not None and max(1, len(pages)) != len(prefixes):
-        logging.error("len(pages) != len(prefixes):  %d != %d for %s", max(1, len(pages)), len(prefixes), file_info["img_path"])
+        msg = "len(pages) != len(prefixes): %d != %d" % (max(1, len(pages)), len(prefixes))
+        logging.error("%s for %s", msg, file_info["img_path"])
+        output_file_info["error"] = msg
+        _append_scam_log_entry(scam_log_json, output_file_info, log_lock)
         return
     try_simple_copy = can_simple_copy(file_info, pages) and not postprocess_options.get("output_jxl")
-    if postprocess_options["src_storage"] == "s3":
-        if not postprocess_options["dryrun"]:
-            try:
-                pil_img, img_bytes, img_ext = get_postprocess_pil_img(scam_json["folder_path"], file_info["img_path"], correction, postprocess_options, output_file_info, try_simple_copy, prefetcher=prefetcher)
-            except:
-                logging.error("exception trying to open "+file_info["img_path"]+", ignoring")
-                return
-    else:
-        local_path = postprocess_options["local_src_folder"]
-        if not postprocess_options["skip_folder_local_input"]:
-            local_path += scam_json["folder_path"]
-        local_path += file_info["img_path"]
-        if not postprocess_options["dryrun"]:
-            # TODO: this is wrong
-            pil_img = Image.open(local_path)
-    if file_info["rotation"] != 0:
-        logging.info("rotate %s by %d", file_info["img_path"], file_info["rotation"])
-        if not postprocess_options["dryrun"]:
-            pil_img = pil_img.rotate(file_info["rotation"], expand=True)
+    with capture_image_warnings() as warnings:
+        try:
+            if postprocess_options["src_storage"] == "s3":
+                if not postprocess_options["dryrun"]:
+                    pil_img, img_bytes, img_ext = get_postprocess_pil_img(
+                        scam_json["folder_path"], file_info["img_path"], correction,
+                        postprocess_options, output_file_info, try_simple_copy,
+                        prefetcher=prefetcher,
+                    )
+            else:
+                local_path = postprocess_options["local_src_folder"]
+                if not postprocess_options["skip_folder_local_input"]:
+                    local_path += scam_json["folder_path"]
+                local_path += file_info["img_path"]
+                if not postprocess_options["dryrun"]:
+                    # TODO: this is wrong
+                    pil_img = Image.open(local_path)
+            if file_info["rotation"] != 0:
+                logging.info("rotate %s by %d", file_info["img_path"], file_info["rotation"])
+                if not postprocess_options["dryrun"]:
+                    pil_img = pil_img.rotate(file_info["rotation"], expand=True)
+        except Exception as e:
+            logging.error("exception trying to open %s: %s", file_info["img_path"], e, exc_info=True)
+            output_file_info["error"] = "exception trying to open: %s" % e
+            if warnings:
+                output_file_info["warnings"] = list(warnings)
+            _append_scam_log_entry(scam_log_json, output_file_info, log_lock)
+            return
+    if warnings:
+        output_file_info["warnings"] = list(warnings)
     if len(pages) == 0:
-        if log_lock:
-            with log_lock:
-                scam_log_json["output_files"].append(output_file_info)
-        else:
-            scam_log_json["output_files"].append(output_file_info)
+        _append_scam_log_entry(scam_log_json, output_file_info, log_lock)
         derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes, img_ext, None, 1, postprocess_options, None if prefixes is None else prefixes[0])
         return
     for i, page in enumerate(pages):
         ofi_p = output_file_info.copy()
-        if log_lock:
-            with log_lock:
-                scam_log_json["output_files"].append(ofi_p)
-        else:
-            scam_log_json["output_files"].append(ofi_p)
+        if "warnings" in ofi_p:
+            ofi_p["warnings"] = list(ofi_p["warnings"])
+        _append_scam_log_entry(scam_log_json, ofi_p, log_lock)
         derive_from_page(scam_json, ofi_p, file_info, pil_img, img_bytes, img_ext, page, i+1, postprocess_options, None if prefixes is None else prefixes[i])
 
 def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes, img_ext, page_info, page_position, postprocess_options, prefix=None):
@@ -353,73 +403,83 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
             img_ext = ".tiff"
     output_file_info["scam_page_info"] = page_info
     output_file_info["page_in_file"] = page_position
-    if page_info is not None:
-        original_img_w = pil_img.height if file_info["rotation"] in ["-90", "90", "-270", "270"] else pil_img.width
-        original_img_h = pil_img.width if file_info["rotation"] in ["-90", "90", "-270", "270"] else pil_img.height
-        mar = get_scaled_mar(file_info, page_info, original_img_w, original_img_h)
-        if not postprocess_options["rotation_in_derivation"]:
-            bbox = get_bounding_box(mar, pil_img.width, pil_img.height)
-            output_file_info["crop_bbox"] = bbox
-            logging.info("  extract with no rotation (%d, %d, %d, %d)", bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3])
-            if not postprocess_options["dryrun"]:
-                extract = pil_img.crop((bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]))
-        else:
-            logging.info("  extract with rotation ((%f, %f), (%f, %f), %f)", mar[0][0], mar[0][1], mar[1][0], mar[1][1], mar[2])
-            output_file_info["crop_rect"] = [mar[0][0], mar[0][1], mar[1][0], mar[1][1], mar[2]]
-            if not postprocess_options["dryrun"]:
-                extract = rotate_warp_affine(pil_img, mar)
-    output_path = None
-    if postprocess_options["dst_storage"] == "s3":
-        s3key = "scam_cropped/"+scam_json["folder_path"]
-        img_path = file_info["img_path"].replace(" ", "_").replace("'", "v").replace('"', "")
-        if prefix is None:
-            output_path = os.path.splitext(img_path)[0]+suffix_letter+img_ext
-            s3key += output_path
-        else:
-            base = ("%04d_" % prefix) + img_path.replace("/", "_")
-            output_path = os.path.splitext(base)[0]+suffix_letter+img_ext
-            s3key += output_path
-        logging.info("  write to s3 key %s", s3key)
-        if not postprocess_options["dryrun"]:
-            if img_bytes is None:
-                if postprocess_options.get("output_jxl") and extract.mode != "1":
-                    img_bytes, img_ext = encode_img_jxl(extract, postprocess_options["try_grayscale"])
-                elif postprocess_options.get("compress_output"):
-                    img_bytes, img_ext = encode_img_compressed_simple(extract, postprocess_options["try_grayscale"])
-                else:
-                    img_bytes, img_ext = encode_img_uncompressed(extract, postprocess_options["try_grayscale"])
-            if img_bytes is None:
-                output_file_info["error"] = "could not encode image"
-                logging.error(" got no resulting image for %s", json.dumps(page_info))
-                return
-            sha256 = get_sha256(img_bytes)
-            output_file_info["sha256"] = sha256
-            upload_to_s3(img_bytes, s3key)
-    else:
-        local_path = postprocess_options["local_dst_folder"]
-        if not postprocess_options["skip_folder_local_output"]:
-            local_path += scam_json["folder_path"]
-        if prefix is None:
-            output_path = os.path.splitext(file_info["img_path"])[0]+suffix_letter+img_ext
-            local_path += output_path
-        else:
-            base = ("%04d_" % prefix) + file_info["img_path"].replace("/", "_")
-            output_path = os.path.splitext(base)[0]+suffix_letter+img_ext
-            local_path += output_path
-        logging.info("  write to local file %s", local_path)
-        if not postprocess_options["dryrun"]:
-            os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            if postprocess_options.get("output_jxl") and extract.mode != "1":
-                b, ext = encode_img_jxl(extract, postprocess_options["try_grayscale"])
-            elif postprocess_options.get("compress_output"):
-                b, ext = encode_img_compressed_simple(extract, postprocess_options["try_grayscale"])
+    try:
+        if page_info is not None:
+            original_img_w = pil_img.height if file_info["rotation"] in ["-90", "90", "-270", "270"] else pil_img.width
+            original_img_h = pil_img.width if file_info["rotation"] in ["-90", "90", "-270", "270"] else pil_img.height
+            mar = get_scaled_mar(file_info, page_info, original_img_w, original_img_h)
+            if not postprocess_options["rotation_in_derivation"]:
+                bbox = get_bounding_box(mar, pil_img.width, pil_img.height)
+                output_file_info["crop_bbox"] = bbox
+                logging.info("  extract with no rotation (%d, %d, %d, %d)", bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3])
+                if not postprocess_options["dryrun"]:
+                    extract = pil_img.crop((bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]))
             else:
-                b, ext = encode_img_uncompressed(extract)
-            sha256 = get_sha256(b)
-            output_file_info["sha256"] = sha256
-            with open(local_path, "wb") as binary_file:
-                binary_file.write(b)
-    output_file_info["output_img_path"] = output_path
+                logging.info("  extract with rotation ((%f, %f), (%f, %f), %f)", mar[0][0], mar[0][1], mar[1][0], mar[1][1], mar[2])
+                output_file_info["crop_rect"] = [mar[0][0], mar[0][1], mar[1][0], mar[1][1], mar[2]]
+                if not postprocess_options["dryrun"]:
+                    extract = rotate_warp_affine(pil_img, mar)
+        output_path = None
+        if postprocess_options["dst_storage"] == "s3":
+            s3key = "scam_cropped/"+scam_json["folder_path"]
+            img_path = file_info["img_path"].replace(" ", "_").replace("'", "v").replace('"', "")
+            if prefix is None:
+                output_path = os.path.splitext(img_path)[0]+suffix_letter+img_ext
+                s3key += output_path
+            else:
+                base = ("%04d_" % prefix) + img_path.replace("/", "_")
+                output_path = os.path.splitext(base)[0]+suffix_letter+img_ext
+                s3key += output_path
+            logging.info("  write to s3 key %s", s3key)
+            if not postprocess_options["dryrun"]:
+                with capture_image_warnings() as encode_warnings:
+                    if img_bytes is None:
+                        if postprocess_options.get("output_jxl") and extract.mode != "1":
+                            img_bytes, img_ext = encode_img_jxl(extract, postprocess_options["try_grayscale"])
+                        elif postprocess_options.get("compress_output"):
+                            img_bytes, img_ext = encode_img_compressed_simple(extract, postprocess_options["try_grayscale"])
+                        else:
+                            img_bytes, img_ext = encode_img_uncompressed(extract, postprocess_options["try_grayscale"])
+                if encode_warnings:
+                    output_file_info.setdefault("warnings", []).extend(encode_warnings)
+                if img_bytes is None:
+                    output_file_info["error"] = "could not encode image"
+                    logging.error(" got no resulting image for %s", json.dumps(page_info))
+                    return
+                sha256 = get_sha256(img_bytes)
+                output_file_info["sha256"] = sha256
+                upload_to_s3(img_bytes, s3key)
+        else:
+            local_path = postprocess_options["local_dst_folder"]
+            if not postprocess_options["skip_folder_local_output"]:
+                local_path += scam_json["folder_path"]
+            if prefix is None:
+                output_path = os.path.splitext(file_info["img_path"])[0]+suffix_letter+img_ext
+                local_path += output_path
+            else:
+                base = ("%04d_" % prefix) + file_info["img_path"].replace("/", "_")
+                output_path = os.path.splitext(base)[0]+suffix_letter+img_ext
+                local_path += output_path
+            logging.info("  write to local file %s", local_path)
+            if not postprocess_options["dryrun"]:
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                with capture_image_warnings() as encode_warnings:
+                    if postprocess_options.get("output_jxl") and extract.mode != "1":
+                        b, ext = encode_img_jxl(extract, postprocess_options["try_grayscale"])
+                    elif postprocess_options.get("compress_output"):
+                        b, ext = encode_img_compressed_simple(extract, postprocess_options["try_grayscale"])
+                    else:
+                        b, ext = encode_img_uncompressed(extract)
+                if encode_warnings:
+                    output_file_info.setdefault("warnings", []).extend(encode_warnings)
+                sha256 = get_sha256(b)
+                output_file_info["sha256"] = sha256
+                with open(local_path, "wb") as binary_file:
+                    binary_file.write(b)
+        output_file_info["output_img_path"] = output_path
+    except Exception as e:
+        logging.error("exception deriving page from %s: %s", file_info["img_path"], e, exc_info=True)
+        output_file_info["error"] = "exception deriving page: %s" % e
 
 def postprocess_folder(folder_path, postprocess_options, workers=1):
     """

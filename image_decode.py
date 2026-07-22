@@ -6,6 +6,8 @@ from PIL import Image
 
 from raw_utils import is_likely_raw
 
+logger = logging.getLogger(__name__)
+
 
 def _blob_bytes(blob):
     blob.seek(0)
@@ -31,7 +33,7 @@ def get_image_size_from_blob(blob, img_path=None):
         img = pyvips.Image.new_from_buffer(data, "", access="sequential")
         return img.width, img.height
     except Exception:
-        logging.debug("vips header read failed, falling back to PIL", exc_info=True)
+        logger.debug("vips header read failed, falling back to PIL", exc_info=True)
 
     with Image.open(io.BytesIO(data)) as img:
         return img.size
@@ -100,7 +102,8 @@ def decode_blob_to_pil(blob, max_dimension=None, img_path=None):
         else:
             vips_img = pyvips.Image.new_from_buffer(data, "", access="sequential")
         return _vips_image_to_pil(vips_img)
-    except Exception:
-        logging.debug("vips decode failed, falling back to PIL", exc_info=True)
+    except Exception as e:
+        # WARNING so callers (e.g. scam_postprocess) can capture this in scam_log.json
+        logger.warning("vips decode failed (%s), falling back to PIL", e)
 
     return _decode_with_pil(io.BytesIO(data), max_dimension=max_dimension)
