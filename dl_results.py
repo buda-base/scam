@@ -1,5 +1,6 @@
 from utils import S3, BUCKET_NAME, list_obj_keys, is_img
 from img_utils import encode_img
+from image_decode import decode_blob_to_pil, get_image_size_from_blob
 from openpecha.buda.api import get_buda_scan_info
 import shutil
 import sys
@@ -9,7 +10,6 @@ import csv
 import os
 from pathlib import Path
 import logging
-from PIL import Image
 import mozjpeg_lossless_optimization
 from datetime import datetime
 import random
@@ -37,6 +37,8 @@ def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, pref
     obj_keys = natsorted(list_obj_keys(s3prefix, bucket), alg=ns.IC|ns.INT)
     fnum = 1
     for obj_key in obj_keys:
+        if not is_img(obj_key):
+            continue
         if nb_intro_pages > 0 and (obj_key.endswith(ilname+"0001.tif") or obj_key.endswith(ilname+"0002.tif")):
             # skip scan requests
             continue
@@ -49,8 +51,13 @@ def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, pref
             os.makedirs(os.path.dirname(dest_fname))
         S3.download_file(bucket, obj_key, dest_fname)
         fnum += 1
-    # return the number of files
+    # return the number of image files downloaded
     return fnum - 1
+
+def _count_local_archive_images(archive_dir):
+    if not os.path.isdir(archive_dir):
+        return 0
+    return sum(1 for f in glob(archive_dir + '/**/*', recursive=True) if os.path.isfile(f) and is_img(f))
 
 def download_folder_into(s3prefix, dst_dir, bucket=BUCKET_NAME):
     for obj_key in list_obj_keys(s3prefix, bucket):
@@ -81,9 +88,11 @@ def get_nbintropages(wlname, ilname):
 # -------------------------
 
 def _get_image_max_dim(path):
-    # Open lazily; PIL won't decode pixels until needed; just want size
-    with Image.open(path) as im:
-        return max(im.width, im.height)
+    # Prefer libvips so JPEG-XL archives work (Pillow often cannot open .jxl)
+    with open(path, "rb") as f:
+        data = f.read()
+    w, h = get_image_size_from_blob(io.BytesIO(data), img_path=path)
+    return max(w, h)
 
 def _scan_folder_dims(files, quantize=64):
     """
@@ -219,10 +228,14 @@ def get_shrink_factor_for_files(files, base_srink_factor, sample_size=3, quality
     sample_paths = random.sample(files, min(sample_size, len(files)))
     sample_shrink_factors = []
     for sample_path in sample_paths:
-        with Image.open(sample_path) as img_pil:
+        with open(sample_path, "rb") as f:
+            img_pil = decode_blob_to_pil(io.BytesIO(f.read()), img_path=sample_path)
+        try:
             sample_shrink_factors.append(
                 get_shrink_factor_one_img(img_pil, base_srink_factor, quality=quality)
             )
+        finally:
+            img_pil.close()
     return statistics.mean(sample_shrink_factors)
 
 # -------------------------
@@ -298,7 +311,8 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
 
         with open(file, "rb") as f:
             img_bytes = f.read()
-        img_pil = Image.open(io.BytesIO(img_bytes))
+        # decode_blob_to_pil handles JPEG-XL via libvips; Pillow cannot open .jxl
+        img_pil = decode_blob_to_pil(io.BytesIO(img_bytes), img_path=file)
 
         file_size = file_stats.st_size
         if (lastfour == ".jpg" or lastfour == "jpeg"):
@@ -336,7 +350,8 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
                         shrink_factor = target_sf  # only affects potential reuse; current bytes already OK
 
         finally:
-            img_pil.close()
+            if img_pil is not None:
+                img_pil.close()
 
         dst_path = Path(images_folder) / Path(ilname + last4 + ext)
         with dst_path.open("wb") as f:
@@ -377,6 +392,9 @@ def download_prefix(argslist):
         if nb_archive_imgs < 1:
             logging.warning("%s-%s has no archive or image files" % (wlname, ilname))
             return [s3prefix, "noarchive"]
+    elif _count_local_archive_images(archive_dir) < 1:
+        logging.warning("%s-%s has no archive or image files" % (wlname, ilname))
+        return [s3prefix, "noarchive"]
     encode_folder(archive_dir, images_dir, ilname, shrink_factor, lum_factor)
     if nbintropages > 0:
         shutil.copyfile("tbrcintropages/1.tif", archive_dir+ilname+"0001.tif")
