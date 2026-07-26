@@ -481,11 +481,17 @@ def derive_from_page(scam_json, output_file_info, file_info, pil_img, img_bytes,
         logging.error("exception deriving page from %s: %s", file_info["img_path"], e, exc_info=True)
         output_file_info["error"] = "exception deriving page: %s" % e
 
+class PostprocessFolderError(Exception):
+    """Raised when a folder cannot be postprocessed due to missing/invalid data."""
+
+
 def postprocess_folder(folder_path, postprocess_options, workers=1):
     """
     post-processes a folder for use with the API
 
     - download scam.json from S3
+
+    Raises PostprocessFolderError for data problems (missing scam.json, etc.).
     """
     scam_log_json = { 
         "folder_path": folder_path,
@@ -495,6 +501,16 @@ def postprocess_folder(folder_path, postprocess_options, workers=1):
         }
     logging.info("postprocess %s" % folder_path)
     scam_json = get_scam_json(folder_path)
+    if scam_json is None:
+        raise PostprocessFolderError(
+            "missing or unreadable scam.json on S3 (key=%sscam.json) — folder skipped"
+            % folder_path
+        )
+    if "files" not in scam_json or scam_json["files"] is None:
+        raise PostprocessFolderError(
+            "scam.json has no usable 'files' list (key=%sscam.json) — folder skipped"
+            % folder_path
+        )
     img_path_to_corr = {}
     img_paths = [file_info["img_path"] for file_info in scam_json["files"]]
     img_paths = natsorted(img_paths, alg=ns.IC|ns.INT)
@@ -747,10 +763,15 @@ def postprocess_csv():
     parser.add_argument("--workers", type=int, default=1, metavar="N", help="number of parallel worker threads (default: 1)")
     args = parser.parse_args()
 
+    ok_folders = []
+    failed_folders = []  # list of (folder, reason)
+
     with open(args.csv, newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
-            folder = row[0]
+            if not row or not row[0].strip():
+                continue
+            folder = row[0].strip()
             if not folder.endswith('/'):
                 folder += "/"
             postprocess_options = DEFAULT_POSTPROCESS_OPTIONS.copy()
@@ -760,7 +781,33 @@ def postprocess_csv():
                 postprocess_options["compress_output"] = True
             if args.jxl:
                 postprocess_options["output_jxl"] = True
-            postprocess_folder(folder, postprocess_options, workers=args.workers)
+            try:
+                postprocess_folder(folder, postprocess_options, workers=args.workers)
+                ok_folders.append(folder)
+            except PostprocessFolderError as e:
+                logging.error("SKIP FOLDER %s: %s", folder, e)
+                failed_folders.append((folder, str(e)))
+            except Exception as e:
+                logging.error(
+                    "SKIP FOLDER %s: unexpected error: %s", folder, e, exc_info=True
+                )
+                failed_folders.append((folder, "unexpected error: %s" % e))
+
+    print("")
+    print("=" * 72)
+    print("POSTPROCESS SUMMARY")
+    print("=" * 72)
+    print("ok:     %d folder(s)" % len(ok_folders))
+    print("failed: %d folder(s)" % len(failed_folders))
+    if failed_folders:
+        print("")
+        print("Failed folders:")
+        for folder, reason in failed_folders:
+            print("  - %s" % folder)
+            print("      %s" % reason)
+        print("=" * 72)
+        sys.exit(1)
+    print("=" * 72)
 
 if __name__ == '__main__':
     postprocess_csv()
