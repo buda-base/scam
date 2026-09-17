@@ -1,22 +1,23 @@
 from utils import S3, BUCKET_NAME, list_obj_keys, is_img
 from img_utils import encode_img
-from image_decode import decode_blob_to_pil, get_image_size_from_blob
+from image_decode import get_image_size_from_path, decode_path_to_pil
 from openpecha.buda.api import get_buda_scan_info
 import shutil
-import sys
+import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from natsort import natsorted, ns
 from glob import glob
 import csv
 import os
 from pathlib import Path
 import logging
+from PIL import Image
 import mozjpeg_lossless_optimization
 from datetime import datetime
 import random
 from parallel_executor import ParallelTaskExecutor
 import statistics
 from tqdm import tqdm
-import io
 import math
 
 WINFOS_CACHE = {}
@@ -34,13 +35,29 @@ def sanitize_fname_for_archive(fpath, imgnum):
     return fpath
 
 def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, prefix, bucket=BUCKET_NAME):
+    """
+    Download archive images from S3. Returns (n_downloaded, diagnostics dict).
+    """
     obj_keys = natsorted(list_obj_keys(s3prefix, bucket), alg=ns.IC|ns.INT)
+    n_total = len(obj_keys)
+    n_img = 0
+    n_skipped_non_img = 0
+    n_skipped_intro = 0
+    ext_counts = {}
+    sample_non_img = []
     fnum = 1
     for obj_key in obj_keys:
+        ext = os.path.splitext(obj_key)[1].lower() or "(no ext)"
+        ext_counts[ext] = ext_counts.get(ext, 0) + 1
         if not is_img(obj_key):
+            n_skipped_non_img += 1
+            if len(sample_non_img) < 5:
+                sample_non_img.append(obj_key)
             continue
+        n_img += 1
         if nb_intro_pages > 0 and (obj_key.endswith(ilname+"0001.tif") or obj_key.endswith(ilname+"0002.tif")):
             # skip scan requests
+            n_skipped_intro += 1
             continue
         obj_key_afterprefix = obj_key[len(s3prefix):]
         obj_key_afterprefix = sanitize_fname_for_archive(obj_key_afterprefix, fnum+nb_intro_pages)
@@ -51,13 +68,75 @@ def download_archive_folder_into(s3prefix, dst_dir, nb_intro_pages, ilname, pref
             os.makedirs(os.path.dirname(dest_fname))
         S3.download_file(bucket, obj_key, dest_fname)
         fnum += 1
-    # return the number of image files downloaded
-    return fnum - 1
+    n_downloaded = fnum - 1
+    diag = {
+        "s3_prefix": s3prefix,
+        "s3_bucket": bucket,
+        "n_keys_listed": n_total,
+        "n_keys_is_img": n_img,
+        "n_skipped_non_img": n_skipped_non_img,
+        "n_skipped_intro": n_skipped_intro,
+        "n_downloaded": n_downloaded,
+        "ext_counts": ext_counts,
+        "sample_non_img_keys": sample_non_img,
+        "sample_keys": obj_keys[:5],
+    }
+    return n_downloaded, diag
+
+def _local_archive_diagnostics(archive_dir):
+    """Inspect a local archive dir; returns diagnostics dict including n_images."""
+    diag = {
+        "archive_dir": archive_dir,
+        "dir_exists": os.path.isdir(archive_dir),
+        "n_files": 0,
+        "n_images": 0,
+        "ext_counts": {},
+        "sample_files": [],
+        "sample_rejected": [],
+    }
+    if not diag["dir_exists"]:
+        parent = os.path.dirname(archive_dir.rstrip("/"))
+        diag["parent_exists"] = os.path.isdir(parent)
+        if diag["parent_exists"]:
+            try:
+                diag["parent_listing"] = sorted(os.listdir(parent))[:20]
+            except OSError as e:
+                diag["parent_listing_error"] = str(e)
+        return diag
+    for f in glob(archive_dir + '/**/*', recursive=True):
+        if not os.path.isfile(f):
+            continue
+        diag["n_files"] += 1
+        ext = os.path.splitext(f)[1].lower() or "(no ext)"
+        diag["ext_counts"][ext] = diag["ext_counts"].get(ext, 0) + 1
+        if len(diag["sample_files"]) < 5:
+            diag["sample_files"].append(f)
+        if is_img(f):
+            diag["n_images"] += 1
+        elif len(diag["sample_rejected"]) < 5:
+            diag["sample_rejected"].append(f)
+    return diag
 
 def _count_local_archive_images(archive_dir):
-    if not os.path.isdir(archive_dir):
-        return 0
-    return sum(1 for f in glob(archive_dir + '/**/*', recursive=True) if os.path.isfile(f) and is_img(f))
+    return _local_archive_diagnostics(archive_dir)["n_images"]
+
+def _format_no_archive_warning(wlname, ilname, *, mode, archive_dir, s3prefix=None, diag=None):
+    """Build an explicit multi-line warning when no archive images were found."""
+    lines = [
+        f"{wlname}-{ilname}: no archive images to process",
+        f"  mode: {mode}",
+        f"  expected local archive_dir: {archive_dir}",
+        f"  DOWNLOAD_FROM_S3={DOWNLOAD_FROM_S3}",
+        f"  is_img() accepts: .jpg .jpeg .tif .tiff .cr2 .nef .arw .jp2 .jxl",
+    ]
+    if s3prefix is not None:
+        lines.append(f"  s3 archive prefix: s3://{BUCKET_NAME}/{s3prefix}")
+    if diag:
+        for k, v in diag.items():
+            if k in ("archive_dir", "s3_prefix", "s3_bucket"):
+                continue
+            lines.append(f"  {k}: {v}")
+    return "\n".join(lines)
 
 def download_folder_into(s3prefix, dst_dir, bucket=BUCKET_NAME):
     for obj_key in list_obj_keys(s3prefix, bucket):
@@ -88,10 +167,8 @@ def get_nbintropages(wlname, ilname):
 # -------------------------
 
 def _get_image_max_dim(path):
-    # Prefer libvips so JPEG-XL archives work (Pillow often cannot open .jxl)
-    with open(path, "rb") as f:
-        data = f.read()
-    w, h = get_image_size_from_blob(io.BytesIO(data), img_path=path)
+    # Prefer libvips header so JPEG-XL archives work without a full file read
+    w, h = get_image_size_from_path(path)
     return max(w, h)
 
 def _scan_folder_dims(files, quantize=64):
@@ -209,34 +286,67 @@ def get_group_shrink_factors(groups, base_shrink_factor=1.0, sample_size=3, qual
 # -------------------------
 
 def get_shrink_factor_one_img(img_pil, base_shrink_factor=1.0, max_size=800, step=0.1,
-                              target_max_dimension=3500, quality=85):
+                              target_max_dimension=3500, quality=85, orig_max_dimension=None):
     """
-    get a good shrink factor for one image
+    get a good shrink factor for one image, relative to the original max dimension.
+
+    img_pil may already be shrink-on-load decoded; pass orig_max_dimension in that case.
     """
     shrink_factor = base_shrink_factor
-    max_dimension = max(img_pil.width, img_pil.height)
+    decoded_max = max(img_pil.width, img_pil.height)
+    orig_max = orig_max_dimension if orig_max_dimension else decoded_max
+    already_applied = decoded_max / orig_max if orig_max else 1.0
     # only downscale if meaningfully larger than target
-    if max_dimension > target_max_dimension and (target_max_dimension / max_dimension) < (1 - step):
-        shrink_factor = min(shrink_factor, target_max_dimension / max_dimension)
-    img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
+    if orig_max > target_max_dimension and (target_max_dimension / orig_max) < (1 - step):
+        shrink_factor = min(shrink_factor, target_max_dimension / orig_max)
+    remaining = shrink_factor / already_applied if already_applied > 0 else shrink_factor
+    img_bytes, ext = encode_img(img_pil, shrink_factor=remaining, quality=quality)
     while len(img_bytes) > max_size * 1024:
         shrink_factor = (1 - step) * shrink_factor
-        img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality)
+        remaining = shrink_factor / already_applied if already_applied > 0 else shrink_factor
+        img_bytes, ext = encode_img(img_pil, shrink_factor=remaining, quality=quality)
     return shrink_factor
 
 def get_shrink_factor_for_files(files, base_srink_factor, sample_size=3, quality=85):
     sample_paths = random.sample(files, min(sample_size, len(files)))
     sample_shrink_factors = []
     for sample_path in sample_paths:
-        with open(sample_path, "rb") as f:
-            img_pil = decode_blob_to_pil(io.BytesIO(f.read()), img_path=sample_path)
+        orig_w, orig_h = get_image_size_from_path(sample_path)
+        orig_max = max(orig_w, orig_h)
+        target_max = 3500
+        max_dimension = None
+        if orig_max > target_max and (target_max / orig_max) < 0.9:
+            max_dimension = target_max
+        img_pil = decode_path_to_pil(sample_path, max_dimension=max_dimension)
         try:
             sample_shrink_factors.append(
-                get_shrink_factor_one_img(img_pil, base_srink_factor, quality=quality)
+                get_shrink_factor_one_img(
+                    img_pil, base_srink_factor, quality=quality, orig_max_dimension=orig_max
+                )
             )
         finally:
             img_pil.close()
     return statistics.mean(sample_shrink_factors)
+
+
+def _is_jpeg_path(path):
+    lastfour = path[-4:].lower()
+    return lastfour == ".jpg" or lastfour == "jpeg"
+
+
+def _is_tiff_path(path):
+    lastfour = path[-4:].lower()
+    return lastfour == ".tif" or lastfour == "tiff"
+
+
+def _tiff_is_small_g4(path, file_size):
+    if file_size >= 800 * 1024 or not _is_tiff_path(path):
+        return False
+    try:
+        with Image.open(path) as im:
+            return im.mode == "1" and im.info.get("compression", "None") == "group4"
+    except Exception:
+        return False
 
 # -------------------------
 # Patched encode_folder with auto-grouping
@@ -245,7 +355,7 @@ def get_shrink_factor_for_files(files, base_srink_factor, sample_size=3, quality
 def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
                   lum_factor=1.0, quality=85, harmonize_sf=False,
                   auto_group=True, std_log_thresh=0.15, break_ratio=1.25,
-                  min_run_len=3, quantize=64, sample_size=3):
+                  min_run_len=3, quantize=64, sample_size=3, workers=1):
     files = glob(archive_folder + '/**/*', recursive=True)
     if len(files) == 0:
         logging.error("no file to encode in %s", archive_folder)
@@ -257,8 +367,23 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
     # Keep only images for grouping/analysis
     img_files = [f for f in files if is_img(f)]
     if not img_files:
-        logging.error("no image files to encode in %s", archive_folder)
+        diag = _local_archive_diagnostics(archive_folder)
+        logging.error(
+            "no image files to encode in %s\n%s",
+            archive_folder,
+            _format_no_archive_warning(
+                "?",
+                "?",
+                mode="encode_folder",
+                archive_dir=archive_folder,
+                diag=diag,
+            ),
+        )
         return
+
+    for f in files:
+        if not is_img(f):
+            logging.error("%s likely not an image" % f)
 
     # 1) auto grouping pre-check
     file_to_group_sf = None
@@ -285,79 +410,96 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
         orig_shrink_factor = get_shrink_factor_for_files(img_files, orig_shrink_factor, quality=quality)
         logging.info("computed shrink factor %f for %s", orig_shrink_factor, archive_folder)
 
-    # 3) Encode loop (mostly your original code)
-    for file in files:
-        if not is_img(file):
-            logging.error("%s likely not an image" % file)
-            continue
-
+    def _encode_one(file):
         rel = file[len(archive_folder):]
         filenoext = rel[:rel.rfind(".")]
         last4 = filenoext[-4:]
 
         if not OVERWRITE_IMG_FILES:
-            file_exists = False
-            for ext in [".jpg", ".tif"]:
-                dst_path = Path(images_folder) / Path(ilname + last4 + ext)
+            for existing_ext in [".jpg", ".tif"]:
+                dst_path = Path(images_folder) / Path(ilname + last4 + existing_ext)
                 if dst_path.is_file():
-                    file_exists = True
-                    break
-            if file_exists:
-                continue
+                    return
 
-        img_bytes, ext, img_pil = None, None, None
         file_stats = os.stat(file)
-        lastfour = file[-4:].lower()
-
-        with open(file, "rb") as f:
-            img_bytes = f.read()
-        # decode_blob_to_pil handles JPEG-XL via libvips; Pillow cannot open .jxl
-        img_pil = decode_blob_to_pil(io.BytesIO(img_bytes), img_path=file)
-
         file_size = file_stats.st_size
-        if (lastfour == ".jpg" or lastfour == "jpeg"):
-            img_bytes = mozjpeg_lossless_optimization.optimize(img_bytes, copy=mozjpeg_lossless_optimization.COPY_MARKERS.ICC)
-            file_size = len(img_bytes)
+        img_bytes = None
+        ext = None
+        img_pil = None
 
         try:
-            if (lastfour == ".jpg" or lastfour == "jpeg") and file_size < 1200 * 1024:
-                ext = ".jpg"
-                # img_bytes already set
-                logging.info("not reencoding %s" % file)
-            elif (lastfour == ".tif" or lastfour == "tiff") and file_stats.st_size < 800 * 1024 and img_pil.mode == "1" and img_pil.info.get('compression', 'None') == "group4":
+            if _is_jpeg_path(file):
+                with open(file, "rb") as f:
+                    img_bytes = f.read()
+                img_bytes = mozjpeg_lossless_optimization.optimize(
+                    img_bytes, copy=mozjpeg_lossless_optimization.COPY_MARKERS.ICC
+                )
+                file_size = len(img_bytes)
+                if file_size < 1200 * 1024:
+                    ext = ".jpg"
+                    logging.info("not reencoding %s" % file)
+                    dst_path = Path(images_folder) / Path(ilname + last4 + ext)
+                    with dst_path.open("wb") as f:
+                        f.write(img_bytes)
+                    return
+
+            if _tiff_is_small_g4(file, file_stats.st_size):
+                with open(file, "rb") as f:
+                    img_bytes = f.read()
                 ext = ".tif"
+                dst_path = Path(images_folder) / Path(ilname + last4 + ext)
+                with dst_path.open("wb") as f:
+                    f.write(img_bytes)
+                return
+
+            if file_to_group_sf:
+                target_sf = file_to_group_sf[file]
             else:
-                # choose which shrink factor to start with
-                if file_to_group_sf:
-                    shrink_factor = file_to_group_sf[file]
-                else:
-                    shrink_factor = orig_shrink_factor
+                target_sf = orig_shrink_factor
 
-                img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality, lum_factor=lum_factor)
-                while len(img_bytes) > 1200 * 1024:
-                    shrink_factor = 0.8 * shrink_factor
-                    img_bytes, ext = encode_img(img_pil, shrink_factor=shrink_factor, quality=quality, lum_factor=lum_factor)
+            orig_w, orig_h = get_image_size_from_path(file)
+            orig_max = max(orig_w, orig_h)
+            decode_sf = target_sf
+            max_dimension = None
+            if decode_sf < 1.0 - 1e-6 and orig_max > 1:
+                max_dimension = max(1, int(round(orig_max * decode_sf)))
+            img_pil = decode_path_to_pil(file, max_dimension=max_dimension)
+            already_applied = max(img_pil.width, img_pil.height) / orig_max if orig_max else 1.0
+            remaining = 1.0
+            if already_applied > 0 and abs(already_applied - decode_sf) > 1e-3 and decode_sf < already_applied:
+                remaining = decode_sf / already_applied
 
-                # If we deviated and harmonization is off, reset for next files
-                if file_to_group_sf:
-                    target_sf = file_to_group_sf[file]
-                else:
-                    target_sf = orig_shrink_factor
+            applied_sf = already_applied * remaining
+            img_bytes, ext = encode_img(
+                img_pil, shrink_factor=remaining, quality=quality, lum_factor=lum_factor
+            )
+            while len(img_bytes) > 1200 * 1024:
+                remaining = 0.8 * remaining
+                applied_sf = already_applied * remaining
+                img_bytes, ext = encode_img(
+                    img_pil, shrink_factor=remaining, quality=quality, lum_factor=lum_factor
+                )
 
-                if abs(target_sf - shrink_factor) > 1e-6:
-                    logging.warning("had to use %f instead of %f on %s", shrink_factor, target_sf, rel)
-                    if not harmonize_sf:
-                        shrink_factor = target_sf  # only affects potential reuse; current bytes already OK
+            if abs(target_sf - applied_sf) > 1e-6:
+                logging.warning("had to use %f instead of %f on %s", applied_sf, target_sf, rel)
 
+            dst_path = Path(images_folder) / Path(ilname + last4 + ext)
+            with dst_path.open("wb") as f:
+                f.write(img_bytes)
         finally:
             if img_pil is not None:
                 img_pil.close()
 
-        dst_path = Path(images_folder) / Path(ilname + last4 + ext)
-        with dst_path.open("wb") as f:
-            f.write(img_bytes)
+    if workers > 1:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_encode_one, f): f for f in img_files}
+            for future in tqdm(as_completed(futures), total=len(futures), desc="encode"):
+                future.result()
+    else:
+        for file in tqdm(img_files, desc="encode"):
+            _encode_one(file)
 
-def download_prefix(argslist):
+def download_prefix(argslist, workers=1):
     dst_dir, s3prefix, wlname, ilname, shrink_factor, lum_factor = argslist[0], argslist[1], argslist[2], argslist[3], argslist[4], argslist[5]
     prefix = None
     if '-' in ilname and not ilname.endswith('-'):
@@ -388,14 +530,39 @@ def download_prefix(argslist):
     if DOWNLOAD_FROM_S3:
         download_folder_into(s3prefix, sources_dir)
         download_folder_into("scam_logs/"+s3prefix, sources_dir)
-        nb_archive_imgs = download_archive_folder_into("scam_cropped/"+s3prefix, archive_dir, nbintropages, ilname, prefix)
+        s3_archive_prefix = "scam_cropped/"+s3prefix
+        nb_archive_imgs, s3_diag = download_archive_folder_into(
+            s3_archive_prefix, archive_dir, nbintropages, ilname, prefix
+        )
         if nb_archive_imgs < 1:
-            logging.warning("%s-%s has no archive or image files" % (wlname, ilname))
+            # Also describe whatever is already on disk (helps when S3 is empty
+            # but a previous local archive exists elsewhere / under another path).
+            local_diag = _local_archive_diagnostics(archive_dir)
+            logging.warning(
+                _format_no_archive_warning(
+                    wlname,
+                    ilname,
+                    mode="download from S3 (0 image keys downloaded)",
+                    archive_dir=archive_dir,
+                    s3prefix=s3_archive_prefix,
+                    diag={**s3_diag, "local_after_download": local_diag},
+                )
+            )
             return [s3prefix, "noarchive"]
-    elif _count_local_archive_images(archive_dir) < 1:
-        logging.warning("%s-%s has no archive or image files" % (wlname, ilname))
-        return [s3prefix, "noarchive"]
-    encode_folder(archive_dir, images_dir, ilname, shrink_factor, lum_factor)
+    else:
+        local_diag = _local_archive_diagnostics(archive_dir)
+        if local_diag["n_images"] < 1:
+            logging.warning(
+                _format_no_archive_warning(
+                    wlname,
+                    ilname,
+                    mode="local archive only (DOWNLOAD_FROM_S3=False)",
+                    archive_dir=archive_dir,
+                    diag=local_diag,
+                )
+            )
+            return [s3prefix, "noarchive"]
+    encode_folder(archive_dir, images_dir, ilname, shrink_factor, lum_factor, workers=workers)
     if nbintropages > 0:
         shutil.copyfile("tbrcintropages/1.tif", archive_dir+ilname+"0001.tif")
         shutil.copyfile("tbrcintropages/2.tif", archive_dir+ilname+"0002.tif")
@@ -405,18 +572,20 @@ def download_prefix(argslist):
 
 
 def postprocess_csv():
-    if len(sys.argv) <= 1:
-        print("nothing to do, please pass the path to a csv file")
+    parser = argparse.ArgumentParser(description="Download SCAM archives and encode delivery JPEGs")
+    parser.add_argument("csv", help="path to the CSV file listing volumes to process")
+    parser.add_argument("dest_dir", nargs="?", default="./", help="output root directory (default: ./)")
+    parser.add_argument("--workers", type=int, default=1, metavar="N",
+                        help="parallel encode threads per volume (default: 1)")
+    args = parser.parse_args()
 
-    dest_dir = "./"
-    if len(sys.argv) > 2:
-        dest_dir = sys.argv[2]
-        if not dest_dir.endswith("/"):
-            dest_dir += "/"
+    dest_dir = args.dest_dir
+    if not dest_dir.endswith("/"):
+        dest_dir += "/"
 
     normalized_todo_lines = []
 
-    with open(sys.argv[1], newline='') as csvfile:
+    with open(args.csv, newline='') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
             folder = row[0]
@@ -430,8 +599,8 @@ def postprocess_csv():
                 shrink_factor = float(row[3])
             normalized_todo_lines.append([dest_dir, folder, wlname, ilname, shrink_factor, lum_factor])
 
-    for tl in tqdm(normalized_todo_lines):
-        download_prefix(tl)
+    for tl in tqdm(normalized_todo_lines, desc="volumes"):
+        download_prefix(tl, workers=args.workers)
     #filesuffix = datetime.now().strftime("%Y%m%d-%H%M%S")
     #ex = ParallelTaskExecutor(normalized_todo_lines, "done-process-"+filesuffix+".csv", download_prefix)
     #ex.run()

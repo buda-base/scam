@@ -39,6 +39,21 @@ def get_image_size_from_blob(blob, img_path=None):
         return img.size
 
 
+def get_image_size_from_path(path):
+    """Return (width, height) from a file path, preferring a libvips header read."""
+    if is_likely_raw(path):
+        with open(path, "rb") as f:
+            return get_image_size_from_blob(io.BytesIO(f.read()), img_path=path)
+    try:
+        import pyvips
+        img = pyvips.Image.new_from_file(path, access="sequential")
+        return img.width, img.height
+    except Exception:
+        logger.debug("vips path header read failed, falling back to blob", exc_info=True)
+    with open(path, "rb") as f:
+        return get_image_size_from_blob(io.BytesIO(f.read()), img_path=path)
+
+
 def _vips_image_to_pil(vips_img):
     import pyvips
 
@@ -107,3 +122,26 @@ def decode_blob_to_pil(blob, max_dimension=None, img_path=None):
         logger.warning("vips decode failed (%s), falling back to PIL", e)
 
     return _decode_with_pil(io.BytesIO(data), max_dimension=max_dimension)
+
+
+def decode_path_to_pil(path, max_dimension=None):
+    """
+    Decode an image file to a PIL image.
+
+    When max_dimension is set, use libvips thumbnail (shrink-on-load) for
+    non-RAW files. Falls back to decode_blob_to_pil on failure.
+    """
+    if is_likely_raw(path):
+        with open(path, "rb") as f:
+            return decode_blob_to_pil(io.BytesIO(f.read()), max_dimension=max_dimension, img_path=path)
+    try:
+        import pyvips
+        if max_dimension is not None:
+            vips_img = pyvips.Image.thumbnail(path, max_dimension, size=pyvips.Size.DOWN)
+        else:
+            vips_img = pyvips.Image.new_from_file(path, access="sequential")
+        return _vips_image_to_pil(vips_img)
+    except Exception as e:
+        logger.warning("vips path decode failed (%s), falling back to blob/PIL", e)
+    with open(path, "rb") as f:
+        return decode_blob_to_pil(io.BytesIO(f.read()), max_dimension=max_dimension, img_path=path)
