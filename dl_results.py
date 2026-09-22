@@ -3,7 +3,9 @@ from img_utils import encode_img
 from image_decode import get_image_size_from_path, decode_path_to_pil
 from openpecha.buda.api import get_buda_scan_info
 import shutil
+import sys
 import argparse
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from natsort import natsorted, ns
 from glob import glob
@@ -339,6 +341,35 @@ def _is_tiff_path(path):
     return lastfour == ".tif" or lastfour == "tiff"
 
 
+# Classic TIFF and BigTIFF, little- and big-endian. Four bytes is enough.
+_TIFF_MAGICS = (b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+")
+
+
+def _header_is_tiff(path):
+    """True when the file starts with a TIFF magic. Reads 4 bytes only."""
+    try:
+        with open(path, "rb") as f:
+            return f.read(4) in _TIFF_MAGICS
+    except OSError:
+        return False
+
+
+def _rename_jpeg_tiff(path):
+    """
+    Rename a .jpg/.jpeg whose bytes are TIFF to .tif.
+    Returns the path to use afterwards (unchanged if the rename could not be done).
+    """
+    new_path = os.path.splitext(path)[0] + ".tif"
+    if os.path.abspath(new_path) == os.path.abspath(path):
+        return path
+    if os.path.exists(new_path):
+        logging.error("refusing to rename %s to %s: destination already exists", path, new_path)
+        return path
+    os.rename(path, new_path)
+    logging.warning("renamed TIFF stored with a JPEG extension: %s -> %s", path, new_path)
+    return new_path
+
+
 def _tiff_is_small_g4(path, file_size):
     if file_size >= 800 * 1024 or not _is_tiff_path(path):
         return False
@@ -348,6 +379,23 @@ def _tiff_is_small_g4(path, file_size):
     except Exception:
         return False
 
+
+def _report_encode_issues(renames, errors):
+    if not renames and not errors:
+        return
+    lines = []
+    if renames:
+        lines.append("renamed %d TIFF file(s) that had a JPEG extension:" % len(renames))
+        for old, new in renames:
+            lines.append("  %s -> %s" % (old, new))
+    if errors:
+        lines.append("%d encode error(s):" % len(errors))
+        for msg in errors:
+            lines.append("  %s" % msg)
+    text = "\n".join(lines)
+    logging.error(text)
+    print(text, file=sys.stderr)
+
 # -------------------------
 # Patched encode_folder with auto-grouping
 # -------------------------
@@ -356,10 +404,15 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
                   lum_factor=1.0, quality=85, harmonize_sf=False,
                   auto_group=True, std_log_thresh=0.15, break_ratio=1.25,
                   min_run_len=3, quantize=64, sample_size=3, workers=1):
+    """
+    Encode one volume. Returns (renames, errors) where renames is a list of
+    (old_path, new_path) for TIFFs that had a JPEG extension, and errors is a
+    list of "path: ExcType: message" strings for files that could not be encoded.
+    """
     files = glob(archive_folder + '/**/*', recursive=True)
     if len(files) == 0:
         logging.error("no file to encode in %s", archive_folder)
-        return
+        return [], []
 
     Path(images_folder).mkdir(parents=True, exist_ok=True)
     files = sorted(files)
@@ -379,7 +432,19 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
                 diag=diag,
             ),
         )
-        return
+        return [], []
+
+    renames = []
+    fixed_files = []
+    for f in img_files:
+        if _is_jpeg_path(f) and _header_is_tiff(f):
+            new_f = _rename_jpeg_tiff(f)
+            if new_f != f:
+                renames.append((f, new_f))
+            fixed_files.append(new_f)
+        else:
+            fixed_files.append(f)
+    img_files = fixed_files
 
     for f in files:
         if not is_img(f):
@@ -410,7 +475,19 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
         orig_shrink_factor = get_shrink_factor_for_files(img_files, orig_shrink_factor, quality=quality)
         logging.info("computed shrink factor %f for %s", orig_shrink_factor, archive_folder)
 
+    errors = []
+    err_lock = threading.Lock()
+
     def _encode_one(file):
+        try:
+            _encode_one_inner(file)
+        except Exception as e:
+            msg = "%s: %s: %s" % (file, type(e).__name__, e)
+            logging.error("encode failed: %s", msg)
+            with err_lock:
+                errors.append(msg)
+
+    def _encode_one_inner(file):
         rel = file[len(archive_folder):]
         filenoext = rel[:rel.rfind(".")]
         last4 = filenoext[-4:]
@@ -428,7 +505,20 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
         img_pil = None
 
         try:
-            if _is_jpeg_path(file):
+            # .jpg/.jpeg that is actually TIFF: rename, then decode and encode
+            # to JPEG (encode_img) before mozjpeg sees the bytes.
+            if _is_jpeg_path(file) and _header_is_tiff(file):
+                new_file = _rename_jpeg_tiff(file)
+                if new_file != file:
+                    with err_lock:
+                        renames.append((file, new_file))
+                    file = new_file
+                    rel = file[len(archive_folder):]
+                    filenoext = rel[:rel.rfind(".")]
+                    last4 = filenoext[-4:]
+                    file_stats = os.stat(file)
+                    file_size = file_stats.st_size
+            elif _is_jpeg_path(file):
                 with open(file, "rb") as f:
                     img_bytes = f.read()
                 img_bytes = mozjpeg_lossless_optimization.optimize(
@@ -452,7 +542,7 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
                     f.write(img_bytes)
                 return
 
-            if file_to_group_sf:
+            if file_to_group_sf and file in file_to_group_sf:
                 target_sf = file_to_group_sf[file]
             else:
                 target_sf = orig_shrink_factor
@@ -498,8 +588,9 @@ def encode_folder(archive_folder, images_folder, ilname, orig_shrink_factor=1.0,
     else:
         for file in tqdm(img_files, desc="encode"):
             _encode_one(file)
+    return renames, errors
 
-def download_prefix(argslist, workers=1):
+def download_prefix(argslist, workers=1, issue_log=None):
     dst_dir, s3prefix, wlname, ilname, shrink_factor, lum_factor = argslist[0], argslist[1], argslist[2], argslist[3], argslist[4], argslist[5]
     prefix = None
     if '-' in ilname and not ilname.endswith('-'):
@@ -562,7 +653,10 @@ def download_prefix(argslist, workers=1):
                 )
             )
             return [s3prefix, "noarchive"]
-    encode_folder(archive_dir, images_dir, ilname, shrink_factor, lum_factor, workers=workers)
+    renames, errors = encode_folder(archive_dir, images_dir, ilname, shrink_factor, lum_factor, workers=workers)
+    if issue_log is not None:
+        issue_log["renames"].extend(renames)
+        issue_log["errors"].extend(errors)
     if nbintropages > 0:
         shutil.copyfile("tbrcintropages/1.tif", archive_dir+ilname+"0001.tif")
         shutil.copyfile("tbrcintropages/2.tif", archive_dir+ilname+"0002.tif")
@@ -599,8 +693,15 @@ def postprocess_csv():
                 shrink_factor = float(row[3])
             normalized_todo_lines.append([dest_dir, folder, wlname, ilname, shrink_factor, lum_factor])
 
+    issue_log = {"renames": [], "errors": []}
     for tl in tqdm(normalized_todo_lines, desc="volumes"):
-        download_prefix(tl, workers=args.workers)
+        try:
+            download_prefix(tl, workers=args.workers, issue_log=issue_log)
+        except Exception as e:
+            msg = "%s: %s: %s" % (tl[1], type(e).__name__, e)
+            logging.exception("volume failed: %s", msg)
+            issue_log["errors"].append(msg)
+    _report_encode_issues(issue_log["renames"], issue_log["errors"])
     #filesuffix = datetime.now().strftime("%Y%m%d-%H%M%S")
     #ex = ParallelTaskExecutor(normalized_todo_lines, "done-process-"+filesuffix+".csv", download_prefix)
     #ex.run()
