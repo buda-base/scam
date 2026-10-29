@@ -151,14 +151,33 @@ def download_folder_into(s3prefix, dst_dir, bucket=BUCKET_NAME):
             os.makedirs(os.path.dirname(dest_fname))
         S3.download_file(bucket, obj_key, dest_fname)
 
+class VolumeSkipError(Exception):
+    """Data/API problem for one volume; CSV runner skips it and continues."""
+
+
 def get_nbintropages(wlname, ilname):
     global WINFOS_CACHE
     if wlname not in WINFOS_CACHE:
-        WINFOS_CACHE[wlname] = get_buda_scan_info(wlname)
+        try:
+            WINFOS_CACHE[wlname] = get_buda_scan_info(wlname)
+        except Exception as e:
+            WINFOS_CACHE[wlname] = None
+            raise VolumeSkipError(
+                "get_buda_scan_info(%s) failed: %s" % (wlname, e)
+            ) from e
     winfo = WINFOS_CACHE[wlname]
-    if ilname not in winfo["image_groups"]:
+    if not winfo or not isinstance(winfo, dict):
+        raise VolumeSkipError(
+            "no BUDA scan info for %s (get_buda_scan_info returned %r)" % (wlname, winfo)
+        )
+    image_groups = winfo.get("image_groups")
+    if image_groups is None:
+        raise VolumeSkipError(
+            "BUDA scan info for %s has image_groups=None" % wlname
+        )
+    if ilname not in image_groups:
         return 0
-    iginfo = winfo["image_groups"][ilname]
+    iginfo = image_groups[ilname] or {}
     if "volume_pages_bdrc_intro" in iginfo:
         logging.info("found %d intro pages for %s" % (iginfo["volume_pages_bdrc_intro"], ilname))
         return iginfo["volume_pages_bdrc_intro"]
@@ -694,17 +713,38 @@ def postprocess_csv():
             normalized_todo_lines.append([dest_dir, folder, wlname, ilname, shrink_factor, lum_factor])
 
     issue_log = {"renames": [], "errors": []}
+    ok_volumes = []
+    failed_volumes = []  # list of (folder, wlname, ilname, reason)
     for tl in tqdm(normalized_todo_lines, desc="volumes"):
+        dest_dir, folder, wlname, ilname = tl[0], tl[1], tl[2], tl[3]
         try:
             download_prefix(tl, workers=args.workers, issue_log=issue_log)
+            ok_volumes.append(folder)
+        except VolumeSkipError as e:
+            logging.error("SKIP VOLUME %s (%s/%s): %s", folder, wlname, ilname, e)
+            failed_volumes.append((folder, wlname, ilname, str(e)))
+            issue_log["errors"].append("%s: %s" % (folder, e))
         except Exception as e:
-            msg = "%s: %s: %s" % (tl[1], type(e).__name__, e)
+            msg = "%s: %s: %s" % (folder, type(e).__name__, e)
             logging.exception("volume failed: %s", msg)
+            failed_volumes.append((folder, wlname, ilname, "%s: %s" % (type(e).__name__, e)))
             issue_log["errors"].append(msg)
     _report_encode_issues(issue_log["renames"], issue_log["errors"])
-    #filesuffix = datetime.now().strftime("%Y%m%d-%H%M%S")
-    #ex = ParallelTaskExecutor(normalized_todo_lines, "done-process-"+filesuffix+".csv", download_prefix)
-    #ex.run()
+    print("")
+    print("=" * 72)
+    print("VOLUME SUMMARY")
+    print("=" * 72)
+    print("ok:     %d volume(s)" % len(ok_volumes))
+    print("failed: %d volume(s)" % len(failed_volumes))
+    if failed_volumes:
+        print("")
+        print("Failed volumes:")
+        for folder, wlname, ilname, reason in failed_volumes:
+            print("  - %s (%s / %s)" % (folder, wlname, ilname))
+            print("      %s" % reason)
+        print("=" * 72)
+        sys.exit(1)
+    print("=" * 72)
 
 if __name__ == '__main__':
     postprocess_csv()
